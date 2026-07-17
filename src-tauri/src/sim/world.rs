@@ -2,33 +2,55 @@ use std::f32::consts::TAU;
 
 use crate::snapshot::{TerrainSnapshot, TickSnapshot, VillagerView};
 
+use super::terrain::generate_terrain;
+
 const ORBIT_TICKS: f32 = 200.0;
 const ORBIT_RADIUS_FACTOR: f32 = 0.32;
+
+pub const DEFAULT_WIDTH: u32 = 128;
+pub const DEFAULT_HEIGHT: u32 = 128;
+pub const DEFAULT_TILE_SIZE: u32 = 32;
+pub const DEFAULT_SEED: u64 = 42;
 
 pub struct World {
     width: u32,
     height: u32,
     tile_size: u32,
     tiles: Vec<u8>,
+    #[allow(dead_code)]
+    seed: u64,
     tick: u64,
 }
 
 impl World {
-    pub fn checkerboard(width: u32, height: u32, tile_size: u32) -> Self {
-        let tiles = (0..height)
-            .flat_map(|y| (0..width).map(move |x| ((x + y) % 2) as u8))
-            .collect();
+    pub fn generate(width: u32, height: u32, tile_size: u32, seed: u64) -> Self {
+        let tiles = generate_terrain(width, height, seed);
         Self {
             width,
             height,
             tile_size,
             tiles,
+            seed,
             tick: 0,
         }
     }
 
+    pub fn default_world() -> Self {
+        Self::generate(
+            DEFAULT_WIDTH,
+            DEFAULT_HEIGHT,
+            DEFAULT_TILE_SIZE,
+            DEFAULT_SEED,
+        )
+    }
+
     pub fn advance(&mut self) {
         self.tick += 1;
+    }
+
+    #[cfg(test)]
+    pub fn seed(&self) -> u64 {
+        self.seed
     }
 
     pub fn terrain_snapshot(&self) -> TerrainSnapshot {
@@ -64,28 +86,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn checkerboard_has_expected_dimensions_and_layout() {
-        let world = World::checkerboard(4, 3, 32);
+    fn generated_world_has_expected_dimensions() {
+        let world = World::generate(16, 12, 32, 7);
         let terrain = world.terrain_snapshot();
 
-        assert_eq!(terrain.width, 4);
-        assert_eq!(terrain.height, 3);
+        assert_eq!(terrain.width, 16);
+        assert_eq!(terrain.height, 12);
         assert_eq!(terrain.tile_size, 32);
-        assert_eq!(terrain.tiles, vec![0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1]);
+        assert_eq!(terrain.tiles.len(), 16 * 12);
+        assert_eq!(world.seed(), 7);
     }
 
     #[test]
     fn villager_motion_is_deterministic_at_known_ticks() {
-        let mut world = World::checkerboard(32, 24, 32);
+        let mut world = World::default_world();
         let at_zero = world.tick_snapshot().villagers[0].clone();
         for _ in 0..50 {
             world.advance();
         }
         let at_quarter_turn = world.tick_snapshot().villagers[0].clone();
 
-        assert!((at_zero.x - 757.76).abs() < 0.01);
-        assert!((at_zero.y - 384.0).abs() < 0.01);
-        assert!((at_quarter_turn.x - 512.0).abs() < 0.01);
-        assert!((at_quarter_turn.y - 629.76).abs() < 0.01);
+        // 128 * 32 = 4096 world pixels; center 2048; radius 0.32 * 4096 = 1310.72
+        assert!((at_zero.x - (2048.0 + 1310.72)).abs() < 0.01);
+        assert!((at_zero.y - 2048.0).abs() < 0.01);
+        assert!((at_quarter_turn.x - 2048.0).abs() < 0.01);
+        assert!((at_quarter_turn.y - (2048.0 + 1310.72)).abs() < 0.01);
     }
 }

@@ -12,6 +12,7 @@ use tokio::sync::watch;
 use crate::snapshot::TickSnapshot;
 use world::World;
 
+pub mod terrain;
 pub mod world;
 
 const TICK_INTERVAL: Duration = Duration::from_millis(50);
@@ -66,7 +67,7 @@ mod tests {
 
     #[test]
     fn simulation_thread_publishes_a_later_tick() {
-        let world = World::checkerboard(4, 4, 32);
+        let world = World::generate(4, 4, 32, 1);
         let initial = world.tick_snapshot();
         let (sender, receiver) = watch::channel(initial);
         let runtime = start_simulation(world, sender);
