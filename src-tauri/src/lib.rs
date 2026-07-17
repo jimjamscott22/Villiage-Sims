@@ -23,7 +23,7 @@ fn forward_snapshots(app: tauri::AppHandle, mut snapshots: watch::Receiver<TickS
 pub fn run() {
     let app = tauri::Builder::default()
         .setup(|app| {
-            let world = World::checkerboard(32, 24, 32);
+            let world = World::default_world();
             let terrain = world.terrain_snapshot();
             let (sender, receiver) = watch::channel(world.tick_snapshot());
 
@@ -32,7 +32,10 @@ pub fn run() {
             forward_snapshots(app.handle().clone(), receiver);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![commands::get_terrain])
+        .invoke_handler(tauri::generate_handler![
+            commands::get_terrain,
+            commands::set_viewport
+        ])
         .build(tauri::generate_context!())
         .expect("failed to build VillageSim");
 

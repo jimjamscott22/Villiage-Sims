@@ -1,6 +1,15 @@
 import type { TerrainSnapshot } from '../state/types';
 
-const COLORS = ['#7aa35a', '#66904f'];
+/** Colors indexed by Terrain enum byte values. */
+const COLORS = [
+  '#1b3a5a', // DeepWater
+  '#3d7ea6', // ShallowWater
+  '#c2b280', // Sand
+  '#5f8f45', // Grass
+  '#2f6b38', // Forest
+  '#7a7a7a', // Rock
+  '#d8d8d8', // Mountain
+];
 
 export function drawTerrain(ctx: CanvasRenderingContext2D, terrain: TerrainSnapshot): void {
   for (let index = 0; index < terrain.tiles.length; index += 1) {

@@ -11,11 +11,13 @@ npm install
 npm run tauri dev
 ```
 
-Browser-only rendering demo:
+Browser-only rendering demo (deterministic island + camera):
 
 ```bash
 npm run dev
 ```
+
+Controls: drag to pan, scroll wheel to zoom (cursor-anchored), `F` for fullscreen.
 
 Focused checks:
 

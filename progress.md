@@ -1,12 +1,17 @@
-Original prompt: Can you read the file docs/villagesim-spec.md and begin to implement the code locally on main?
-
-Scope was narrowed and approved as Milestone 1 only; implementation is deferred to a stronger computer.
+# VillageSim progress
 
 ## Current milestone
 
-- Implement M1 from `docs/superpowers/plans/2026-07-16-milestone-1.md`.
-- Keep Rust authoritative and the browser adapter test-only.
+- Milestone 1 complete on `main` (sim pipe, checkerboard, interpolated villager).
+- Milestone 2 in progress: seeded island terrain + camera pan/zoom.
+
+## M2 notes
+
+- Rust generates `128×128` terrain with the `noise` crate (seed `42`).
+- Frontend camera: drag to pan, wheel zoom (cursor-anchored), edge-scroll.
+- Browser-demo transport uses a deterministic island (same thresholds; not byte-identical to Rust).
 
 ## Next milestone
 
-- Do not begin M2 until M1 is runnable and demoable.
+- Do not begin M3 (building placement) until M2 is runnable and demoable.
+- Re-read `docs/villagesim-spec.md` and write/approve an M3 design before implementation.
