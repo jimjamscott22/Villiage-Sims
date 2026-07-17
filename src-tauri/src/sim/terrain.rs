@@ -62,9 +62,9 @@ pub fn generate_terrain(width: u32, height: u32, seed: u64) -> Vec<u8> {
             let dx = (nx - center_x) / max_radius;
             let dy = (ny - center_y) / max_radius;
             let dist = (dx * dx + dy * dy).sqrt().clamp(0.0, 1.0);
-            // Circular island mask: subtract distance so coasts form near the rim
-            // and interior peaks can still reach rock/mountain thresholds.
-            let elev = (raw_elev * 0.65 + 0.35 - dist * 0.85).clamp(0.0, 1.0);
+            // Strong radial mask: ocean at the rim, contiguous landmass in the center.
+            let mask = (1.0 - dist).max(0.0).powf(1.35);
+            let elev = (raw_elev * 0.55 + 0.45) * mask;
 
             tiles.push(classify(elev, raw_moist) as u8);
         }

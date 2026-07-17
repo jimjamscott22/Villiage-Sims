@@ -74,8 +74,9 @@ export function generateDemoTerrain(
     for (let x = 0; x < width; x += 1) {
       const rawElev = fbm(x, y, seed);
       const rawMoist = fbm(x + 1000, y + 1000, seed + 91);
-      const dist = Math.hypot((x - centerX) / maxRadius, (y - centerY) / maxRadius);
-      const elev = Math.min(1, Math.max(0, rawElev * 0.65 + 0.35 - dist * 0.85));
+      const dist = Math.min(1, Math.hypot((x - centerX) / maxRadius, (y - centerY) / maxRadius));
+      const mask = Math.pow(Math.max(0, 1 - dist), 1.35);
+      const elev = (rawElev * 0.55 + 0.45) * mask;
       tiles[y * width + x] = classify(elev, rawMoist);
     }
   }

@@ -35,6 +35,14 @@ export class Camera {
     this.y = wy - sy / this.zoom;
   }
 
+  /** Fit the world in the viewport with a small margin, centered. */
+  fitWorld(worldWidth: number, worldHeight: number, viewWidth: number, viewHeight: number, margin = 0.92): void {
+    const zoomX = viewWidth / worldWidth;
+    const zoomY = viewHeight / worldHeight;
+    this.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.min(zoomX, zoomY) * margin));
+    this.centerOnWorld(worldWidth, worldHeight, viewWidth, viewHeight);
+  }
+
   /** Center the camera on a world-sized map given the viewport size in CSS pixels. */
   centerOnWorld(worldWidth: number, worldHeight: number, viewWidth: number, viewHeight: number): void {
     this.x = (worldWidth - viewWidth / this.zoom) / 2;

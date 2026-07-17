@@ -24,10 +24,18 @@ describe('Camera', () => {
     expect(camera.zoom).toBe(MAX_ZOOM);
   });
 
-  it('pans in world units scaled by zoom', () => {
-    const camera = new Camera(0, 0, 2);
-    camera.panBy(40, -20);
-    expect(camera.x).toBe(-20);
-    expect(camera.y).toBe(10);
+  it('fits the world into the viewport, clamped to min zoom', () => {
+    const camera = new Camera();
+    camera.fitWorld(4096, 4096, 1280, 800);
+    // Ideal fit for height is ~0.18, so we clamp to MIN_ZOOM.
+    expect(camera.zoom).toBe(MIN_ZOOM);
+    expect(camera.x).toBeCloseTo((4096 - 1280 / camera.zoom) / 2, 5);
+    expect(camera.y).toBeCloseTo((4096 - 800 / camera.zoom) / 2, 5);
+  });
+
+  it('fits a smaller world without hitting the clamp', () => {
+    const camera = new Camera();
+    camera.fitWorld(1024, 768, 1280, 800);
+    expect(camera.zoom).toBeCloseTo(Math.min(1280 / 1024, 800 / 768) * 0.92, 5);
   });
 });

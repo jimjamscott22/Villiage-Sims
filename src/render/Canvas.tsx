@@ -73,7 +73,7 @@ export function Canvas() {
       canvas.style.width = `${viewWidth}px`;
       canvas.style.height = `${viewHeight}px`;
       if (terrain && worldWidth > 0 && !cameraCentered) {
-        camera.centerOnWorld(worldWidth, worldHeight, viewWidth, viewHeight);
+        camera.fitWorld(worldWidth, worldHeight, viewWidth, viewHeight);
         cameraCentered = true;
         scheduleViewportSync();
       }
@@ -101,7 +101,7 @@ export function Canvas() {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(terrainLayer, 0, 0);
       rendered = buffer.interpolate(now, TICK_MS);
-      if (rendered) drawVillagers(ctx, rendered.villagers);
+      if (rendered) drawVillagers(ctx, rendered.villagers, camera.zoom);
     };
 
     const animate = (now: number) => {
