@@ -27,6 +27,11 @@ export class SnapshotBuffer {
       };
     });
 
-    return { tick: this.current.tick, villagers };
+    return {
+      tick: this.current.tick,
+      villagers,
+      buildings: this.current.buildings,
+      resources: this.current.resources,
+    };
   }
 }

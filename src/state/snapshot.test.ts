@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { SnapshotBuffer } from './snapshot';
+import type { ResourceTotals, TickSnapshot } from './types';
 
-const tick = (number: number, x: number) => ({
+const resources: ResourceTotals = { wood: 120, stone: 40, grain: 0, food: 0, gold: 0 };
+
+const tick = (number: number, x: number): TickSnapshot => ({
   tick: number,
   villagers: [{ id: 1, x, y: 20 }],
+  buildings: [{ id: 9, kind: 0, x: 1, y: 2, rot: 0, state: 2, progress: 100 }],
+  resources,
 });
 
 describe('SnapshotBuffer', () => {
@@ -28,5 +33,13 @@ describe('SnapshotBuffer', () => {
     buffer.push(tick(2, 20), 1000);
 
     expect(buffer.interpolate(1100, 50)?.villagers[0].x).toBe(20);
+  });
+
+  it('passes buildings and resources through without interpolation', () => {
+    const buffer = new SnapshotBuffer();
+    buffer.push(tick(1, 10), 1000);
+    const rendered = buffer.interpolate(1025, 50);
+    expect(rendered?.buildings).toEqual(tick(1, 10).buildings);
+    expect(rendered?.resources.wood).toBe(120);
   });
 });

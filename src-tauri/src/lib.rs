@@ -2,6 +2,8 @@ mod commands;
 mod sim;
 mod snapshot;
 
+use std::sync::mpsc;
+
 use commands::AppState;
 use sim::{SimRuntime, start_simulation, world::World};
 use snapshot::TickSnapshot;
@@ -25,16 +27,22 @@ pub fn run() {
         .setup(|app| {
             let world = World::default_world();
             let terrain = world.terrain_snapshot();
-            let (sender, receiver) = watch::channel(world.tick_snapshot());
+            let catalog = world.catalog().clone();
+            let (snapshot_tx, snapshot_rx) = watch::channel(world.tick_snapshot());
+            let (command_tx, command_rx) = mpsc::channel();
 
-            app.manage(AppState::new(terrain));
-            app.manage(start_simulation(world, sender));
-            forward_snapshots(app.handle().clone(), receiver);
+            app.manage(AppState::new(terrain, catalog, command_tx));
+            app.manage(start_simulation(world, snapshot_tx, command_rx));
+            forward_snapshots(app.handle().clone(), snapshot_rx);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_terrain,
-            commands::set_viewport
+            commands::get_catalog,
+            commands::set_viewport,
+            commands::validate_placement,
+            commands::place_building,
+            commands::demolish
         ])
         .build(tauri::generate_context!())
         .expect("failed to build VillageSim");

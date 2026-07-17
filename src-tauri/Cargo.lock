@@ -3621,6 +3621,7 @@ version = "0.1.0"
 dependencies = [
  "noise",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tokio",

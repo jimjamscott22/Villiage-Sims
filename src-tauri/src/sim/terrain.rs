@@ -14,7 +14,6 @@ pub enum Terrain {
 }
 
 impl Terrain {
-    #[cfg(test)]
     pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0 => Some(Self::DeepWater),
