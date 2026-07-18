@@ -411,7 +411,18 @@ export function Canvas({
       void refreshGhost();
     };
 
-    const onContextMenu = (event: Event) => event.preventDefault();
+    const onContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+      if (!terrain) return;
+      const bounds = canvas.getBoundingClientRect();
+      pointerX = event.clientX - bounds.left;
+      pointerY = event.clientY - bounds.top;
+      const tile = tileAtPointer();
+      if (!tile) return;
+      void transport.moveVillagerTo(tile[0], tile[1]).catch((cause) => {
+        fail(cause instanceof Error ? cause.message : String(cause));
+      });
+    };
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('resize', resize);
@@ -452,7 +463,9 @@ export function Canvas({
       />
       <span className="pointer-events-none absolute bottom-3 right-3 bg-black/55 px-2 py-1 text-xs text-white/70">
         Tick {tick}
-        {selectedKind ? ' · build mode' : ' · drag to pan · scroll to zoom'}
+        {selectedKind
+          ? ' · build mode'
+          : ' · drag to pan · scroll to zoom · right-click to move'}
       </span>
       {error && (
         <p role="alert" className="absolute inset-x-4 top-4 bg-red-950/90 p-3 text-sm text-red-100">

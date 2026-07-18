@@ -15,9 +15,11 @@ use crate::snapshot::TickSnapshot;
 use commands::SimCommand;
 use world::World;
 
+pub mod agents;
 pub mod buildings;
 pub mod catalog;
 pub mod commands;
+pub mod pathfind;
 pub mod resources;
 pub mod terrain;
 pub mod world;
