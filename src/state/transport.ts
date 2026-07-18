@@ -122,3 +122,14 @@ export const transport: Transport = isTauri() ? tauriTransport : browserTranspor
 export function advanceDemoTime(ms: number): void {
   if (transport.mode === 'browser-demo') browserTransport.advance(ms);
 }
+
+declare global {
+  interface Window {
+    __villageTransport?: Transport;
+  }
+}
+
+// Expose the live transport for cloud/browser smoke tests (same instance as Canvas).
+if (typeof window !== 'undefined' && transport.mode === 'browser-demo') {
+  window.__villageTransport = transport;
+}
