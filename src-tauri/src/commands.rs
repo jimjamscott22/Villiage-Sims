@@ -1,38 +1,30 @@
+use std::sync::mpsc;
+
 use tauri::State;
+use tokio::sync::oneshot;
 
+use crate::sim::buildings::{PlacementResult, PlacementValidity};
+use crate::sim::catalog::Catalog;
+use crate::sim::commands::SimCommand;
 use crate::snapshot::TerrainSnapshot;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Viewport {
-    pub x: f32,
-    pub y: f32,
-    pub w: f32,
-    pub h: f32,
-}
 
 pub struct AppState {
     terrain: TerrainSnapshot,
-    viewport: std::sync::Mutex<Viewport>,
+    catalog: Catalog,
+    commands: mpsc::Sender<SimCommand>,
 }
 
 impl AppState {
-    pub fn new(terrain: TerrainSnapshot) -> Self {
-        let w = terrain.width as f32 * terrain.tile_size as f32;
-        let h = terrain.height as f32 * terrain.tile_size as f32;
+    pub fn new(
+        terrain: TerrainSnapshot,
+        catalog: Catalog,
+        commands: mpsc::Sender<SimCommand>,
+    ) -> Self {
         Self {
             terrain,
-            viewport: std::sync::Mutex::new(Viewport {
-                x: 0.0,
-                y: 0.0,
-                w,
-                h,
-            }),
+            catalog,
+            commands,
         }
-    }
-
-    #[cfg(test)]
-    pub fn viewport(&self) -> Viewport {
-        *self.viewport.lock().expect("viewport lock poisoned")
     }
 }
 
@@ -42,41 +34,95 @@ pub(crate) fn get_terrain(state: State<'_, AppState>) -> TerrainSnapshot {
 }
 
 #[tauri::command]
+pub(crate) fn get_catalog(state: State<'_, AppState>) -> Catalog {
+    state.catalog.clone()
+}
+
+#[tauri::command]
 pub(crate) fn set_viewport(state: State<'_, AppState>, x: f32, y: f32, w: f32, h: f32) {
-    let mut viewport = state.viewport.lock().expect("viewport lock poisoned");
-    *viewport = Viewport { x, y, w, h };
+    let _ = state.commands.send(SimCommand::SetViewport { x, y, w, h });
+}
+
+#[tauri::command]
+pub(crate) async fn validate_placement(
+    state: State<'_, AppState>,
+    kind: String,
+    x: i32,
+    y: i32,
+    rotation: u8,
+) -> Result<PlacementValidity, String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::ValidatePlacement {
+            kind,
+            x,
+            y,
+            rotation,
+            reply,
+        })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped placement validation".to_string())
+}
+
+#[tauri::command]
+pub(crate) async fn place_building(
+    state: State<'_, AppState>,
+    kind: String,
+    x: i32,
+    y: i32,
+    rotation: u8,
+) -> Result<PlacementResult, String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::PlaceBuilding {
+            kind,
+            x,
+            y,
+            rotation,
+            reply,
+        })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped place_building".to_string())?
+}
+
+#[tauri::command]
+pub(crate) async fn demolish(state: State<'_, AppState>, entity_id: u32) -> Result<(), String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::Demolish { entity_id, reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped demolish".to_string())?
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sim::catalog::Catalog;
     use crate::snapshot::TerrainSnapshot;
+    use std::sync::mpsc;
 
     #[test]
-    fn set_viewport_updates_stored_bounds() {
-        let state = AppState::new(TerrainSnapshot {
-            width: 4,
-            height: 4,
-            tile_size: 32,
-            tiles: vec![0; 16],
-        });
-        {
-            let mut viewport = state.viewport.lock().unwrap();
-            *viewport = Viewport {
-                x: 10.0,
-                y: 20.0,
-                w: 100.0,
-                h: 80.0,
-            };
-        }
-        assert_eq!(
-            state.viewport(),
-            Viewport {
-                x: 10.0,
-                y: 20.0,
-                w: 100.0,
-                h: 80.0
-            }
+    fn app_state_holds_catalog() {
+        let (tx, _rx) = mpsc::channel();
+        let state = AppState::new(
+            TerrainSnapshot {
+                width: 4,
+                height: 4,
+                tile_size: 32,
+                tiles: vec![0; 16],
+            },
+            Catalog::load_builtin().unwrap(),
+            tx,
         );
+        assert_eq!(state.catalog.buildings.len(), 3);
     }
 }

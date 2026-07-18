@@ -20,6 +20,8 @@ VillageSim is a Tauri 2 desktop app: an authoritative Rust simulation (`src-taur
   when the URL has `?test=1` so time only advances via `advanceTime`.
 - Camera: drag to pan, wheel to zoom (cursor-anchored). `render_game_to_text()` includes camera
   state (`x`, `y`, `zoom`, viewport size).
+- Build mode (M3): select a building in the right-hand menu, click the map to place, `R` rotates,
+  `Esc` cancels. Click a placed building then Demolish (or Delete) to refund its cost.
 
 ### Non-obvious gotchas
 

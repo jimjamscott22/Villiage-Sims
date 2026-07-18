@@ -2,6 +2,7 @@ use std::{
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
+        mpsc,
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -10,8 +11,14 @@ use std::{
 use tokio::sync::watch;
 
 use crate::snapshot::TickSnapshot;
+
+use commands::SimCommand;
 use world::World;
 
+pub mod buildings;
+pub mod catalog;
+pub mod commands;
+pub mod resources;
 pub mod terrain;
 pub mod world;
 
@@ -37,12 +44,19 @@ impl Drop for SimRuntime {
     }
 }
 
-pub fn start_simulation(mut world: World, snapshots: watch::Sender<TickSnapshot>) -> SimRuntime {
+pub fn start_simulation(
+    mut world: World,
+    snapshots: watch::Sender<TickSnapshot>,
+    commands: mpsc::Receiver<SimCommand>,
+) -> SimRuntime {
     let stop = Arc::new(AtomicBool::new(false));
     let thread_stop = Arc::clone(&stop);
     let worker = thread::spawn(move || {
         while !thread_stop.load(Ordering::Relaxed) {
             let deadline = Instant::now() + TICK_INTERVAL;
+            while let Ok(command) = commands.try_recv() {
+                world.handle_command(command);
+            }
             world.advance();
             snapshots.send_replace(world.tick_snapshot());
             if let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
@@ -59,7 +73,7 @@ pub fn start_simulation(mut world: World, snapshots: watch::Sender<TickSnapshot>
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{sync::mpsc, time::Duration};
 
     use tokio::sync::watch;
 
@@ -70,7 +84,8 @@ mod tests {
         let world = World::generate(4, 4, 32, 1);
         let initial = world.tick_snapshot();
         let (sender, receiver) = watch::channel(initial);
-        let runtime = start_simulation(world, sender);
+        let (_command_tx, command_rx) = mpsc::channel();
+        let runtime = start_simulation(world, sender, command_rx);
 
         std::thread::sleep(Duration::from_millis(70));
         let observed = receiver.borrow().tick;

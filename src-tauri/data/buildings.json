@@ -1,0 +1,35 @@
+[
+  {
+    "id": "hut",
+    "name": "Hut",
+    "footprint": [1, 1],
+    "cost": { "wood": 20 },
+    "build_ticks": 40,
+    "category": "housing",
+    "houses": 2,
+    "valid_terrain": ["grass", "sand"],
+    "jobs": []
+  },
+  {
+    "id": "farm",
+    "name": "Farm Plot",
+    "footprint": [3, 3],
+    "cost": { "wood": 10 },
+    "build_ticks": 30,
+    "category": "production",
+    "valid_terrain": ["grass"],
+    "jobs": [{ "kind": "tend_crops", "slots": 2 }]
+  },
+  {
+    "id": "granary",
+    "name": "Granary",
+    "footprint": [2, 2],
+    "cost": { "wood": 40, "stone": 10 },
+    "build_ticks": 60,
+    "category": "storage",
+    "stores": ["food"],
+    "capacity": 500,
+    "valid_terrain": ["grass", "sand"],
+    "jobs": [{ "kind": "haul", "slots": 1 }]
+  }
+]

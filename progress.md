@@ -2,18 +2,19 @@
 
 ## Current milestone
 
-- Milestone 1 complete on `main` (sim pipe, checkerboard, interpolated villager).
-- Milestone 2 complete on branch `jimjamscott22/milestone-2-terrain-camera-8d49`.
+- Milestone 1–2 complete on `main`.
+- Milestone 3 complete on branch `jimjamscott22/milestone-3-building-placement-8d49`.
 
-## M2 completion
+## M3 completion
 
-- Rust generates `128×128` terrain with the `noise` crate (seed `42`); reproducible island with water, sand, grass/forest, rock/mountain.
-- Frontend camera: drag/edge-scroll pan, cursor-anchored wheel zoom (`0.25…4.0`), initial fit-to-world.
-- `set_viewport` IPC records camera frustum for M3+ culling.
-- Browser-demo transport uses a deterministic island (same thresholds; not byte-identical to Rust).
-- Verified: `cargo test --lib` (8), `npm test` (9), `npm run build`, browser smoke screenshots.
+- `buildings.json` catalog (hut/farm/granary) with `get_catalog`.
+- Command channel: `validate_placement`, `place_building`, `demolish`, `set_viewport`.
+- Tick snapshots include buildings + resources; construction auto-progresses.
+- BuildMenu + ghost preview; demolish with full refund.
+- Browser smoke: place hut (wood 120→100), demolish (wood→120).
+- Verified: `cargo test --lib` (14), `npm test` (12), `npm run build`.
 
 ## Next milestone
 
-- Do not begin M3 (building placement) until this PR is merged and demoed.
-- Re-read `docs/villagesim-spec.md` and write/approve an M3 design before implementation.
+- Do not begin M4 (pathfinding / villager FSM) until this PR is merged.
+- Re-read `docs/villagesim-spec.md` and write/approve an M4 design before implementation.
