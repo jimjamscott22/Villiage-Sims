@@ -347,10 +347,30 @@ impl World {
     }
 
     fn find_walkable_near(&self, cx: i32, cy: i32) -> Option<(i32, i32)> {
-        if self.is_passable(cx, cy) {
+        // Prefer a connected walkable tile (has a passable neighbor) so the
+        // villager is not stranded on an isolated forest/rock pocket.
+        if self.is_spawn_candidate(cx, cy) {
             return Some((cx, cy));
         }
         let max_r = self.width.max(self.height) as i32;
+        for r in 1..=max_r {
+            for dy in -r..=r {
+                for dx in -r..=r {
+                    if dx.abs() != r && dy.abs() != r {
+                        continue;
+                    }
+                    let x = cx + dx;
+                    let y = cy + dy;
+                    if self.is_spawn_candidate(x, y) {
+                        return Some((x, y));
+                    }
+                }
+            }
+        }
+        // Fallback: any passable tile if the map has no connected land.
+        if self.is_passable(cx, cy) {
+            return Some((cx, cy));
+        }
         for r in 1..=max_r {
             for dy in -r..=r {
                 for dx in -r..=r {
@@ -366,6 +386,18 @@ impl World {
             }
         }
         None
+    }
+
+    fn is_spawn_candidate(&self, x: i32, y: i32) -> bool {
+        if !self.is_passable(x, y) {
+            return false;
+        }
+        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            if self.is_passable(x + dx, y + dy) {
+                return true;
+            }
+        }
+        false
     }
 
     fn building_views(&self) -> Vec<BuildingView> {
@@ -553,6 +585,10 @@ mod tests {
         assert_eq!(snap.villagers[0].state, 0);
         let (tx, ty) = world.pos_to_tile(world.villager().pos);
         assert!(world.is_passable(tx, ty));
+        assert!(
+            world.is_spawn_candidate(tx, ty),
+            "spawn ({tx},{ty}) should have a passable neighbor"
+        );
         // Idle villager does not drift across ticks.
         let mut world = world;
         let before = world.villager().pos;

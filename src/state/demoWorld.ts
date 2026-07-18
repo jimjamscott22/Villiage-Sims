@@ -343,8 +343,20 @@ export class DemoWorld {
   }
 
   private findWalkableNear(cx: number, cy: number): [number, number] | null {
-    if (this.isPassable(cx, cy)) return [cx, cy];
+    // Prefer a connected walkable tile so the agent is not stranded.
+    if (this.isSpawnCandidate(cx, cy)) return [cx, cy];
     const maxR = Math.max(this.terrain.width, this.terrain.height);
+    for (let r = 1; r <= maxR; r += 1) {
+      for (let dy = -r; dy <= r; dy += 1) {
+        for (let dx = -r; dx <= r; dx += 1) {
+          if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+          const x = cx + dx;
+          const y = cy + dy;
+          if (this.isSpawnCandidate(x, y)) return [x, y];
+        }
+      }
+    }
+    if (this.isPassable(cx, cy)) return [cx, cy];
     for (let r = 1; r <= maxR; r += 1) {
       for (let dy = -r; dy <= r; dy += 1) {
         for (let dx = -r; dx <= r; dx += 1) {
@@ -356,6 +368,16 @@ export class DemoWorld {
       }
     }
     return null;
+  }
+
+  private isSpawnCandidate(x: number, y: number): boolean {
+    if (!this.isPassable(x, y)) return false;
+    return (
+      this.isPassable(x + 1, y)
+      || this.isPassable(x - 1, y)
+      || this.isPassable(x, y + 1)
+      || this.isPassable(x, y - 1)
+    );
   }
 
   private buildingViews(): BuildingView[] {
