@@ -1,19 +1,21 @@
-use std::f32::consts::TAU;
-
 use crate::snapshot::{BuildingView, TerrainSnapshot, TickSnapshot, VillagerView};
 
+use super::agents::{
+    AgentState, MOVE_SPEED_TILES_PER_SEC, MovePurpose, REPATH_COOLDOWN_TICKS, Villager,
+};
 use super::buildings::{
     BuildState, Building, PlacementResult, PlacementValidity, footprint_tiles, rotated_footprint,
     terrain_allowed,
 };
 use super::catalog::Catalog;
 use super::commands::SimCommand;
+use super::pathfind::{find_path, terrain_passable};
 use super::resources::ResourceTotals;
 use super::terrain::{Terrain, generate_terrain};
 
-const ORBIT_TICKS: f32 = 200.0;
-const ORBIT_RADIUS_FACTOR: f32 = 0.32;
 const VIEWPORT_MARGIN_TILES: f32 = 4.0;
+const TICKS_PER_SECOND: f32 = 20.0;
+const ARRIVE_EPSILON_PX: f32 = 0.5;
 
 pub const DEFAULT_WIDTH: u32 = 128;
 pub const DEFAULT_HEIGHT: u32 = 128;
@@ -41,6 +43,7 @@ pub struct World {
     occupancy: Vec<Option<u32>>,
     resources: ResourceTotals,
     next_building_id: u32,
+    villager: Villager,
     viewport: Viewport,
 }
 
@@ -50,7 +53,7 @@ impl World {
         let occupancy = vec![None; (width * height) as usize];
         let world_w = width as f32 * tile_size as f32;
         let world_h = height as f32 * tile_size as f32;
-        Self {
+        let mut world = Self {
             width,
             height,
             tile_size,
@@ -62,13 +65,19 @@ impl World {
             occupancy,
             resources: ResourceTotals::starting(),
             next_building_id: 1,
+            villager: Villager::new(1, (0.0, 0.0)),
             viewport: Viewport {
                 x: 0.0,
                 y: 0.0,
                 w: world_w,
                 h: world_h,
             },
-        }
+        };
+        let spawn = world
+            .find_walkable_near(width as i32 / 2, height as i32 / 2)
+            .unwrap_or((width as i32 / 2, height as i32 / 2));
+        world.villager.pos = world.tile_center(spawn.0, spawn.1);
+        world
     }
 
     pub fn default_world() -> Self {
@@ -113,6 +122,10 @@ impl World {
                 let result = self.demolish(entity_id);
                 let _ = reply.send(result);
             }
+            SimCommand::MoveVillagerTo { x, y, reply } => {
+                let result = self.order_move(x, y);
+                let _ = reply.send(result);
+            }
         }
     }
 
@@ -130,6 +143,7 @@ impl World {
                 self.buildings[index].state = BuildState::Complete;
             }
         }
+        self.tick_villager();
     }
 
     #[cfg(test)]
@@ -147,6 +161,11 @@ impl World {
         &self.buildings
     }
 
+    #[cfg(test)]
+    pub fn villager(&self) -> &Villager {
+        &self.villager
+    }
+
     pub fn terrain_snapshot(&self) -> TerrainSnapshot {
         TerrainSnapshot {
             width: self.width,
@@ -157,23 +176,228 @@ impl World {
     }
 
     pub fn tick_snapshot(&self) -> TickSnapshot {
-        let world_width = self.width as f32 * self.tile_size as f32;
-        let world_height = self.height as f32 * self.tile_size as f32;
-        let center_x = world_width / 2.0;
-        let center_y = world_height / 2.0;
-        let radius = world_width.min(world_height) * ORBIT_RADIUS_FACTOR;
-        let angle = self.tick as f32 * TAU / ORBIT_TICKS;
-
         TickSnapshot {
             tick: self.tick,
             villagers: vec![VillagerView {
-                id: 1,
-                x: center_x + angle.cos() * radius,
-                y: center_y + angle.sin() * radius,
+                id: self.villager.id,
+                x: self.villager.pos.0,
+                y: self.villager.pos.1,
+                state: self.villager.state.as_u8(),
             }],
             buildings: self.building_views(),
             resources: self.resources.clone(),
         }
+    }
+
+    pub fn order_move(&mut self, x: i32, y: i32) -> Result<(), String> {
+        if !self.in_bounds(x, y) {
+            return Err("out of bounds".into());
+        }
+        if !self.is_passable(x, y) {
+            return Err("tile impassable".into());
+        }
+        let start = self.pos_to_tile(self.villager.pos);
+        let path = self
+            .compute_path(start, (x, y))
+            .ok_or_else(|| "no path".to_string())?;
+        self.villager.state = AgentState::MovingTo {
+            target: (x, y),
+            purpose: MovePurpose::PlayerOrder,
+        };
+        self.villager.path = Some(path);
+        self.villager.repath_cooldown = 0;
+        Ok(())
+    }
+
+    fn tick_villager(&mut self) {
+        if self.villager.repath_cooldown > 0 {
+            self.villager.repath_cooldown -= 1;
+        }
+
+        let AgentState::MovingTo { target, .. } = self.villager.state else {
+            return;
+        };
+
+        if self.path_is_blocked(target) {
+            self.try_repath(target);
+            if !matches!(self.villager.state, AgentState::MovingTo { .. }) {
+                return;
+            }
+        }
+
+        if self.villager.path.as_ref().is_none_or(|path| path.is_empty()) {
+            // Already at/near goal with an empty path.
+            let start = self.pos_to_tile(self.villager.pos);
+            if start == target {
+                self.villager.clear_path_to_idle();
+                return;
+            }
+            self.try_repath(target);
+            if self.villager.path.as_ref().is_none_or(|path| path.is_empty()) {
+                return;
+            }
+        }
+
+        let speed_px = MOVE_SPEED_TILES_PER_SEC * self.tile_size as f32 / TICKS_PER_SECOND;
+        let Some(next) = self
+            .villager
+            .path
+            .as_ref()
+            .and_then(|path| path.first().copied())
+        else {
+            return;
+        };
+        let (cx, cy) = self.tile_center(next.0, next.1);
+        let dx = cx - self.villager.pos.0;
+        let dy = cy - self.villager.pos.1;
+        let dist = (dx * dx + dy * dy).sqrt();
+        if dist <= speed_px || dist <= ARRIVE_EPSILON_PX {
+            self.villager.pos = (cx, cy);
+            if let Some(path) = self.villager.path.as_mut() {
+                path.remove(0);
+                if path.is_empty() {
+                    self.villager.clear_path_to_idle();
+                }
+            }
+        } else {
+            self.villager.pos.0 += dx / dist * speed_px;
+            self.villager.pos.1 += dy / dist * speed_px;
+        }
+    }
+
+    fn try_repath(&mut self, target: (i32, i32)) {
+        if self.villager.repath_cooldown > 0 {
+            self.villager.clear_path_to_idle();
+            return;
+        }
+        let start = self.pos_to_tile(self.villager.pos);
+        match self.compute_path(start, target) {
+            Some(path) => {
+                self.villager.path = Some(path);
+                self.villager.state = AgentState::MovingTo {
+                    target,
+                    purpose: MovePurpose::PlayerOrder,
+                };
+            }
+            None => {
+                self.villager.clear_path_to_idle();
+                self.villager.repath_cooldown = REPATH_COOLDOWN_TICKS;
+            }
+        }
+    }
+
+    fn path_is_blocked(&self, target: (i32, i32)) -> bool {
+        if !self.is_passable(target.0, target.1) {
+            return true;
+        }
+        match &self.villager.path {
+            Some(path) => path.iter().any(|&(x, y)| !self.is_passable(x, y)),
+            None => false,
+        }
+    }
+
+    fn invalidate_path_if_needed(&mut self) {
+        let Some(target) = self.villager.target_tile() else {
+            return;
+        };
+        if self.path_is_blocked(target) {
+            self.try_repath(target);
+        }
+    }
+
+    fn compute_path(&self, start: (i32, i32), goal: (i32, i32)) -> Option<Vec<(i32, i32)>> {
+        let width = self.width as i32;
+        let height = self.height as i32;
+        // Always allow the villager's current tile so they can path out if a
+        // building was placed on top of them.
+        find_path(start, goal, width, height, &|x, y| {
+            (x, y) == start || self.is_passable(x, y)
+        })
+    }
+
+    fn is_passable(&self, x: i32, y: i32) -> bool {
+        if !self.in_bounds(x, y) {
+            return false;
+        }
+        let index = (y as u32 * self.width + x as u32) as usize;
+        if self.occupancy[index].is_some() {
+            return false;
+        }
+        let terrain = Terrain::from_u8(self.tiles[index]).unwrap_or(Terrain::DeepWater);
+        terrain_passable(terrain)
+    }
+
+    fn in_bounds(&self, x: i32, y: i32) -> bool {
+        x >= 0 && y >= 0 && x < self.width as i32 && y < self.height as i32
+    }
+
+    fn tile_center(&self, x: i32, y: i32) -> (f32, f32) {
+        let tile = self.tile_size as f32;
+        ((x as f32 + 0.5) * tile, (y as f32 + 0.5) * tile)
+    }
+
+    fn pos_to_tile(&self, pos: (f32, f32)) -> (i32, i32) {
+        let tile = self.tile_size as f32;
+        let x = (pos.0 / tile).floor() as i32;
+        let y = (pos.1 / tile).floor() as i32;
+        (
+            x.clamp(0, self.width.saturating_sub(1) as i32),
+            y.clamp(0, self.height.saturating_sub(1) as i32),
+        )
+    }
+
+    fn find_walkable_near(&self, cx: i32, cy: i32) -> Option<(i32, i32)> {
+        // Prefer a connected walkable tile (has a passable neighbor) so the
+        // villager is not stranded on an isolated forest/rock pocket.
+        if self.is_spawn_candidate(cx, cy) {
+            return Some((cx, cy));
+        }
+        let max_r = self.width.max(self.height) as i32;
+        for r in 1..=max_r {
+            for dy in -r..=r {
+                for dx in -r..=r {
+                    if dx.abs() != r && dy.abs() != r {
+                        continue;
+                    }
+                    let x = cx + dx;
+                    let y = cy + dy;
+                    if self.is_spawn_candidate(x, y) {
+                        return Some((x, y));
+                    }
+                }
+            }
+        }
+        // Fallback: any passable tile if the map has no connected land.
+        if self.is_passable(cx, cy) {
+            return Some((cx, cy));
+        }
+        for r in 1..=max_r {
+            for dy in -r..=r {
+                for dx in -r..=r {
+                    if dx.abs() != r && dy.abs() != r {
+                        continue;
+                    }
+                    let x = cx + dx;
+                    let y = cy + dy;
+                    if self.is_passable(x, y) {
+                        return Some((x, y));
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn is_spawn_candidate(&self, x: i32, y: i32) -> bool {
+        if !self.is_passable(x, y) {
+            return false;
+        }
+        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            if self.is_passable(x + dx, y + dy) {
+                return true;
+            }
+        }
+        false
     }
 
     fn building_views(&self) -> Vec<BuildingView> {
@@ -294,6 +518,7 @@ impl World {
             rotation: rotation % 4,
             state: BuildState::UnderConstruction { progress_ticks: 0 },
         });
+        self.invalidate_path_if_needed();
         Ok(PlacementResult { id })
     }
 
@@ -319,6 +544,8 @@ impl World {
             }
         }
         self.resources.refund(&def.cost);
+        // Demolish opens tiles; no forced repath, but a blocked goal may become free —
+        // leave current path intact.
         Ok(())
     }
 }
@@ -326,12 +553,15 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sim::agents::AgentState;
     use crate::sim::terrain::Terrain;
 
     fn grass_world() -> World {
         let mut world = World::generate(8, 8, 32, 1);
         world.tiles = vec![Terrain::Grass as u8; 64];
         world.occupancy = vec![None; 64];
+        world.villager.pos = world.tile_center(0, 0);
+        world.villager.clear_path_to_idle();
         world
     }
 
@@ -348,18 +578,64 @@ mod tests {
     }
 
     #[test]
-    fn villager_motion_is_deterministic_at_known_ticks() {
-        let mut world = World::default_world();
-        let at_zero = world.tick_snapshot().villagers[0].clone();
-        for _ in 0..50 {
+    fn villager_spawns_idle_on_walkable_tile() {
+        let world = World::default_world();
+        let snap = world.tick_snapshot();
+        assert_eq!(snap.villagers.len(), 1);
+        assert_eq!(snap.villagers[0].state, 0);
+        let (tx, ty) = world.pos_to_tile(world.villager().pos);
+        assert!(world.is_passable(tx, ty));
+        assert!(
+            world.is_spawn_candidate(tx, ty),
+            "spawn ({tx},{ty}) should have a passable neighbor"
+        );
+        // Idle villager does not drift across ticks.
+        let mut world = world;
+        let before = world.villager().pos;
+        for _ in 0..10 {
             world.advance();
         }
-        let at_quarter_turn = world.tick_snapshot().villagers[0].clone();
+        assert_eq!(world.villager().pos, before);
+    }
 
-        assert!((at_zero.x - (2048.0 + 1310.72)).abs() < 0.01);
-        assert!((at_zero.y - 2048.0).abs() < 0.01);
-        assert!((at_quarter_turn.x - 2048.0).abs() < 0.01);
-        assert!((at_quarter_turn.y - (2048.0 + 1310.72)).abs() < 0.01);
+    #[test]
+    fn order_move_approaches_target_over_ticks() {
+        let mut world = grass_world();
+        world.order_move(5, 0).unwrap();
+        assert!(matches!(
+            world.villager().state,
+            AgentState::MovingTo { target: (5, 0), .. }
+        ));
+        let start_x = world.villager().pos.0;
+        for _ in 0..40 {
+            world.advance();
+        }
+        assert!(world.villager().pos.0 > start_x + 10.0);
+        for _ in 0..200 {
+            world.advance();
+        }
+        let (tx, ty) = world.pos_to_tile(world.villager().pos);
+        assert_eq!((tx, ty), (5, 0));
+        assert!(matches!(world.villager().state, AgentState::Idle));
+    }
+
+    #[test]
+    fn placing_building_on_path_triggers_repath_or_idle() {
+        let mut world = grass_world();
+        // Walk along y=0 from (0,0) to (7,0).
+        world.order_move(7, 0).unwrap();
+        let path_before = world.villager().path.clone().expect("path");
+        assert!(path_before.contains(&(3, 0)));
+        // Block the corridor mid-path.
+        world.place_building("hut", 3, 0, 0).unwrap();
+        // Either repathed around (3,0) or briefly idled with cooldown.
+        if let Some(path) = &world.villager().path {
+            assert!(!path.contains(&(3, 0)));
+            assert!(matches!(world.villager().state, AgentState::MovingTo { .. }));
+        } else {
+            assert!(matches!(world.villager().state, AgentState::Idle));
+            assert!(world.villager().repath_cooldown > 0);
+        }
     }
 
     #[test]
@@ -393,5 +669,15 @@ mod tests {
             world.advance();
         }
         assert_eq!(world.buildings()[0].state, BuildState::Complete);
+    }
+
+    #[test]
+    fn path_routes_around_building() {
+        let mut world = grass_world();
+        world.place_building("hut", 3, 0, 0).unwrap();
+        world.order_move(6, 0).unwrap();
+        let path = world.villager().path.clone().expect("path");
+        assert!(!path.contains(&(3, 0)));
+        assert_eq!(*path.last().unwrap(), (6, 0));
     }
 }

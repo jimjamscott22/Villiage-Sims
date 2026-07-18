@@ -9,6 +9,8 @@ export interface VillagerView {
   id: number;
   x: number;
   y: number;
+  /** 0 = Idle, 1 = Moving (M4 FSM). */
+  state?: number;
 }
 
 export interface BuildingView {

@@ -22,8 +22,8 @@ VillageSim is a Tauri 2 desktop app: an authoritative Rust simulation (`src-taur
   state (`x`, `y`, `zoom`, viewport size).
 - Build mode (M3): select a building in the right-hand menu, click the map to place, `R` rotates,
   `Esc` cancels. Click a placed building then Demolish (or Delete) to refund its cost.
-- Next work is **M4** (pathfinding + villager FSM). See `progress.md` and
-  `docs/superpowers/specs/2026-07-18-milestone-4-design.md` before implementing.
+- Move order (M4): right-click a walkable tile to path the villager there. Placing a building on
+  the active path forces a repath (or Idle + cooldown). Next work is **M5** — see `progress.md`.
 
 ### Non-obvious gotchas
 

@@ -25,6 +25,9 @@ pub struct VillagerView {
     pub id: u32,
     pub x: f32,
     pub y: f32,
+    /// 0 = Idle, 1 = Moving (M4 FSM).
+    #[serde(default)]
+    pub state: u8,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]

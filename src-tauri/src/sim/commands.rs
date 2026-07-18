@@ -27,4 +27,9 @@ pub enum SimCommand {
         entity_id: u32,
         reply: oneshot::Sender<Result<(), String>>,
     },
+    MoveVillagerTo {
+        x: i32,
+        y: i32,
+        reply: oneshot::Sender<Result<(), String>>,
+    },
 }

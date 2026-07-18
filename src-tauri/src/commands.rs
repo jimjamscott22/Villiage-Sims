@@ -103,6 +103,18 @@ pub(crate) async fn demolish(state: State<'_, AppState>, entity_id: u32) -> Resu
         .map_err(|_| "simulation dropped demolish".to_string())?
 }
 
+#[tauri::command]
+pub(crate) async fn move_villager_to(state: State<'_, AppState>, x: i32, y: i32) -> Result<(), String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::MoveVillagerTo { x, y, reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped move_villager_to".to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
