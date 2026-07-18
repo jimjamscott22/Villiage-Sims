@@ -347,30 +347,31 @@ impl World {
     }
 
     fn find_walkable_near(&self, cx: i32, cy: i32) -> Option<(i32, i32)> {
-        // Prefer a connected walkable tile (has a passable neighbor) so the
-        // villager is not stranded on an isolated forest/rock pocket.
-        if self.is_spawn_candidate(cx, cy) {
-            return Some((cx, cy));
-        }
-        let max_r = self.width.max(self.height) as i32;
-        for r in 1..=max_r {
-            for dy in -r..=r {
-                for dx in -r..=r {
-                    if dx.abs() != r && dy.abs() != r {
-                        continue;
-                    }
-                    let x = cx + dx;
-                    let y = cy + dy;
-                    if self.is_spawn_candidate(x, y) {
-                        return Some((x, y));
-                    }
+        // Prefer the most open connected walkable tile near center so the
+        // villager has room to path around buildings.
+        let search_r = (self.width.max(self.height) as i32).min(48);
+        let mut best: Option<(i32, i32, i32, i32)> = None; // x,y,score,dist
+        for y in (cy - search_r)..=(cy + search_r) {
+            for x in (cx - search_r)..=(cx + search_r) {
+                if !self.is_spawn_candidate(x, y) {
+                    continue;
+                }
+                let score = self.openness_score(x, y);
+                let dist = (x - cx).abs() + (y - cy).abs();
+                match best {
+                    Some((_, _, best_score, best_dist))
+                        if score < best_score || (score == best_score && dist >= best_dist) => {}
+                    _ => best = Some((x, y, score, dist)),
                 }
             }
         }
-        // Fallback: any passable tile if the map has no connected land.
+        if let Some((x, y, _, _)) = best {
+            return Some((x, y));
+        }
         if self.is_passable(cx, cy) {
             return Some((cx, cy));
         }
+        let max_r = self.width.max(self.height) as i32;
         for r in 1..=max_r {
             for dy in -r..=r {
                 for dx in -r..=r {
@@ -398,6 +399,18 @@ impl World {
             }
         }
         false
+    }
+
+    fn openness_score(&self, x: i32, y: i32) -> i32 {
+        let mut score = 0;
+        for dy in -4..=4 {
+            for dx in -4..=4 {
+                if self.is_passable(x + dx, y + dy) {
+                    score += 1;
+                }
+            }
+        }
+        score
     }
 
     fn building_views(&self) -> Vec<BuildingView> {
