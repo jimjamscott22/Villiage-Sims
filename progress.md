@@ -9,7 +9,7 @@ Last updated: 2026-07-18 (after M4).
 | M1 — Prove the pipe | Complete on `main` | #1 |
 | M2 — Terrain + camera | Complete on `main` | #2 |
 | M3 — Building placement | Complete on `main` | #3 |
-| **M4 — Pathfinding + villager FSM** | **Complete (this branch)** | — |
+| **M4 — Pathfinding + villager FSM** | **Complete** | #5 (+ follow-up) |
 | M5–M10 | Later | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).

@@ -343,20 +343,27 @@ export class DemoWorld {
   }
 
   private findWalkableNear(cx: number, cy: number): [number, number] | null {
-    // Prefer a connected walkable tile so the agent is not stranded.
-    if (this.isSpawnCandidate(cx, cy)) return [cx, cy];
-    const maxR = Math.max(this.terrain.width, this.terrain.height);
-    for (let r = 1; r <= maxR; r += 1) {
-      for (let dy = -r; dy <= r; dy += 1) {
-        for (let dx = -r; dx <= r; dx += 1) {
-          if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
-          const x = cx + dx;
-          const y = cy + dy;
-          if (this.isSpawnCandidate(x, y)) return [x, y];
+    // Search near the center for the most open connected walkable tile so the
+    // browser-demo villager has room to path around obstacles.
+    const searchR = Math.min(48, Math.max(this.terrain.width, this.terrain.height));
+    let best: { x: number; y: number; score: number; dist: number } | null = null;
+    for (let y = cy - searchR; y <= cy + searchR; y += 1) {
+      for (let x = cx - searchR; x <= cx + searchR; x += 1) {
+        if (!this.isSpawnCandidate(x, y)) continue;
+        const score = this.opennessScore(x, y);
+        const dist = Math.abs(x - cx) + Math.abs(y - cy);
+        if (
+          !best
+          || score > best.score
+          || (score === best.score && dist < best.dist)
+        ) {
+          best = { x, y, score, dist };
         }
       }
     }
+    if (best) return [best.x, best.y];
     if (this.isPassable(cx, cy)) return [cx, cy];
+    const maxR = Math.max(this.terrain.width, this.terrain.height);
     for (let r = 1; r <= maxR; r += 1) {
       for (let dy = -r; dy <= r; dy += 1) {
         for (let dx = -r; dx <= r; dx += 1) {
@@ -378,6 +385,16 @@ export class DemoWorld {
       || this.isPassable(x, y + 1)
       || this.isPassable(x, y - 1)
     );
+  }
+
+  private opennessScore(x: number, y: number): number {
+    let score = 0;
+    for (let dy = -4; dy <= 4; dy += 1) {
+      for (let dx = -4; dx <= 4; dx += 1) {
+        if (this.isPassable(x + dx, y + dy)) score += 1;
+      }
+    }
+    return score;
   }
 
   private buildingViews(): BuildingView[] {
