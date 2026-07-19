@@ -9,6 +9,7 @@ import type {
   TickListener,
   TickSnapshot,
   Unlisten,
+  VillagerDetail,
 } from './types';
 import { generateDemoTerrain } from './demoTerrain';
 
@@ -32,6 +33,7 @@ interface Transport {
   placeBuilding(kind: string, x: number, y: number, rotation: number): Promise<PlacementResult>;
   demolish(entityId: number): Promise<void>;
   moveVillagerTo(x: number, y: number): Promise<void>;
+  getVillagerDetail(id: number): Promise<VillagerDetail>;
 }
 
 class BrowserTransport implements Transport {
@@ -88,6 +90,10 @@ class BrowserTransport implements Transport {
     this.emit(this.world.snapshot());
   }
 
+  async getVillagerDetail(id: number): Promise<VillagerDetail> {
+    return this.world.getVillagerDetail(id);
+  }
+
   advance(ms: number): void {
     this.elapsed += Math.max(0, ms);
     while (this.elapsed >= TICK_MS) {
@@ -115,6 +121,7 @@ const tauriTransport: Transport = {
     invoke<PlacementResult>('place_building', { kind, x, y, rotation }),
   demolish: (entityId) => invoke('demolish', { entityId }),
   moveVillagerTo: (x, y) => invoke('move_villager_to', { x, y }),
+  getVillagerDetail: (id) => invoke<VillagerDetail>('get_villager_detail', { id }),
 };
 
 export const transport: Transport = isTauri() ? tauriTransport : browserTransport;

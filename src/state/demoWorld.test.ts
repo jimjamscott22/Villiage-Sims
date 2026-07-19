@@ -69,4 +69,43 @@ describe('DemoWorld pathfinding', () => {
     expect(finalTileX).toBeGreaterThan(6);
     void snap0;
   });
+
+  it('decays hunger and exposes detail', () => {
+    const world = new DemoWorld(generateDemoTerrain());
+    const before = world.getVillagerDetail(1).hunger;
+    for (let i = 0; i < 500; i += 1) world.advance();
+    const after = world.getVillagerDetail(1);
+    expect(after.hunger).toBeLessThan(before);
+    expect(after.name).toBe('Ash');
+  });
+
+  it('claims tend_crops on completed farm and enters working', () => {
+    const terrain = {
+      width: 16,
+      height: 16,
+      tileSize: 32,
+      tiles: new Array(16 * 16).fill(3),
+    };
+    const world = new DemoWorld(terrain);
+    const v = world.snapshot().villagers[0];
+    const tx = Math.floor(v.x / 32);
+    const ty = Math.floor(v.y / 32);
+    // Place farm a few tiles away so an adjacent stand tile is reachable.
+    const farmX = Math.min(12, tx + 3);
+    const farmY = Math.min(12, ty + 3);
+    world.placeBuilding('farm', farmX, farmY, 0);
+    for (let i = 0; i < 30; i += 1) world.advance();
+    let working = false;
+    for (let i = 0; i < 500; i += 1) {
+      world.advance();
+      if (world.snapshot().villagers[0].state === 2) {
+        working = true;
+        break;
+      }
+    }
+    expect(working).toBe(true);
+    const detail = world.getVillagerDetail(1);
+    expect(detail.jobKind).toBe('tend_crops');
+    expect(detail.state).toBe(2);
+  });
 });

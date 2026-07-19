@@ -1,10 +1,12 @@
-import type { BuildingDef, Catalog, ResourceTotals } from '../state/types';
+import type { BuildingDef, Catalog, ResourceTotals, VillagerDetail } from '../state/types';
+import { VillagerPanel } from './VillagerPanel';
 
 interface BuildMenuProps {
   catalog: Catalog | null;
   resources: ResourceTotals | null;
   selectedKind: string | null;
   selectedBuildingId: number | null;
+  villagerDetail: VillagerDetail | null;
   onSelectKind: (kind: string | null) => void;
   onDemolish: () => void;
 }
@@ -20,6 +22,7 @@ export function BuildMenu({
   resources,
   selectedKind,
   selectedBuildingId,
+  villagerDetail,
   onSelectKind,
   onDemolish,
 }: BuildMenuProps) {
@@ -34,6 +37,8 @@ export function BuildMenu({
           <dd className="text-right tabular-nums">{resources?.stone ?? '—'}</dd>
         </dl>
       </div>
+
+      <VillagerPanel detail={villagerDetail} />
 
       <div className="min-h-0 flex-1">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-white/50">Build</h2>
@@ -58,7 +63,7 @@ export function BuildMenu({
         </ul>
         <p className="mt-3 text-[11px] leading-relaxed text-white/45">
           Select a building, then click the map. <kbd className="text-white/70">R</kbd> rotates,{' '}
-          <kbd className="text-white/70">Esc</kbd> cancels. Middle-drag pans.
+          <kbd className="text-white/70">Esc</kbd> cancels. Middle-drag pans. Right-click to move.
         </p>
       </div>
 

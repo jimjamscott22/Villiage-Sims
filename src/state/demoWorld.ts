@@ -8,6 +8,7 @@ import type {
   ResourceTotals,
   TerrainSnapshot,
   TickSnapshot,
+  VillagerDetail,
 } from './types';
 
 export const DEMO_CATALOG: Catalog = {
@@ -55,6 +56,11 @@ const TICKS_PER_SECOND = 20;
 const MOVE_SPEED_TILES_PER_SEC = 2;
 const REPATH_COOLDOWN_TICKS = 20;
 const ARRIVE_EPSILON_PX = 0.5;
+const HUNGER_DECAY = 0.00008;
+const ENERGY_DECAY = 0.00005;
+const SOCIAL_DECAY = 0.00003;
+const WORK_CYCLE_TICKS = 40;
+const DEFAULT_JOB_PRIORITY = 10;
 
 function startingResources(): ResourceTotals {
   return { wood: 120, stone: 40, grain: 0, food: 0, gold: 0 };
@@ -85,14 +91,45 @@ interface DemoBuilding {
   complete: boolean;
 }
 
+interface DemoJob {
+  id: number;
+  kind: 'tend_crops';
+  site: number;
+  tile: [number, number];
+  priority: number;
+  claimedBy: number | null;
+}
+
+interface DemoNeeds {
+  hunger: number;
+  energy: number;
+  social: number;
+  happiness: number;
+}
+
 interface DemoVillager {
   id: number;
+  name: string;
   x: number;
   y: number;
-  state: 'idle' | 'moving';
+  state: 'idle' | 'moving' | 'working';
+  purpose: 'player' | 'work' | null;
   target: [number, number] | null;
   path: Array<[number, number]> | null;
   repathCooldown: number;
+  needs: DemoNeeds;
+  currentJob: number | null;
+  workTicksRemaining: number;
+}
+
+function recomputeHappiness(needs: DemoNeeds): void {
+  needs.happiness = Math.max(0, Math.min(1, (needs.hunger + needs.energy + needs.social) / 3));
+}
+
+function fullNeeds(): DemoNeeds {
+  const needs = { hunger: 1, energy: 1, social: 1, happiness: 1 };
+  recomputeHappiness(needs);
+  return needs;
 }
 
 export class DemoWorld {
@@ -101,8 +138,10 @@ export class DemoWorld {
   buildings: DemoBuilding[] = [];
   private occupancy: Array<number | null>;
   private nextId = 1;
+  private nextJobId = 1;
   private tick = 0;
   private villager: DemoVillager;
+  private jobs: DemoJob[] = [];
 
   constructor(terrain: TerrainSnapshot) {
     this.terrain = terrain;
@@ -112,12 +151,17 @@ export class DemoWorld {
     const [cx, cy] = this.tileCenter(spawn[0], spawn[1]);
     this.villager = {
       id: 1,
+      name: 'Ash',
       x: cx,
       y: cy,
       state: 'idle',
+      purpose: null,
       target: null,
       path: null,
       repathCooldown: 0,
+      needs: fullNeeds(),
+      currentJob: null,
+      workTicksRemaining: 0,
     };
   }
 
@@ -131,37 +175,71 @@ export class DemoWorld {
 
   advance(): TickSnapshot {
     this.tick += 1;
+    const newlyComplete: number[] = [];
     for (const building of this.buildings) {
       if (building.complete) continue;
       const def = DEMO_CATALOG.buildings[building.kindIndex];
       building.progressTicks += 1;
-      if (building.progressTicks >= def.buildTicks) building.complete = true;
+      if (building.progressTicks >= def.buildTicks) {
+        building.complete = true;
+        newlyComplete.push(building.id);
+      }
     }
+    for (const id of newlyComplete) this.advertiseJobsFor(id);
+
+    this.decayNeeds();
     this.tickVillager();
     return this.snapshot();
   }
 
   snapshot(): TickSnapshot {
+    const stateByte = this.villager.state === 'working' ? 2 : this.villager.state === 'moving' ? 1 : 0;
     return {
       tick: this.tick,
       villagers: [{
         id: this.villager.id,
         x: this.villager.x,
         y: this.villager.y,
-        state: this.villager.state === 'moving' ? 1 : 0,
+        state: stateByte,
       }],
       buildings: this.buildingViews(),
       resources: { ...this.resources },
     };
   }
 
+  getVillagerDetail(id: number): VillagerDetail {
+    if (this.villager.id !== id) throw new Error(`unknown villager ${id}`);
+    const job = this.villager.currentJob != null
+      ? this.jobs.find((entry) => entry.id === this.villager.currentJob) ?? null
+      : null;
+    const stateLabel = this.villager.state === 'working'
+      ? 'Working'
+      : this.villager.state === 'moving'
+        ? (this.villager.purpose === 'work' ? 'Going to work' : 'Moving')
+        : 'Idle';
+    return {
+      id: this.villager.id,
+      name: this.villager.name,
+      state: this.villager.state === 'working' ? 2 : this.villager.state === 'moving' ? 1 : 0,
+      stateLabel,
+      hunger: this.villager.needs.hunger,
+      energy: this.villager.needs.energy,
+      social: this.villager.needs.social,
+      happiness: this.villager.needs.happiness,
+      jobKind: job?.kind ?? null,
+      jobSite: job?.site ?? null,
+    };
+  }
+
   moveVillagerTo(x: number, y: number): void {
     if (!this.inBounds(x, y)) throw new Error('out of bounds');
     if (!this.isPassable(x, y)) throw new Error('tile impassable');
+    this.releaseCurrentJob();
     const start = this.posToTile(this.villager.x, this.villager.y);
     const path = this.computePath(start, [x, y]);
     if (!path) throw new Error('no path');
     this.villager.state = 'moving';
+    this.villager.purpose = 'player';
     this.villager.target = [x, y];
     this.villager.path = path;
     this.villager.repathCooldown = 0;
@@ -234,25 +312,181 @@ export class DemoWorld {
       this.resources[resourceKey] += amount;
     }
     this.buildings.splice(index, 1);
+    const released = this.jobs.filter((job) => job.site === entityId && job.claimedBy != null)
+      .map((job) => job.claimedBy!);
+    this.jobs = this.jobs.filter((job) => job.site !== entityId);
+    if (released.includes(this.villager.id)) {
+      this.villager.currentJob = null;
+      if (this.villager.state === 'working' || (this.villager.state === 'moving' && this.villager.purpose === 'work')) {
+        this.clearToIdle();
+      }
+    }
+  }
+
+  private decayNeeds(): void {
+    const n = this.villager.needs;
+    n.hunger = Math.max(0, Math.min(1, n.hunger - HUNGER_DECAY));
+    n.energy = Math.max(0, Math.min(1, n.energy - ENERGY_DECAY));
+    n.social = Math.max(0, Math.min(1, n.social - SOCIAL_DECAY));
+    recomputeHappiness(n);
+  }
+
+  private advertiseJobsFor(buildingId: number): void {
+    const building = this.buildings.find((entry) => entry.id === buildingId);
+    if (!building) return;
+    const def = DEMO_CATALOG.buildings[building.kindIndex];
+    this.jobs = this.jobs.filter((job) => job.site !== buildingId);
+    const [fw, fh] = rotatedFootprint(def, building.rot);
+    const standTiles = this.adjacentStandTiles(building.x, building.y, fw, fh);
+    let tileIndex = 0;
+    for (const jobDef of def.jobs ?? []) {
+      if (jobDef.kind !== 'tend_crops') continue;
+      for (let slot = 0; slot < jobDef.slots; slot += 1) {
+        if (tileIndex >= standTiles.length) return;
+        const tile = standTiles[tileIndex];
+        tileIndex += 1;
+        const id = this.nextJobId;
+        this.nextJobId += 1;
+        this.jobs.push({
+          id,
+          kind: 'tend_crops',
+          site: buildingId,
+          tile,
+          priority: DEFAULT_JOB_PRIORITY,
+          claimedBy: null,
+        });
+      }
+    }
+  }
+
+  private adjacentStandTiles(x: number, y: number, fw: number, fh: number): Array<[number, number]> {
+    const x0 = x;
+    const y0 = y;
+    const x1 = x + fw - 1;
+    const y1 = y + fh - 1;
+    const candidates: Array<[number, number]> = [];
+    for (let tx = x0 - 1; tx <= x1 + 1; tx += 1) {
+      for (const ty of [y0 - 1, y1 + 1]) {
+        if (this.isPassable(tx, ty)) candidates.push([tx, ty]);
+      }
+    }
+    for (let ty = y0; ty <= y1; ty += 1) {
+      for (const tx of [x0 - 1, x1 + 1]) {
+        if (this.isPassable(tx, ty)) candidates.push([tx, ty]);
+      }
+    }
+    candidates.sort((a, b) => (a[1] - b[1]) || (a[0] - b[0]));
+    const unique: Array<[number, number]> = [];
+    for (const tile of candidates) {
+      if (!unique.some((u) => u[0] === tile[0] && u[1] === tile[1])) unique.push(tile);
+    }
+    return unique;
   }
 
   private tickVillager(): void {
     if (this.villager.repathCooldown > 0) this.villager.repathCooldown -= 1;
-    if (this.villager.state !== 'moving' || !this.villager.target) return;
 
-    const target = this.villager.target;
+    if (this.villager.currentJob != null && !this.jobs.some((job) => job.id === this.villager.currentJob)) {
+      this.villager.currentJob = null;
+      if (this.villager.state === 'working' || (this.villager.state === 'moving' && this.villager.purpose === 'work')) {
+        this.clearToIdle();
+      }
+    }
+
+    if (this.villager.state === 'idle') {
+      this.tickIdle();
+      return;
+    }
+    if (this.villager.state === 'working') {
+      this.tickWorking();
+      return;
+    }
+    if (this.villager.state === 'moving' && this.villager.target) {
+      this.tickMoving(this.villager.target, this.villager.purpose ?? 'player');
+    }
+  }
+
+  private tickIdle(): void {
+    if (this.villager.repathCooldown > 0) return;
+    if (this.villager.currentJob != null) {
+      const job = this.jobs.find((entry) => entry.id === this.villager.currentJob);
+      if (job) {
+        this.beginMoveToJob(job.tile, job.id);
+        return;
+      }
+      this.villager.currentJob = null;
+    }
+    const from = this.posToTile(this.villager.x, this.villager.y);
+    const jobId = this.claimBest(from);
+    if (jobId == null) return;
+    const job = this.jobs.find((entry) => entry.id === jobId)!;
+    this.villager.currentJob = jobId;
+    this.beginMoveToJob(job.tile, jobId);
+  }
+
+  private claimBest(from: [number, number]): number | null {
+    let best: { id: number; score: number } | null = null;
+    for (const job of this.jobs) {
+      if (job.claimedBy != null) continue;
+      const dist = Math.abs(job.tile[0] - from[0]) + Math.abs(job.tile[1] - from[1]);
+      const score = job.priority / (1 + dist);
+      if (!best || score > best.score) best = { id: job.id, score };
+    }
+    if (!best) return null;
+    const job = this.jobs.find((entry) => entry.id === best!.id)!;
+    job.claimedBy = this.villager.id;
+    return job.id;
+  }
+
+  private beginMoveToJob(tile: [number, number], _jobId: number): void {
+    const start = this.posToTile(this.villager.x, this.villager.y);
+    if (start[0] === tile[0] && start[1] === tile[1]) {
+      this.villager.path = null;
+      this.villager.target = null;
+      this.villager.purpose = null;
+      this.villager.state = 'working';
+      this.villager.workTicksRemaining = WORK_CYCLE_TICKS;
+      return;
+    }
+    const path = this.computePath(start, tile);
+    if (!path) {
+      this.releaseCurrentJob();
+      this.villager.repathCooldown = REPATH_COOLDOWN_TICKS;
+      return;
+    }
+    this.villager.state = 'moving';
+    this.villager.purpose = 'work';
+    this.villager.target = tile;
+    this.villager.path = path;
+  }
+
+  private tickWorking(): void {
+    if (this.villager.currentJob == null
+      || !this.jobs.some((job) => job.id === this.villager.currentJob)) {
+      this.villager.currentJob = null;
+      this.clearToIdle();
+      return;
+    }
+    if (this.villager.workTicksRemaining <= 1) {
+      this.villager.workTicksRemaining = WORK_CYCLE_TICKS;
+    } else {
+      this.villager.workTicksRemaining -= 1;
+    }
+  }
+
+  private tickMoving(target: [number, number], purpose: 'player' | 'work'): void {
     if (this.pathIsBlocked(target)) {
-      this.tryRepath(target);
+      this.tryRepath(target, purpose);
       if (this.villager.state !== 'moving') return;
     }
 
     if (!this.villager.path || this.villager.path.length === 0) {
       const start = this.posToTile(this.villager.x, this.villager.y);
       if (start[0] === target[0] && start[1] === target[1]) {
-        this.clearToIdle();
+        this.onArrived(purpose);
         return;
       }
-      this.tryRepath(target);
+      this.tryRepath(target, purpose);
       if (!this.villager.path || this.villager.path.length === 0) return;
     }
 
@@ -266,14 +500,34 @@ export class DemoWorld {
       this.villager.x = cx;
       this.villager.y = cy;
       this.villager.path!.shift();
-      if (this.villager.path!.length === 0) this.clearToIdle();
+      if (this.villager.path!.length === 0) this.onArrived(purpose);
     } else {
       this.villager.x += (dx / dist) * speedPx;
       this.villager.y += (dy / dist) * speedPx;
     }
   }
 
-  private tryRepath(target: [number, number]): void {
+  private onArrived(purpose: 'player' | 'work'): void {
+    this.villager.path = null;
+    this.villager.target = null;
+    if (purpose === 'player') {
+      this.villager.purpose = null;
+      this.villager.state = 'idle';
+      return;
+    }
+    if (this.villager.currentJob != null
+      && this.jobs.some((job) => job.id === this.villager.currentJob)) {
+      this.villager.purpose = null;
+      this.villager.state = 'working';
+      this.villager.workTicksRemaining = WORK_CYCLE_TICKS;
+      return;
+    }
+    this.villager.currentJob = null;
+    this.villager.purpose = null;
+    this.villager.state = 'idle';
+  }
+
+  private tryRepath(target: [number, number], purpose: 'player' | 'work'): void {
     if (this.villager.repathCooldown > 0) {
       this.clearToIdle();
       return;
@@ -283,17 +537,19 @@ export class DemoWorld {
     if (path) {
       this.villager.path = path;
       this.villager.state = 'moving';
+      this.villager.purpose = purpose;
       this.villager.target = target;
     } else {
       this.clearToIdle();
       this.villager.repathCooldown = REPATH_COOLDOWN_TICKS;
+      if (purpose === 'work') this.releaseCurrentJob();
     }
   }
 
   private invalidatePathIfNeeded(): void {
     if (this.villager.state !== 'moving' || !this.villager.target) return;
     if (this.pathIsBlocked(this.villager.target)) {
-      this.tryRepath(this.villager.target);
+      this.tryRepath(this.villager.target, this.villager.purpose ?? 'player');
     }
   }
 
@@ -304,8 +560,16 @@ export class DemoWorld {
 
   private clearToIdle(): void {
     this.villager.state = 'idle';
+    this.villager.purpose = null;
     this.villager.target = null;
     this.villager.path = null;
+  }
+
+  private releaseCurrentJob(): void {
+    if (this.villager.currentJob == null) return;
+    const job = this.jobs.find((entry) => entry.id === this.villager.currentJob);
+    if (job && job.claimedBy === this.villager.id) job.claimedBy = null;
+    this.villager.currentJob = null;
   }
 
   private computePath(start: [number, number], goal: [number, number]): Array<[number, number]> | null {
@@ -343,8 +607,6 @@ export class DemoWorld {
   }
 
   private findWalkableNear(cx: number, cy: number): [number, number] | null {
-    // Search near the center for the most open connected walkable tile so the
-    // browser-demo villager has room to path around obstacles.
     const searchR = Math.min(48, Math.max(this.terrain.width, this.terrain.height));
     let best: { x: number; y: number; score: number; dist: number } | null = null;
     for (let y = cy - searchR; y <= cy + searchR; y += 1) {
