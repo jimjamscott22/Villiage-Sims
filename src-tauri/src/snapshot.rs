@@ -25,7 +25,7 @@ pub struct VillagerView {
     pub id: u32,
     pub x: f32,
     pub y: f32,
-    /// 0 = Idle, 1 = Moving (M4 FSM).
+    /// 0 = Idle, 1 = Moving, 2 = Working (M5 FSM).
     #[serde(default)]
     pub state: u8,
 }
@@ -39,4 +39,20 @@ pub struct BuildingView {
     pub rot: u8,
     pub state: u8,
     pub progress: u8,
+}
+
+/// On-demand villager detail for the panel (never in tick payload).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VillagerDetail {
+    pub id: u32,
+    pub name: String,
+    pub state: u8,
+    pub state_label: String,
+    pub hunger: f32,
+    pub energy: f32,
+    pub social: f32,
+    pub happiness: f32,
+    pub job_kind: Option<String>,
+    pub job_site: Option<u32>,
 }

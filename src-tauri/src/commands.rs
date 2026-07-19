@@ -6,7 +6,7 @@ use tokio::sync::oneshot;
 use crate::sim::buildings::{PlacementResult, PlacementValidity};
 use crate::sim::catalog::Catalog;
 use crate::sim::commands::SimCommand;
-use crate::snapshot::TerrainSnapshot;
+use crate::snapshot::{TerrainSnapshot, VillagerDetail};
 
 pub struct AppState {
     terrain: TerrainSnapshot,
@@ -113,6 +113,21 @@ pub(crate) async fn move_villager_to(state: State<'_, AppState>, x: i32, y: i32)
     receiver
         .await
         .map_err(|_| "simulation dropped move_villager_to".to_string())?
+}
+
+#[tauri::command]
+pub(crate) async fn get_villager_detail(
+    state: State<'_, AppState>,
+    id: u32,
+) -> Result<VillagerDetail, String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::GetVillagerDetail { id, reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped get_villager_detail".to_string())?
 }
 
 #[cfg(test)]

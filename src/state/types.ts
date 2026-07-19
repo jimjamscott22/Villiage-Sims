@@ -9,8 +9,21 @@ export interface VillagerView {
   id: number;
   x: number;
   y: number;
-  /** 0 = Idle, 1 = Moving (M4 FSM). */
+  /** 0 = Idle, 1 = Moving, 2 = Working (M5 FSM). */
   state?: number;
+}
+
+export interface VillagerDetail {
+  id: number;
+  name: string;
+  state: number;
+  stateLabel: string;
+  hunger: number;
+  energy: number;
+  social: number;
+  happiness: number;
+  jobKind: string | null;
+  jobSite: number | null;
 }
 
 export interface BuildingView {

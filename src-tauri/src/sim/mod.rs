@@ -19,6 +19,8 @@ pub mod agents;
 pub mod buildings;
 pub mod catalog;
 pub mod commands;
+pub mod jobs;
+pub mod needs;
 pub mod pathfind;
 pub mod resources;
 pub mod terrain;

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Canvas } from './render/Canvas';
 import { transport } from './state/transport';
-import type { Catalog, ResourceTotals, TickSnapshot } from './state/types';
+import type { Catalog, ResourceTotals, TickSnapshot, VillagerDetail } from './state/types';
 import { BuildMenu } from './ui/BuildMenu';
+
+const DETAIL_POLL_MS = 250;
 
 export default function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -10,6 +12,7 @@ export default function App() {
   const [selectedKind, setSelectedKind] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0);
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
+  const [villagerDetail, setVillagerDetail] = useState<VillagerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -17,6 +20,26 @@ export default function App() {
       .getCatalog()
       .then(setCatalog)
       .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      void transport
+        .getVillagerDetail(1)
+        .then((detail) => {
+          if (!cancelled) setVillagerDetail(detail);
+        })
+        .catch(() => {
+          /* detail optional until sim ready */
+        });
+    };
+    refresh();
+    const timer = window.setInterval(refresh, DETAIL_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, []);
 
   const onSnapshot = (snapshot: TickSnapshot) => {
@@ -62,6 +85,7 @@ export default function App() {
           resources={resources}
           selectedKind={selectedKind}
           selectedBuildingId={selectedBuildingId}
+          villagerDetail={villagerDetail}
           onSelectKind={(kind) => {
             setSelectedKind(kind);
             setSelectedBuildingId(null);

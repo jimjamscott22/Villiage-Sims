@@ -1,6 +1,7 @@
 use tokio::sync::oneshot;
 
 use super::buildings::{PlacementResult, PlacementValidity};
+use crate::snapshot::VillagerDetail;
 
 pub enum SimCommand {
     SetViewport {
@@ -31,5 +32,9 @@ pub enum SimCommand {
         x: i32,
         y: i32,
         reply: oneshot::Sender<Result<(), String>>,
+    },
+    GetVillagerDetail {
+        id: u32,
+        reply: oneshot::Sender<Result<VillagerDetail, String>>,
     },
 }
