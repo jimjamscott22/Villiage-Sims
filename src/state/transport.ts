@@ -31,6 +31,7 @@ interface Transport {
   validatePlacement(kind: string, x: number, y: number, rotation: number): Promise<PlacementValidity>;
   placeBuilding(kind: string, x: number, y: number, rotation: number): Promise<PlacementResult>;
   demolish(entityId: number): Promise<void>;
+  moveVillagerTo(x: number, y: number): Promise<void>;
 }
 
 class BrowserTransport implements Transport {
@@ -82,6 +83,11 @@ class BrowserTransport implements Transport {
     this.emit(this.world.snapshot());
   }
 
+  async moveVillagerTo(x: number, y: number): Promise<void> {
+    this.world.moveVillagerTo(x, y);
+    this.emit(this.world.snapshot());
+  }
+
   advance(ms: number): void {
     this.elapsed += Math.max(0, ms);
     while (this.elapsed >= TICK_MS) {
@@ -108,10 +114,22 @@ const tauriTransport: Transport = {
   placeBuilding: (kind, x, y, rotation) =>
     invoke<PlacementResult>('place_building', { kind, x, y, rotation }),
   demolish: (entityId) => invoke('demolish', { entityId }),
+  moveVillagerTo: (x, y) => invoke('move_villager_to', { x, y }),
 };
 
 export const transport: Transport = isTauri() ? tauriTransport : browserTransport;
 
 export function advanceDemoTime(ms: number): void {
   if (transport.mode === 'browser-demo') browserTransport.advance(ms);
+}
+
+declare global {
+  interface Window {
+    __villageTransport?: Transport;
+  }
+}
+
+// Expose the live transport for cloud/browser smoke tests (same instance as Canvas).
+if (typeof window !== 'undefined' && transport.mode === 'browser-demo') {
+  window.__villageTransport = transport;
 }

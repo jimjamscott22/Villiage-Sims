@@ -42,7 +42,8 @@ pub fn run() {
             commands::set_viewport,
             commands::validate_placement,
             commands::place_building,
-            commands::demolish
+            commands::demolish,
+            commands::move_villager_to
         ])
         .build(tauri::generate_context!())
         .expect("failed to build VillageSim");
