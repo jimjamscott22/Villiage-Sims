@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-07-19 (M5 in progress).
+Last updated: 2026-07-19 (after M5).
 
 ## Status
 
@@ -10,7 +10,7 @@ Last updated: 2026-07-19 (M5 in progress).
 | M2 — Terrain + camera | Complete on `main` | #2 |
 | M3 — Building placement | Complete on `main` | #3 |
 | M4 — Pathfinding + villager FSM | Complete on `main` | #5 (+ follow-up) |
-| **M5 — Needs and a single job** | **In progress** | — |
+| **M5 — Needs and a single job** | **Complete** | #8 |
 | M6–M10 | Later | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
