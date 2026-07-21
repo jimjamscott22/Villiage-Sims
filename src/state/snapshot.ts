@@ -29,9 +29,12 @@ export class SnapshotBuffer {
 
     return {
       tick: this.current.tick,
+      clock: this.current.clock,
       villagers,
       buildings: this.current.buildings,
+      crops: this.current.crops,
       resources: this.current.resources,
+      events: this.current.events,
     };
   }
 }

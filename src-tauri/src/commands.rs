@@ -130,6 +130,55 @@ pub(crate) async fn get_villager_detail(
         .map_err(|_| "simulation dropped get_villager_detail".to_string())?
 }
 
+#[tauri::command]
+pub(crate) async fn set_speed(state: State<'_, AppState>, speed: u8) -> Result<(), String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::SetSpeed { speed, reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped set_speed".to_string())?
+}
+
+#[tauri::command]
+pub(crate) async fn plant_crop(
+    state: State<'_, AppState>,
+    kind: String,
+    x: i32,
+    y: i32,
+) -> Result<(), String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::PlantCrop { kind, x, y, reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped plant_crop".to_string())?
+}
+
+#[tauri::command]
+pub(crate) async fn advance_clock(
+    state: State<'_, AppState>,
+    days: u32,
+    season: Option<u8>,
+) -> Result<(), String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::AdvanceClock {
+            days,
+            season,
+            reply,
+        })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped advance_clock".to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Canvas } from './render/Canvas';
 import { transport } from './state/transport';
-import type { Catalog, ResourceTotals, TickSnapshot, VillagerDetail } from './state/types';
+import type { Catalog, ClockView, ResourceTotals, TickSnapshot, VillagerDetail } from './state/types';
 import { BuildMenu } from './ui/BuildMenu';
 
 const DETAIL_POLL_MS = 250;
@@ -9,7 +9,9 @@ const DETAIL_POLL_MS = 250;
 export default function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [resources, setResources] = useState<ResourceTotals | null>(null);
+  const [clock, setClock] = useState<ClockView | null>(null);
   const [selectedKind, setSelectedKind] = useState<string | null>(null);
+  const [selectedCropKind, setSelectedCropKind] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0);
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
   const [villagerDetail, setVillagerDetail] = useState<VillagerDetail | null>(null);
@@ -44,6 +46,7 @@ export default function App() {
 
   const onSnapshot = (snapshot: TickSnapshot) => {
     setResources(snapshot.resources);
+    setClock(snapshot.clock);
   };
 
   const onDemolish = async () => {
@@ -51,6 +54,14 @@ export default function App() {
     try {
       await transport.demolish(selectedBuildingId);
       setSelectedBuildingId(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+
+  const onSetSpeed = async (speed: number) => {
+    try {
+      await transport.setSpeed(speed);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
@@ -73,23 +84,38 @@ export default function App() {
         <Canvas
           catalog={catalog}
           selectedKind={selectedKind}
+          selectedCropKind={selectedCropKind}
           rotation={rotation}
           selectedBuildingId={selectedBuildingId}
           onRotationChange={setRotation}
-          onCancelBuild={() => setSelectedKind(null)}
+          onCancelBuild={() => {
+            setSelectedKind(null);
+            setSelectedCropKind(null);
+          }}
           onSelectBuilding={setSelectedBuildingId}
           onSnapshot={onSnapshot}
         />
         <BuildMenu
           catalog={catalog}
           resources={resources}
+          clock={clock}
           selectedKind={selectedKind}
+          selectedCropKind={selectedCropKind}
           selectedBuildingId={selectedBuildingId}
           villagerDetail={villagerDetail}
           onSelectKind={(kind) => {
             setSelectedKind(kind);
+            setSelectedCropKind(null);
             setSelectedBuildingId(null);
             setRotation(0);
+          }}
+          onSelectCropKind={(kind) => {
+            setSelectedCropKind(kind);
+            setSelectedKind(null);
+            setSelectedBuildingId(null);
+          }}
+          onSetSpeed={(speed) => {
+            void onSetSpeed(speed);
           }}
           onDemolish={() => {
             void onDemolish();

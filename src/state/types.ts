@@ -36,6 +36,24 @@ export interface BuildingView {
   progress: number;
 }
 
+export interface CropView {
+  id: number;
+  x: number;
+  y: number;
+  kind: number;
+  stage: number;
+}
+
+export interface ClockView {
+  minute: number;
+  day: number;
+  season: number;
+  year: number;
+  speed: number;
+}
+
+export type SimEvent = { type: 'cropReady'; id: number };
+
 export interface ResourceTotals {
   wood: number;
   stone: number;
@@ -46,9 +64,12 @@ export interface ResourceTotals {
 
 export interface TickSnapshot {
   tick: number;
+  clock: ClockView;
   villagers: VillagerView[];
   buildings: BuildingView[];
+  crops: CropView[];
   resources: ResourceTotals;
+  events?: SimEvent[];
 }
 
 export interface BuildingDef {
@@ -65,8 +86,20 @@ export interface BuildingDef {
   capacity?: number;
 }
 
+export interface CropDef {
+  id: string;
+  name: string;
+  stages: number;
+  ticksPerStage: number;
+  seasons: string[];
+  waterRequired: boolean;
+  yield?: Record<string, number>;
+  seedCost?: Record<string, number>;
+}
+
 export interface Catalog {
   buildings: BuildingDef[];
+  crops: CropDef[];
 }
 
 export interface PlacementValidity {
@@ -80,3 +113,5 @@ export interface PlacementResult {
 
 export type Unlisten = () => void;
 export type TickListener = (snapshot: TickSnapshot) => void;
+
+export const SEASON_NAMES = ['Spring', 'Summer', 'Autumn', 'Winter'] as const;

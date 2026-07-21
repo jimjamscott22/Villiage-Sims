@@ -23,7 +23,10 @@ VillageSim is a Tauri 2 desktop app: an authoritative Rust simulation (`src-taur
 - Build mode (M3): select a building in the right-hand menu, click the map to place, `R` rotates,
   `Esc` cancels. Click a placed building then Demolish (or Delete) to refund its cost.
 - Move order (M4): right-click a walkable tile to path the villager there. Placing a building on
-  the active path forces a repath (or Idle + cooldown). Next work is **M5** — see `progress.md`.
+  the active path forces a repath (or Idle + cooldown).
+- Clock/crops (M6): speed Pause/1×/2×/3× in the right panel; Plant wheat on a completed farm tile
+  (or wait for TendCrops to auto-plant). Crops need watering from tend work and stall out of season.
+  Test helpers: `advanceClock(days, season?)` and `advanceTime(ms)` when `?test=1`.
 
 ### Non-obvious gotchas
 

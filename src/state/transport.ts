@@ -34,6 +34,9 @@ interface Transport {
   demolish(entityId: number): Promise<void>;
   moveVillagerTo(x: number, y: number): Promise<void>;
   getVillagerDetail(id: number): Promise<VillagerDetail>;
+  setSpeed(speed: number): Promise<void>;
+  plantCrop(kind: string, x: number, y: number): Promise<void>;
+  advanceClock(days: number, season?: number | null): Promise<void>;
 }
 
 class BrowserTransport implements Transport {
@@ -54,9 +57,7 @@ class BrowserTransport implements Transport {
   async listenToTicks(listener: TickListener): Promise<Unlisten> {
     this.listeners.add(listener);
     listener(this.world.snapshot());
-    if (!new URLSearchParams(location.search).has('test') && this.timer === null) {
-      this.timer = window.setInterval(() => this.advance(TICK_MS), TICK_MS);
-    }
+    this.ensureTimer();
     return () => {
       this.listeners.delete(listener);
       if (this.listeners.size === 0 && this.timer !== null) {
@@ -94,12 +95,40 @@ class BrowserTransport implements Transport {
     return this.world.getVillagerDetail(id);
   }
 
+  async setSpeed(speed: number): Promise<void> {
+    this.world.setSpeed(speed);
+    this.ensureTimer();
+    this.emit(this.world.snapshot());
+  }
+
+  async plantCrop(kind: string, x: number, y: number): Promise<void> {
+    this.world.plantCrop(kind, x, y);
+    this.emit(this.world.snapshot());
+  }
+
+  async advanceClock(days: number, season?: number | null): Promise<void> {
+    this.world.advanceClock(days, season);
+    this.emit(this.world.snapshot());
+  }
+
   advance(ms: number): void {
-    this.elapsed += Math.max(0, ms);
+    if (this.world.speed === 0) return;
+    const scaled = ms * this.world.speed;
+    this.elapsed += Math.max(0, scaled);
     while (this.elapsed >= TICK_MS) {
       this.elapsed -= TICK_MS;
       this.emit(this.world.advance());
     }
+  }
+
+  private ensureTimer(): void {
+    if (new URLSearchParams(location.search).has('test')) return;
+    if (this.listeners.size === 0) return;
+    if (this.timer !== null) {
+      window.clearInterval(this.timer);
+      this.timer = null;
+    }
+    this.timer = window.setInterval(() => this.advance(TICK_MS), TICK_MS);
   }
 
   private emit(snapshot: TickSnapshot): void {
@@ -122,6 +151,9 @@ const tauriTransport: Transport = {
   demolish: (entityId) => invoke('demolish', { entityId }),
   moveVillagerTo: (x, y) => invoke('move_villager_to', { x, y }),
   getVillagerDetail: (id) => invoke<VillagerDetail>('get_villager_detail', { id }),
+  setSpeed: (speed) => invoke('set_speed', { speed }),
+  plantCrop: (kind, x, y) => invoke('plant_crop', { kind, x, y }),
+  advanceClock: (days, season) => invoke('advance_clock', { days, season: season ?? null }),
 };
 
 export const transport: Transport = isTauri() ? tauriTransport : browserTransport;

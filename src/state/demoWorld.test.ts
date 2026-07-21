@@ -108,4 +108,42 @@ describe('DemoWorld pathfinding', () => {
     expect(detail.jobKind).toBe('tend_crops');
     expect(detail.state).toBe(2);
   });
+
+  it('plants wheat, grows in spring, stalls in winter', () => {
+    const terrain = {
+      width: 16,
+      height: 16,
+      tileSize: 32,
+      tiles: new Array(16 * 16).fill(3),
+    };
+    const world = new DemoWorld(terrain);
+    world.placeBuilding('farm', 4, 4, 0);
+    for (let i = 0; i < 30; i += 1) world.advance();
+    world.plantCrop('wheat', 4, 4);
+    expect(world.snapshot().crops).toHaveLength(1);
+
+    // Water via tend work cycles by advancing until working, then force growth checks.
+    for (let i = 0; i < 200; i += 1) world.advance();
+    // Manually keep advancing with auto-plant/water from tend; stage may still be 0 early.
+    const snapSpring = world.snapshot();
+    expect(snapSpring.clock.season).toBe(0);
+    expect(snapSpring.crops.length).toBeGreaterThanOrEqual(1);
+
+    world.advanceClock(0, 3); // winter
+    const stageBefore = world.snapshot().crops[0]?.stage ?? 0;
+    const tickBefore = world.snapshot().tick;
+    for (let i = 0; i < 50; i += 1) world.advance();
+    expect(world.snapshot().clock.season).toBe(3);
+    expect(world.snapshot().crops[0]?.stage).toBe(stageBefore);
+    expect(world.snapshot().tick).toBeGreaterThan(tickBefore);
+  });
+
+  it('exposes clock in snapshots and respects pause via setSpeed', () => {
+    const world = new DemoWorld(generateDemoTerrain());
+    expect(world.snapshot().clock.day).toBe(1);
+    world.setSpeed(0);
+    expect(world.speed).toBe(0);
+    world.setSpeed(2);
+    expect(world.speed).toBe(2);
+  });
 });

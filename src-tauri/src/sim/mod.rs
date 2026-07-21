@@ -18,15 +18,15 @@ use world::World;
 pub mod agents;
 pub mod buildings;
 pub mod catalog;
+pub mod clock;
 pub mod commands;
+pub mod crops;
 pub mod jobs;
 pub mod needs;
 pub mod pathfind;
 pub mod resources;
 pub mod terrain;
 pub mod world;
-
-const TICK_INTERVAL: Duration = Duration::from_millis(50);
 
 pub struct SimRuntime {
     stop: Arc<AtomicBool>,
@@ -57,11 +57,14 @@ pub fn start_simulation(
     let thread_stop = Arc::clone(&stop);
     let worker = thread::spawn(move || {
         while !thread_stop.load(Ordering::Relaxed) {
-            let deadline = Instant::now() + TICK_INTERVAL;
+            let interval = Duration::from_millis(world.clock_speed().tick_interval_ms());
+            let deadline = Instant::now() + interval;
             while let Ok(command) = commands.try_recv() {
                 world.handle_command(command);
             }
-            world.advance();
+            if !world.clock_speed().is_paused() {
+                world.advance();
+            }
             snapshots.send_replace(world.tick_snapshot());
             if let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
                 thread::sleep(remaining);

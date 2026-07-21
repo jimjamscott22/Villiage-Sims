@@ -6,8 +6,10 @@ const resources: ResourceTotals = { wood: 120, stone: 40, grain: 0, food: 0, gol
 
 const tick = (number: number, x: number): TickSnapshot => ({
   tick: number,
+  clock: { minute: 0, day: 1, season: 0, year: 1, speed: 1 },
   villagers: [{ id: 1, x, y: 20 }],
   buildings: [{ id: 9, kind: 0, x: 1, y: 2, rot: 0, state: 2, progress: 100 }],
+  crops: [],
   resources,
 });
 

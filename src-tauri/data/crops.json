@@ -1,0 +1,12 @@
+[
+  {
+    "id": "wheat",
+    "name": "Wheat",
+    "stages": 4,
+    "ticks_per_stage": 400,
+    "seasons": ["spring", "summer"],
+    "water_required": true,
+    "yield": { "grain": 3 },
+    "seed_cost": { "grain": 1 }
+  }
+]

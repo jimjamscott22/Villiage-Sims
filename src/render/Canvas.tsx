@@ -3,7 +3,7 @@ import { SnapshotBuffer } from '../state/snapshot';
 import { advanceDemoTime, transport } from '../state/transport';
 import type { BuildingDef, Catalog, TerrainSnapshot, TickSnapshot } from '../state/types';
 import { Camera } from './camera';
-import { drawBuildings, drawVillagers } from './drawEntities';
+import { drawBuildings, drawCrops, drawVillagers } from './drawEntities';
 import { drawGhost } from './drawGhost';
 import { drawTerrain } from './drawTerrain';
 
@@ -16,6 +16,7 @@ const CLICK_DRAG_THRESHOLD = 6;
 interface CanvasProps {
   catalog: Catalog | null;
   selectedKind: string | null;
+  selectedCropKind: string | null;
   rotation: number;
   selectedBuildingId: number | null;
   onRotationChange: (rotation: number) => void;
@@ -32,6 +33,7 @@ function rotatedFootprint(def: BuildingDef, rotation: number): [number, number] 
 export function Canvas({
   catalog,
   selectedKind,
+  selectedCropKind,
   rotation,
   selectedBuildingId,
   onRotationChange,
@@ -45,6 +47,7 @@ export function Canvas({
   const errorRef = useRef<string | null>(null);
   const tickRef = useRef(0);
   const selectedKindRef = useRef(selectedKind);
+  const selectedCropKindRef = useRef(selectedCropKind);
   const rotationRef = useRef(rotation);
   const catalogRef = useRef(catalog);
   const selectedBuildingIdRef = useRef(selectedBuildingId);
@@ -56,6 +59,9 @@ export function Canvas({
   useEffect(() => {
     selectedKindRef.current = selectedKind;
   }, [selectedKind]);
+  useEffect(() => {
+    selectedCropKindRef.current = selectedCropKind;
+  }, [selectedCropKind]);
   useEffect(() => {
     rotationRef.current = rotation;
   }, [rotation]);
@@ -153,7 +159,8 @@ export function Canvas({
 
     const refreshGhost = async () => {
       const kind = selectedKindRef.current;
-      if (!kind || !terrain) {
+      const cropKind = selectedCropKindRef.current;
+      if ((!kind && !cropKind) || !terrain) {
         hoverTile = null;
         return;
       }
@@ -163,10 +170,14 @@ export function Canvas({
         return;
       }
       hoverTile = tile;
+      if (cropKind) {
+        hoverValid = true;
+        return;
+      }
       const key = `${kind}:${tile[0]}:${tile[1]}:${rotationRef.current}`;
       if (key === lastValidateKey) return;
       lastValidateKey = key;
-      const validity = await transport.validatePlacement(kind, tile[0], tile[1], rotationRef.current);
+      const validity = await transport.validatePlacement(kind!, tile[0], tile[1], rotationRef.current);
       if (key === lastValidateKey) hoverValid = validity.valid;
     };
 
@@ -198,7 +209,13 @@ export function Canvas({
           (building) => building.footprint as [number, number],
         );
         drawBuildings(ctx, rendered.buildings, terrain.tileSize, footprints);
+        drawCrops(ctx, rendered.crops ?? [], terrain.tileSize);
         drawVillagers(ctx, rendered.villagers, camera.zoom);
+      }
+
+      const cropKind = selectedCropKindRef.current;
+      if (cropKind && hoverTile) {
+        drawGhost(ctx, hoverTile[0], hoverTile[1], [1, 1], terrain.tileSize, hoverValid);
       }
 
       const kind = selectedKindRef.current;
@@ -272,11 +289,15 @@ export function Canvas({
       advanceDemoTime(ms);
       draw(performance.now() + Math.max(0, ms));
     };
+    window.advanceClock = (days, season) => {
+      void transport.advanceClock(days, season).then(() => draw(performance.now()));
+    };
     window.render_game_to_text = () =>
       JSON.stringify({
         coordinateSystem: 'origin top-left; x right; y down; world pixels',
         mode: transport.mode,
         tick: rendered?.tick ?? tickRef.current,
+        clock: rendered?.clock ?? null,
         terrain: terrain
           ? { width: terrain.width, height: terrain.height, tileSize: terrain.tileSize }
           : null,
@@ -288,8 +309,10 @@ export function Canvas({
           viewHeight,
         },
         buildings: rendered?.buildings ?? [],
+        crops: rendered?.crops ?? [],
         resources: rendered?.resources ?? null,
         selectedKind: selectedKindRef.current,
+        selectedCropKind: selectedCropKindRef.current,
         villagers: rendered?.villagers ?? [],
         error: errorRef.current,
       });
@@ -350,7 +373,7 @@ export function Canvas({
         dragMoved = true;
       }
       // In build mode, only middle-mouse pans; left button is reserved for placement clicks.
-      if (event.buttons & 4 || (event.buttons & 1 && !selectedKindRef.current)) {
+      if (event.buttons & 4 || (event.buttons & 1 && !selectedKindRef.current && !selectedCropKindRef.current)) {
         lastPointerX = event.clientX;
         lastPointerY = event.clientY;
         camera.panBy(dx, dy);
@@ -369,6 +392,15 @@ export function Canvas({
 
       const tile = tileAtPointer();
       if (!tile) return;
+      const cropKind = selectedCropKindRef.current;
+      if (cropKind) {
+        try {
+          await transport.plantCrop(cropKind, tile[0], tile[1]);
+        } catch (cause) {
+          fail(cause instanceof Error ? cause.message : String(cause));
+        }
+        return;
+      }
       const kind = selectedKindRef.current;
       if (kind) {
         try {
@@ -450,6 +482,7 @@ export function Canvas({
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('contextmenu', onContextMenu);
       delete window.advanceTime;
+      delete window.advanceClock;
       delete window.render_game_to_text;
     };
   }, []);
@@ -463,9 +496,11 @@ export function Canvas({
       />
       <span className="pointer-events-none absolute bottom-3 right-3 bg-black/55 px-2 py-1 text-xs text-white/70">
         Tick {tick}
-        {selectedKind
-          ? ' · build mode'
-          : ' · drag to pan · scroll to zoom · right-click to move'}
+        {selectedCropKind
+          ? ' · plant mode'
+          : selectedKind
+            ? ' · build mode'
+            : ' · drag to pan · scroll to zoom · right-click to move'}
       </span>
       {error && (
         <p role="alert" className="absolute inset-x-4 top-4 bg-red-950/90 p-3 text-sm text-red-100">
