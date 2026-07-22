@@ -40,11 +40,14 @@ pub fn run() {
             commands::get_terrain,
             commands::get_catalog,
             commands::set_viewport,
+            commands::set_speed,
             commands::validate_placement,
             commands::place_building,
             commands::demolish,
             commands::move_villager_to,
-            commands::get_villager_detail
+            commands::get_villager_detail,
+            commands::plant_crop,
+            commands::advance_clock
         ])
         .build(tauri::generate_context!())
         .expect("failed to build VillageSim");

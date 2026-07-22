@@ -8,7 +8,10 @@ const tick = (number: number, x: number): TickSnapshot => ({
   tick: number,
   villagers: [{ id: 1, x, y: 20 }],
   buildings: [{ id: 9, kind: 0, x: 1, y: 2, rot: 0, state: 2, progress: 100 }],
+  crops: [],
   resources,
+  clock: { minute: 0, day: 1, season: 0, year: 1, speed: 1 },
+  events: [],
 });
 
 describe('SnapshotBuffer', () => {
@@ -41,5 +44,6 @@ describe('SnapshotBuffer', () => {
     const rendered = buffer.interpolate(1025, 50);
     expect(rendered?.buildings).toEqual(tick(1, 10).buildings);
     expect(rendered?.resources.wood).toBe(120);
+    expect(rendered?.clock.day).toBe(1);
   });
 });

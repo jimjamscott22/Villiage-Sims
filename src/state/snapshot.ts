@@ -24,6 +24,7 @@ export class SnapshotBuffer {
         id: current.id,
         x: previous.x + (current.x - previous.x) * alpha,
         y: previous.y + (current.y - previous.y) * alpha,
+        state: current.state,
       };
     });
 
@@ -31,7 +32,10 @@ export class SnapshotBuffer {
       tick: this.current.tick,
       villagers,
       buildings: this.current.buildings,
+      crops: this.current.crops,
       resources: this.current.resources,
+      clock: this.current.clock,
+      events: this.current.events,
     };
   }
 }

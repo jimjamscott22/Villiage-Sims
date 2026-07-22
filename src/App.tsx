@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Canvas } from './render/Canvas';
 import { transport } from './state/transport';
-import type { Catalog, ResourceTotals, TickSnapshot, VillagerDetail } from './state/types';
+import type { Catalog, ClockView, ResourceTotals, TickSnapshot, VillagerDetail } from './state/types';
 import { BuildMenu } from './ui/BuildMenu';
+import { ClockBar } from './ui/ClockBar';
 
 const DETAIL_POLL_MS = 250;
 
 export default function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [resources, setResources] = useState<ResourceTotals | null>(null);
+  const [clock, setClock] = useState<ClockView | null>(null);
   const [selectedKind, setSelectedKind] = useState<string | null>(null);
+  const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0);
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
   const [villagerDetail, setVillagerDetail] = useState<VillagerDetail | null>(null);
@@ -44,6 +47,7 @@ export default function App() {
 
   const onSnapshot = (snapshot: TickSnapshot) => {
     setResources(snapshot.resources);
+    setClock(snapshot.clock);
   };
 
   const onDemolish = async () => {
@@ -56,10 +60,19 @@ export default function App() {
     }
   };
 
+  const onSetSpeed = async (speed: number) => {
+    try {
+      await transport.setSpeed(speed);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+
   return (
     <main className="flex h-full flex-col bg-[#17211b] text-[#f7f4e9]">
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
         <h1 className="text-base font-semibold">VillageSim</h1>
+        <ClockBar clock={clock} onSetSpeed={(speed) => { void onSetSpeed(speed); }} />
         <span className="text-xs text-white/60">
           {transport.mode === 'tauri' ? 'Simulation connected' : 'Browser demo'}
         </span>
@@ -73,10 +86,14 @@ export default function App() {
         <Canvas
           catalog={catalog}
           selectedKind={selectedKind}
+          selectedCrop={selectedCrop}
           rotation={rotation}
           selectedBuildingId={selectedBuildingId}
           onRotationChange={setRotation}
-          onCancelBuild={() => setSelectedKind(null)}
+          onCancelBuild={() => {
+            setSelectedKind(null);
+            setSelectedCrop(null);
+          }}
           onSelectBuilding={setSelectedBuildingId}
           onSnapshot={onSnapshot}
         />
@@ -84,12 +101,19 @@ export default function App() {
           catalog={catalog}
           resources={resources}
           selectedKind={selectedKind}
+          selectedCrop={selectedCrop}
           selectedBuildingId={selectedBuildingId}
           villagerDetail={villagerDetail}
           onSelectKind={(kind) => {
             setSelectedKind(kind);
+            setSelectedCrop(null);
             setSelectedBuildingId(null);
             setRotation(0);
+          }}
+          onSelectCrop={(kind) => {
+            setSelectedCrop(kind);
+            setSelectedKind(null);
+            setSelectedBuildingId(null);
           }}
           onDemolish={() => {
             void onDemolish();

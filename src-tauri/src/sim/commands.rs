@@ -37,4 +37,18 @@ pub enum SimCommand {
         id: u32,
         reply: oneshot::Sender<Result<VillagerDetail, String>>,
     },
+    SetSpeed {
+        speed: u8,
+    },
+    PlantCrop {
+        kind: String,
+        x: i32,
+        y: i32,
+        reply: oneshot::Sender<Result<(), String>>,
+    },
+    AdvanceClock {
+        days: u32,
+        season: Option<u8>,
+        reply: oneshot::Sender<Result<(), String>>,
+    },
 }

@@ -3,7 +3,7 @@ import { SnapshotBuffer } from '../state/snapshot';
 import { advanceDemoTime, transport } from '../state/transport';
 import type { BuildingDef, Catalog, TerrainSnapshot, TickSnapshot } from '../state/types';
 import { Camera } from './camera';
-import { drawBuildings, drawVillagers } from './drawEntities';
+import { drawBuildings, drawCrops, drawVillagers } from './drawEntities';
 import { drawGhost } from './drawGhost';
 import { drawTerrain } from './drawTerrain';
 
@@ -16,6 +16,7 @@ const CLICK_DRAG_THRESHOLD = 6;
 interface CanvasProps {
   catalog: Catalog | null;
   selectedKind: string | null;
+  selectedCrop: string | null;
   rotation: number;
   selectedBuildingId: number | null;
   onRotationChange: (rotation: number) => void;
@@ -29,9 +30,25 @@ function rotatedFootprint(def: BuildingDef, rotation: number): [number, number] 
   return rotation % 2 === 0 ? [w, h] : [h, w];
 }
 
+function cropPlantValid(
+  snapshot: TickSnapshot,
+  catalog: Catalog,
+  x: number,
+  y: number,
+): boolean {
+  if (snapshot.crops.some((crop) => crop.x === x && crop.y === y)) return false;
+  return snapshot.buildings.some((building) => {
+    const def = catalog.buildings[building.kind];
+    if (!def || def.id !== 'farm' || building.state !== 2) return false;
+    const [fw, fh] = rotatedFootprint(def, building.rot);
+    return x >= building.x && y >= building.y && x < building.x + fw && y < building.y + fh;
+  });
+}
+
 export function Canvas({
   catalog,
   selectedKind,
+  selectedCrop,
   rotation,
   selectedBuildingId,
   onRotationChange,
@@ -45,6 +62,7 @@ export function Canvas({
   const errorRef = useRef<string | null>(null);
   const tickRef = useRef(0);
   const selectedKindRef = useRef(selectedKind);
+  const selectedCropRef = useRef(selectedCrop);
   const rotationRef = useRef(rotation);
   const catalogRef = useRef(catalog);
   const selectedBuildingIdRef = useRef(selectedBuildingId);
@@ -56,6 +74,9 @@ export function Canvas({
   useEffect(() => {
     selectedKindRef.current = selectedKind;
   }, [selectedKind]);
+  useEffect(() => {
+    selectedCropRef.current = selectedCrop;
+  }, [selectedCrop]);
   useEffect(() => {
     rotationRef.current = rotation;
   }, [rotation]);
@@ -153,7 +174,8 @@ export function Canvas({
 
     const refreshGhost = async () => {
       const kind = selectedKindRef.current;
-      if (!kind || !terrain) {
+      const crop = selectedCropRef.current;
+      if ((!kind && !crop) || !terrain) {
         hoverTile = null;
         return;
       }
@@ -163,10 +185,19 @@ export function Canvas({
         return;
       }
       hoverTile = tile;
+      if (crop) {
+        const key = `crop:${crop}:${tile[0]}:${tile[1]}`;
+        if (key === lastValidateKey) return;
+        lastValidateKey = key;
+        const snapshot = rendered ?? buffer.interpolate(performance.now(), TICK_MS);
+        const cat = catalogRef.current;
+        hoverValid = !!(snapshot && cat && cropPlantValid(snapshot, cat, tile[0], tile[1]));
+        return;
+      }
       const key = `${kind}:${tile[0]}:${tile[1]}:${rotationRef.current}`;
       if (key === lastValidateKey) return;
       lastValidateKey = key;
-      const validity = await transport.validatePlacement(kind, tile[0], tile[1], rotationRef.current);
+      const validity = await transport.validatePlacement(kind!, tile[0], tile[1], rotationRef.current);
       if (key === lastValidateKey) hoverValid = validity.valid;
     };
 
@@ -198,10 +229,12 @@ export function Canvas({
           (building) => building.footprint as [number, number],
         );
         drawBuildings(ctx, rendered.buildings, terrain.tileSize, footprints);
+        drawCrops(ctx, rendered.crops ?? [], terrain.tileSize);
         drawVillagers(ctx, rendered.villagers, camera.zoom);
       }
 
       const kind = selectedKindRef.current;
+      const crop = selectedCropRef.current;
       const def = kind ? catalogRef.current?.buildings.find((building) => building.id === kind) : null;
       if (def && hoverTile) {
         drawGhost(
@@ -212,6 +245,8 @@ export function Canvas({
           terrain.tileSize,
           hoverValid,
         );
+      } else if (crop && hoverTile) {
+        drawGhost(ctx, hoverTile[0], hoverTile[1], [1, 1], terrain.tileSize, hoverValid);
       }
 
       if (rendered && selectedBuildingIdRef.current != null) {
@@ -288,8 +323,11 @@ export function Canvas({
           viewHeight,
         },
         buildings: rendered?.buildings ?? [],
+        crops: rendered?.crops ?? [],
+        clock: rendered?.clock ?? null,
         resources: rendered?.resources ?? null,
         selectedKind: selectedKindRef.current,
+        selectedCrop: selectedCropRef.current,
         villagers: rendered?.villagers ?? [],
         error: errorRef.current,
       });
@@ -349,8 +387,11 @@ export function Canvas({
       ) {
         dragMoved = true;
       }
-      // In build mode, only middle-mouse pans; left button is reserved for placement clicks.
-      if (event.buttons & 4 || (event.buttons & 1 && !selectedKindRef.current)) {
+      // In build/plant mode, only middle-mouse pans; left button is reserved for clicks.
+      if (
+        event.buttons & 4
+        || (event.buttons & 1 && !selectedKindRef.current && !selectedCropRef.current)
+      ) {
         lastPointerX = event.clientX;
         lastPointerY = event.clientY;
         camera.panBy(dx, dy);
@@ -369,6 +410,15 @@ export function Canvas({
 
       const tile = tileAtPointer();
       if (!tile) return;
+      const crop = selectedCropRef.current;
+      if (crop) {
+        try {
+          await transport.plantCrop(crop, tile[0], tile[1]);
+        } catch (cause) {
+          fail(cause instanceof Error ? cause.message : String(cause));
+        }
+        return;
+      }
       const kind = selectedKindRef.current;
       if (kind) {
         try {
@@ -465,7 +515,9 @@ export function Canvas({
         Tick {tick}
         {selectedKind
           ? ' · build mode'
-          : ' · drag to pan · scroll to zoom · right-click to move'}
+          : selectedCrop
+            ? ' · plant mode'
+            : ' · drag to pan · scroll to zoom · right-click to move'}
       </span>
       {error && (
         <p role="alert" className="absolute inset-x-4 top-4 bg-red-950/90 p-3 text-sm text-red-100">

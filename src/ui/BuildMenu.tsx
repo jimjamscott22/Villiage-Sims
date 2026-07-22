@@ -1,13 +1,15 @@
-import type { BuildingDef, Catalog, ResourceTotals, VillagerDetail } from '../state/types';
+import type { BuildingDef, Catalog, CropDef, ResourceTotals, VillagerDetail } from '../state/types';
 import { VillagerPanel } from './VillagerPanel';
 
 interface BuildMenuProps {
   catalog: Catalog | null;
   resources: ResourceTotals | null;
   selectedKind: string | null;
+  selectedCrop: string | null;
   selectedBuildingId: number | null;
   villagerDetail: VillagerDetail | null;
   onSelectKind: (kind: string | null) => void;
+  onSelectCrop: (kind: string | null) => void;
   onDemolish: () => void;
 }
 
@@ -21,9 +23,11 @@ export function BuildMenu({
   catalog,
   resources,
   selectedKind,
+  selectedCrop,
   selectedBuildingId,
   villagerDetail,
   onSelectKind,
+  onSelectCrop,
   onDemolish,
 }: BuildMenuProps) {
   return (
@@ -35,10 +39,37 @@ export function BuildMenu({
           <dd className="text-right tabular-nums">{resources?.wood ?? '—'}</dd>
           <dt>Stone</dt>
           <dd className="text-right tabular-nums">{resources?.stone ?? '—'}</dd>
+          <dt>Grain</dt>
+          <dd className="text-right tabular-nums">{resources?.grain ?? '—'}</dd>
         </dl>
       </div>
 
       <VillagerPanel detail={villagerDetail} />
+
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-white/50">Plant</h2>
+        <ul className="mt-2 flex flex-col gap-1">
+          {(catalog?.crops ?? []).map((crop: CropDef) => {
+            const active = selectedCrop === crop.id;
+            return (
+              <li key={crop.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelectCrop(active ? null : crop.id)}
+                  className={`w-full rounded px-2 py-2 text-left transition ${
+                    active ? 'bg-lime-800/70 text-white' : 'bg-white/5 text-white/85 hover:bg-white/10'
+                  }`}
+                >
+                  <div className="font-medium">{crop.name}</div>
+                  <div className="text-[11px] text-white/55">
+                    {crop.seasons.join(', ')} · {crop.stages} stages
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
       <div className="min-h-0 flex-1">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-white/50">Build</h2>
@@ -62,7 +93,7 @@ export function BuildMenu({
           })}
         </ul>
         <p className="mt-3 text-[11px] leading-relaxed text-white/45">
-          Select a building, then click the map. <kbd className="text-white/70">R</kbd> rotates,{' '}
+          Select a building or crop, then click the map. <kbd className="text-white/70">R</kbd> rotates,{' '}
           <kbd className="text-white/70">Esc</kbd> cancels. Middle-drag pans. Right-click to move.
         </p>
       </div>

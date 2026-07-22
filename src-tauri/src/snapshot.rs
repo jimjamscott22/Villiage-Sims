@@ -1,5 +1,7 @@
 use serde::Serialize;
 
+use crate::sim::clock::ClockView;
+use crate::sim::crops::CropView;
 use crate::sim::resources::ResourceTotals;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -12,12 +14,21 @@ pub struct TerrainSnapshot {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum SimEvent {
+    CropReady { id: u32 },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TickSnapshot {
     pub tick: u64,
     pub villagers: Vec<VillagerView>,
     pub buildings: Vec<BuildingView>,
+    pub crops: Vec<CropView>,
     pub resources: ResourceTotals,
+    pub clock: ClockView,
+    pub events: Vec<SimEvent>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]

@@ -29,11 +29,14 @@ interface Transport {
   getCatalog(): Promise<Catalog>;
   listenToTicks(listener: TickListener): Promise<Unlisten>;
   setViewport(x: number, y: number, w: number, h: number): Promise<void>;
+  setSpeed(speed: number): Promise<void>;
   validatePlacement(kind: string, x: number, y: number, rotation: number): Promise<PlacementValidity>;
   placeBuilding(kind: string, x: number, y: number, rotation: number): Promise<PlacementResult>;
   demolish(entityId: number): Promise<void>;
   moveVillagerTo(x: number, y: number): Promise<void>;
   getVillagerDetail(id: number): Promise<VillagerDetail>;
+  plantCrop(kind: string, x: number, y: number): Promise<void>;
+  advanceClock(days: number, season: number | null): Promise<void>;
 }
 
 class BrowserTransport implements Transport {
@@ -70,6 +73,11 @@ class BrowserTransport implements Transport {
     this.world.setViewport(x, y, w, h);
   }
 
+  async setSpeed(speed: number): Promise<void> {
+    this.world.setSpeed(speed);
+    this.emit(this.world.snapshot());
+  }
+
   async validatePlacement(kind: string, x: number, y: number, rotation: number): Promise<PlacementValidity> {
     return this.world.validatePlacement(kind, x, y, rotation);
   }
@@ -94,10 +102,23 @@ class BrowserTransport implements Transport {
     return this.world.getVillagerDetail(id);
   }
 
+  async plantCrop(kind: string, x: number, y: number): Promise<void> {
+    this.world.plantCrop(kind, x, y);
+    this.emit(this.world.snapshot());
+  }
+
+  async advanceClock(days: number, season: number | null): Promise<void> {
+    this.world.advanceClock(days, season);
+    this.emit(this.world.snapshot());
+  }
+
   advance(ms: number): void {
     this.elapsed += Math.max(0, ms);
-    while (this.elapsed >= TICK_MS) {
-      this.elapsed -= TICK_MS;
+    const speed = Math.max(1, this.world.speed || 0);
+    // Paused: still emit so UI updates, but skip world.advance via DemoWorld.
+    const step = this.world.speed === 0 ? TICK_MS : TICK_MS / speed;
+    while (this.elapsed >= step) {
+      this.elapsed -= step;
       this.emit(this.world.advance());
     }
   }
@@ -115,6 +136,7 @@ const tauriTransport: Transport = {
   getCatalog: () => invoke<Catalog>('get_catalog'),
   listenToTicks: async (listener) => listen<TickSnapshot>('tick', (event) => listener(event.payload)),
   setViewport: (x, y, w, h) => invoke('set_viewport', { x, y, w, h }),
+  setSpeed: (speed) => invoke('set_speed', { speed }),
   validatePlacement: (kind, x, y, rotation) =>
     invoke<PlacementValidity>('validate_placement', { kind, x, y, rotation }),
   placeBuilding: (kind, x, y, rotation) =>
@@ -122,6 +144,8 @@ const tauriTransport: Transport = {
   demolish: (entityId) => invoke('demolish', { entityId }),
   moveVillagerTo: (x, y) => invoke('move_villager_to', { x, y }),
   getVillagerDetail: (id) => invoke<VillagerDetail>('get_villager_detail', { id }),
+  plantCrop: (kind, x, y) => invoke('plant_crop', { kind, x, y }),
+  advanceClock: (days, season) => invoke('advance_clock', { days, season }),
 };
 
 export const transport: Transport = isTauri() ? tauriTransport : browserTransport;

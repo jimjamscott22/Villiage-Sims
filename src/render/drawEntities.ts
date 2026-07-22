@@ -1,6 +1,7 @@
-import type { BuildingView, VillagerView } from '../state/types';
+import type { BuildingView, CropView, VillagerView } from '../state/types';
 
 const BUILDING_COLORS = ['#c4a574', '#8fbc5a', '#b08968'];
+const CROP_STAGE_COLORS = ['#6b8f3c', '#7fa84a', '#c4b44a', '#d4a017'];
 
 /** Draw villagers with a roughly constant on-screen size across zoom levels. */
 export function drawVillagers(
@@ -45,5 +46,24 @@ export function drawBuildings(
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.fillRect(x + 4, y + height - 10, ((width - 8) * building.progress) / 100, 4);
     }
+  }
+}
+
+/** Stage-based crop markers (size/color progression for M6). */
+export function drawCrops(
+  ctx: CanvasRenderingContext2D,
+  crops: CropView[],
+  tileSize: number,
+): void {
+  for (const crop of crops) {
+    const pad = Math.max(4, tileSize * (0.35 - crop.stage * 0.05));
+    const size = tileSize - pad * 2;
+    const x = crop.x * tileSize + pad;
+    const y = crop.y * tileSize + pad;
+    ctx.fillStyle = CROP_STAGE_COLORS[crop.stage] ?? CROP_STAGE_COLORS[CROP_STAGE_COLORS.length - 1];
+    ctx.fillRect(x, y, size, size);
+    ctx.strokeStyle = '#2a3a1a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, size, size);
   }
 }
