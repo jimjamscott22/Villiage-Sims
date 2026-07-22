@@ -18,7 +18,9 @@ use world::World;
 pub mod agents;
 pub mod buildings;
 pub mod catalog;
+pub mod clock;
 pub mod commands;
+pub mod crops;
 pub mod jobs;
 pub mod needs;
 pub mod pathfind;
@@ -57,11 +59,15 @@ pub fn start_simulation(
     let thread_stop = Arc::clone(&stop);
     let worker = thread::spawn(move || {
         while !thread_stop.load(Ordering::Relaxed) {
-            let deadline = Instant::now() + TICK_INTERVAL;
             while let Ok(command) = commands.try_recv() {
                 world.handle_command(command);
             }
-            world.advance();
+            let interval = world.clock().speed.tick_interval(TICK_INTERVAL);
+            let deadline = Instant::now() + interval;
+            if !world.clock().speed.is_paused() {
+                world.advance();
+            }
+            // Always publish so paused plant/demolish commands reach the UI.
             snapshots.send_replace(world.tick_snapshot());
             if let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
                 thread::sleep(remaining);

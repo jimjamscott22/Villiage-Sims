@@ -2,9 +2,11 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use super::crops::CropDef;
 use super::terrain::Terrain;
 
 const BUILDINGS_JSON: &str = include_str!("../../data/buildings.json");
+const CROPS_JSON: &str = include_str!("../../data/crops.json");
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,13 +40,17 @@ pub struct JobDef {
 #[serde(rename_all = "camelCase")]
 pub struct Catalog {
     pub buildings: Vec<BuildingDef>,
+    #[serde(default)]
+    pub crops: Vec<CropDef>,
 }
 
 impl Catalog {
     pub fn load_builtin() -> Result<Self, String> {
         let buildings: Vec<BuildingDef> = serde_json::from_str(BUILDINGS_JSON)
             .map_err(|error| format!("invalid buildings.json: {error}"))?;
-        let catalog = Self { buildings };
+        let crops: Vec<CropDef> = serde_json::from_str(CROPS_JSON)
+            .map_err(|error| format!("invalid crops.json: {error}"))?;
+        let catalog = Self { buildings, crops };
         catalog.validate()?;
         Ok(catalog)
     }
@@ -76,6 +82,35 @@ impl Catalog {
                 }
             }
         }
+        if self.crops.is_empty() {
+            return Err("crops catalog is empty".into());
+        }
+        let mut crop_seen = std::collections::BTreeSet::new();
+        for (index, crop) in self.crops.iter().enumerate() {
+            if crop.id.is_empty() {
+                return Err(format!("crop at index {index} has empty id"));
+            }
+            if !crop_seen.insert(crop.id.clone()) {
+                return Err(format!("duplicate crop id '{}'", crop.id));
+            }
+            if crop.stages == 0 {
+                return Err(format!("crop '{}' has zero stages", crop.id));
+            }
+            if crop.ticks_per_stage == 0 {
+                return Err(format!("crop '{}' has zero ticks_per_stage", crop.id));
+            }
+            if crop.seasons.is_empty() {
+                return Err(format!("crop '{}' has no seasons", crop.id));
+            }
+            for season in &crop.seasons {
+                if super::clock::Season::from_name(season).is_none() {
+                    return Err(format!(
+                        "crop '{}' references unknown season '{season}'",
+                        crop.id
+                    ));
+                }
+            }
+        }
         Ok(())
     }
 
@@ -89,6 +124,18 @@ impl Catalog {
 
     pub fn get(&self, kind_index: u8) -> Option<&BuildingDef> {
         self.buildings.get(kind_index as usize)
+    }
+
+    pub fn find_crop(&self, id: &str) -> Option<(u8, &CropDef)> {
+        self.crops
+            .iter()
+            .enumerate()
+            .find(|(_, def)| def.id == id)
+            .map(|(index, def)| (index as u8, def))
+    }
+
+    pub fn get_crop(&self, kind_index: u8) -> Option<&CropDef> {
+        self.crops.get(kind_index as usize)
     }
 }
 
@@ -110,11 +157,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn builtin_catalog_loads_three_buildings() {
+    fn builtin_catalog_loads_buildings_and_crops() {
         let catalog = Catalog::load_builtin().expect("catalog");
         assert_eq!(catalog.buildings.len(), 3);
         assert!(catalog.find("hut").is_some());
         assert!(catalog.find("farm").is_some());
         assert!(catalog.find("granary").is_some());
+        assert_eq!(catalog.crops.len(), 1);
+        assert!(catalog.find_crop("wheat").is_some());
     }
 }

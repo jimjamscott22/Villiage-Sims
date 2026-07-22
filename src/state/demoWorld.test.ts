@@ -108,4 +108,34 @@ describe('DemoWorld pathfinding', () => {
     expect(detail.jobKind).toBe('tend_crops');
     expect(detail.state).toBe(2);
   });
+
+  it('plants wheat on a completed farm and stalls in winter', () => {
+    const terrain = {
+      width: 16,
+      height: 16,
+      tileSize: 32,
+      tiles: new Array(16 * 16).fill(3),
+    };
+    const world = new DemoWorld(terrain);
+    world.placeBuilding('farm', 2, 2, 0);
+    for (let i = 0; i < 30; i += 1) world.advance();
+    world.plantCrop('wheat', 2, 2);
+    expect(world.snapshot().crops).toHaveLength(1);
+    world.advanceClock(0, 3);
+    const crop = world.crops[0];
+    crop.watered = true;
+    for (let i = 0; i < 500; i += 1) {
+      crop.watered = true;
+      world.advance();
+    }
+    expect(world.crops[0].stage).toBe(0);
+  });
+
+  it('respects pause speed', () => {
+    const world = new DemoWorld(generateDemoTerrain());
+    const before = world.snapshot().tick;
+    world.setSpeed(0);
+    world.advance();
+    expect(world.snapshot().tick).toBe(before);
+  });
 });

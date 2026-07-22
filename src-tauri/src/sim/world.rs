@@ -1,4 +1,6 @@
-use crate::snapshot::{BuildingView, TerrainSnapshot, TickSnapshot, VillagerDetail, VillagerView};
+use crate::snapshot::{
+    BuildingView, SimEvent, TerrainSnapshot, TickSnapshot, VillagerDetail, VillagerView,
+};
 
 use super::agents::{
     AgentState, DEFAULT_JOB_PRIORITY, MOVE_SPEED_TILES_PER_SEC, MovePurpose, REPATH_COOLDOWN_TICKS,
@@ -9,7 +11,9 @@ use super::buildings::{
     terrain_allowed,
 };
 use super::catalog::Catalog;
+use super::clock::Clock;
 use super::commands::SimCommand;
+use super::crops::{Crop, tick_crop};
 use super::jobs::JobBoard;
 use super::pathfind::{find_path, terrain_passable};
 use super::resources::ResourceTotals;
@@ -39,14 +43,17 @@ pub struct World {
     tiles: Vec<u8>,
     #[allow(dead_code)]
     seed: u64,
-    tick: u64,
+    clock: Clock,
     catalog: Catalog,
     buildings: Vec<Building>,
+    crops: Vec<Crop>,
     occupancy: Vec<Option<u32>>,
     resources: ResourceTotals,
     next_building_id: u32,
+    next_crop_id: u32,
     villager: Villager,
     job_board: JobBoard,
+    events: Vec<SimEvent>,
     viewport: Viewport,
 }
 
@@ -62,14 +69,17 @@ impl World {
             tile_size,
             tiles,
             seed,
-            tick: 0,
+            clock: Clock::new(),
             catalog: Catalog::load_builtin().expect("builtin buildings catalog"),
             buildings: Vec::new(),
+            crops: Vec::new(),
             occupancy,
             resources: ResourceTotals::starting(),
             next_building_id: 1,
+            next_crop_id: 1,
             villager: Villager::new(1, "Ash", (0.0, 0.0)),
             job_board: JobBoard::new(),
+            events: Vec::new(),
             viewport: Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -95,6 +105,10 @@ impl World {
 
     pub fn catalog(&self) -> &Catalog {
         &self.catalog
+    }
+
+    pub fn clock(&self) -> &Clock {
+        &self.clock
     }
 
     pub fn handle_command(&mut self, command: SimCommand) {
@@ -134,12 +148,31 @@ impl World {
                 let result = self.villager_detail(id);
                 let _ = reply.send(result);
             }
+            SimCommand::SetSpeed { speed } => {
+                let _ = self.clock.set_speed(speed);
+            }
+            SimCommand::PlantCrop { kind, x, y, reply } => {
+                let result = self.plant_crop(&kind, x, y);
+                let _ = reply.send(result);
+            }
+            SimCommand::AdvanceClock {
+                days,
+                season,
+                reply,
+            } => {
+                let result = self.advance_clock(days, season);
+                let _ = reply.send(result);
+            }
         }
     }
 
     pub fn advance(&mut self) {
-        self.tick += 1;
+        self.events.clear();
+        if self.clock.advance_tick() {
+            self.clear_all_crop_water();
+        }
         self.complete_buildings();
+        self.tick_crops();
         self.villager.needs.tick_decay();
         self.tick_villager();
     }
@@ -169,6 +202,11 @@ impl World {
         &self.job_board
     }
 
+    #[cfg(test)]
+    pub fn crops(&self) -> &[Crop] {
+        &self.crops
+    }
+
     pub fn terrain_snapshot(&self) -> TerrainSnapshot {
         TerrainSnapshot {
             width: self.width,
@@ -180,7 +218,7 @@ impl World {
 
     pub fn tick_snapshot(&self) -> TickSnapshot {
         TickSnapshot {
-            tick: self.tick,
+            tick: self.clock.tick,
             villagers: vec![VillagerView {
                 id: self.villager.id,
                 x: self.villager.pos.0,
@@ -188,7 +226,10 @@ impl World {
                 state: self.villager.state.as_u8(),
             }],
             buildings: self.building_views(),
+            crops: self.crops.iter().map(Crop::view).collect(),
             resources: self.resources.clone(),
+            clock: self.clock.view(),
+            events: self.events.clone(),
         }
     }
 
@@ -457,6 +498,11 @@ impl World {
             self.villager.state = AgentState::Idle;
             return;
         }
+        // TendCrops: water every tick; auto-plant at the start of each work cycle.
+        if ticks_remaining == WORK_CYCLE_TICKS {
+            self.tend_auto_plant(job);
+        }
+        self.tend_water_crops(job);
         if ticks_remaining <= 1 {
             // Loop the work cycle so tend_crops stays visibly active.
             self.villager.state = AgentState::Working {
@@ -757,6 +803,138 @@ impl World {
         Ok(PlacementResult { id })
     }
 
+    pub fn plant_crop(&mut self, kind: &str, x: i32, y: i32) -> Result<(), String> {
+        let (kind_index, def) = self
+            .catalog
+            .find_crop(kind)
+            .ok_or_else(|| format!("unknown crop '{kind}'"))?;
+        let _ = def;
+        let farm_id = self
+            .completed_farm_at(x, y)
+            .ok_or_else(|| "tile is not on a completed farm".to_string())?;
+        let _ = farm_id;
+        if self.crops.iter().any(|crop| crop.tile == (x, y)) {
+            return Err("tile already has a crop".into());
+        }
+        let id = self.next_crop_id;
+        self.next_crop_id = self.next_crop_id.saturating_add(1);
+        self.crops
+            .push(Crop::new(id, kind.to_string(), kind_index, (x, y)));
+        Ok(())
+    }
+
+    pub fn advance_clock(&mut self, days: u32, season: Option<u8>) -> Result<(), String> {
+        for _ in 0..days {
+            self.clock.force_day_rollover();
+            self.clear_all_crop_water();
+        }
+        if let Some(value) = season {
+            self.clock.set_season(value)?;
+        }
+        Ok(())
+    }
+
+    fn tick_crops(&mut self) {
+        let season = self.clock.season;
+        let defs: Vec<Option<_>> = self
+            .crops
+            .iter()
+            .map(|crop| self.catalog.get_crop(crop.kind_index).cloned())
+            .collect();
+        let mut ready_ids = Vec::new();
+        for (crop, def) in self.crops.iter_mut().zip(defs) {
+            let Some(def) = def else {
+                continue;
+            };
+            if tick_crop(crop, &def, season) {
+                ready_ids.push(crop.id);
+            }
+        }
+        for id in ready_ids {
+            self.events.push(SimEvent::CropReady { id });
+        }
+    }
+
+    fn clear_all_crop_water(&mut self) {
+        for crop in &mut self.crops {
+            crop.watered = false;
+        }
+    }
+
+    fn completed_farm_at(&self, x: i32, y: i32) -> Option<u32> {
+        for building in &self.buildings {
+            if building.state != BuildState::Complete {
+                continue;
+            }
+            let Some(def) = self.catalog.get(building.kind_index) else {
+                continue;
+            };
+            if def.id != "farm" {
+                continue;
+            }
+            let footprint = rotated_footprint(def, building.rotation);
+            if footprint_tiles(building.origin, footprint)
+                .into_iter()
+                .any(|(tx, ty)| tx == x && ty == y)
+            {
+                return Some(building.id);
+            }
+        }
+        None
+    }
+
+    fn farm_footprint_tiles(&self, building_id: u32) -> Vec<(i32, i32)> {
+        let Some(building) = self.buildings.iter().find(|b| b.id == building_id) else {
+            return Vec::new();
+        };
+        let Some(def) = self.catalog.get(building.kind_index) else {
+            return Vec::new();
+        };
+        let footprint = rotated_footprint(def, building.rotation);
+        footprint_tiles(building.origin, footprint)
+    }
+
+    fn tend_water_crops(&mut self, job_id: u32) {
+        let Some(job) = self.job_board.get(job_id).cloned() else {
+            return;
+        };
+        let tiles = self.farm_footprint_tiles(job.site);
+        for crop in &mut self.crops {
+            if tiles.iter().any(|&tile| tile == crop.tile) {
+                crop.watered = true;
+            }
+        }
+    }
+
+    fn tend_auto_plant(&mut self, job_id: u32) {
+        let Some(job) = self.job_board.get(job_id).cloned() else {
+            return;
+        };
+        let Some((kind_index, def)) = self.catalog.find_crop("wheat") else {
+            return;
+        };
+        if !def.grows_in(self.clock.season) {
+            return;
+        }
+        let tiles = self.farm_footprint_tiles(job.site);
+        let empty = tiles.into_iter().find(|&tile| {
+            self.completed_farm_at(tile.0, tile.1) == Some(job.site)
+                && !self.crops.iter().any(|crop| crop.tile == tile)
+        });
+        let Some(tile) = empty else {
+            return;
+        };
+        let id = self.next_crop_id;
+        self.next_crop_id = self.next_crop_id.saturating_add(1);
+        self.crops
+            .push(Crop::new(id, "wheat".to_string(), kind_index, tile));
+    }
+
+    fn remove_crops_on_tiles(&mut self, tiles: &[(i32, i32)]) {
+        self.crops
+            .retain(|crop| !tiles.iter().any(|&tile| tile == crop.tile));
+    }
+
     pub fn demolish(&mut self, entity_id: u32) -> Result<(), String> {
         let index = self
             .buildings
@@ -767,17 +945,20 @@ impl World {
         let def = self
             .catalog
             .get(building.kind_index)
-            .ok_or_else(|| "missing building definition".to_string())?;
-        let footprint = rotated_footprint(def, building.rotation);
-        for (tx, ty) in footprint_tiles(building.origin, footprint) {
-            if tx < 0 || ty < 0 || tx >= self.width as i32 || ty >= self.height as i32 {
+            .ok_or_else(|| "missing building definition".to_string())?
+            .clone();
+        let footprint = rotated_footprint(&def, building.rotation);
+        let tiles = footprint_tiles(building.origin, footprint);
+        for (tx, ty) in &tiles {
+            if *tx < 0 || *ty < 0 || *tx >= self.width as i32 || *ty >= self.height as i32 {
                 continue;
             }
-            let tile_index = (ty as u32 * self.width + tx as u32) as usize;
+            let tile_index = (*ty as u32 * self.width + *tx as u32) as usize;
             if self.occupancy[tile_index] == Some(entity_id) {
                 self.occupancy[tile_index] = None;
             }
         }
+        self.remove_crops_on_tiles(&tiles);
         self.resources.refund(&def.cost);
         let released = self.job_board.remove_site(entity_id);
         if released.contains(&self.villager.id) {
@@ -805,6 +986,7 @@ impl World {
 mod tests {
     use super::*;
     use crate::sim::agents::AgentState;
+    use crate::sim::clock::{Clock, Season};
     use crate::sim::jobs::JobKind;
     use crate::sim::terrain::Terrain;
 
@@ -816,6 +998,9 @@ mod tests {
         world.villager.clear_path_to_idle();
         world.villager.current_job = None;
         world.job_board = JobBoard::new();
+        world.crops.clear();
+        world.events.clear();
+        world.clock = Clock::new();
         world
     }
 
@@ -1025,5 +1210,119 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn plant_crop_on_completed_farm_and_grow_with_water() {
+        let mut world = grass_world();
+        world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..30 {
+            world.advance();
+        }
+        world.plant_crop("wheat", 2, 2).unwrap();
+        assert_eq!(world.crops().len(), 1);
+        assert!(world.plant_crop("wheat", 2, 2).is_err());
+        assert!(world.plant_crop("wheat", 0, 0).is_err());
+
+        // Water + grow through stages with a fast manual watered flag.
+        world.crops[0].watered = true;
+        let ticks_per_stage = world.catalog().find_crop("wheat").unwrap().1.ticks_per_stage;
+        let stages = world.catalog().find_crop("wheat").unwrap().1.stages;
+        for _ in 0..(ticks_per_stage * u32::from(stages)) {
+            world.crops[0].watered = true;
+            world.advance();
+        }
+        assert_eq!(world.crops()[0].stage, stages - 1);
+        assert!(world.crops()[0].ready_emitted);
+    }
+
+    #[test]
+    fn winter_stalls_crop_growth() {
+        let mut world = grass_world();
+        world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..30 {
+            world.advance();
+        }
+        world.plant_crop("wheat", 3, 3).unwrap();
+        world.advance_clock(0, Some(Season::Winter as u8)).unwrap();
+        world.crops[0].watered = true;
+        for _ in 0..500 {
+            world.crops[0].watered = true;
+            world.advance();
+        }
+        assert_eq!(world.crops()[0].stage, 0);
+    }
+
+    #[test]
+    fn tend_crops_auto_plants_and_waters() {
+        let mut world = grass_world();
+        world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..30 {
+            world.advance();
+        }
+        for _ in 0..500 {
+            world.advance();
+            if !world.crops().is_empty() {
+                break;
+            }
+        }
+        assert!(
+            !world.crops().is_empty(),
+            "TendCrops should auto-plant wheat on empty farm tiles"
+        );
+        assert!(world.crops().iter().any(|crop| crop.watered));
+    }
+
+    #[test]
+    fn demolish_farm_removes_crops() {
+        let mut world = grass_world();
+        let placed = world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..30 {
+            world.advance();
+        }
+        world.plant_crop("wheat", 2, 2).unwrap();
+        world.plant_crop("wheat", 3, 2).unwrap();
+        assert_eq!(world.crops().len(), 2);
+        world.demolish(placed.id).unwrap();
+        assert!(world.crops().is_empty());
+    }
+
+    #[test]
+    fn day_rollover_clears_water_and_paused_skips_advance() {
+        let mut world = grass_world();
+        world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..30 {
+            world.advance();
+        }
+        world.plant_crop("wheat", 2, 2).unwrap();
+        world.crops[0].watered = true;
+        world.advance_clock(1, None).unwrap();
+        assert!(!world.crops()[0].watered);
+        assert_eq!(world.clock().day, 2);
+
+        let tick_before = world.clock().tick;
+        world.clock.set_speed(0).unwrap();
+        // Sim loop skips advance when paused; exercise the same gate here.
+        if !world.clock().speed.is_paused() {
+            world.advance();
+        }
+        assert_eq!(world.clock().tick, tick_before);
+    }
+
+    #[test]
+    fn snapshot_includes_clock_and_crops() {
+        let mut world = grass_world();
+        world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..30 {
+            world.advance();
+        }
+        world.plant_crop("wheat", 4, 4).unwrap();
+        let snap = world.tick_snapshot();
+        assert_eq!(snap.clock.day, 1);
+        assert_eq!(snap.clock.season, 0);
+        assert_eq!(snap.clock.speed, 1);
+        assert_eq!(snap.crops.len(), 1);
+        assert_eq!(snap.crops[0].x, 4);
+        assert_eq!(snap.crops[0].y, 4);
     }
 }

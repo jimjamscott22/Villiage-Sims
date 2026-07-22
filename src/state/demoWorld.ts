@@ -3,13 +3,30 @@ import type {
   BuildingDef,
   BuildingView,
   Catalog,
+  ClockView,
+  CropDef,
+  CropView,
   PlacementResult,
   PlacementValidity,
   ResourceTotals,
+  SimEvent,
   TerrainSnapshot,
   TickSnapshot,
   VillagerDetail,
 } from './types';
+
+const DEMO_CROPS: CropDef[] = [
+  {
+    id: 'wheat',
+    name: 'Wheat',
+    stages: 4,
+    ticksPerStage: 400,
+    seasons: ['spring', 'summer'],
+    waterRequired: true,
+    yield: { grain: 3 },
+    seedCost: { grain: 1 },
+  },
+];
 
 export const DEMO_CATALOG: Catalog = {
   buildings: [
@@ -47,10 +64,12 @@ export const DEMO_CATALOG: Catalog = {
       jobs: [{ kind: 'haul', slots: 1 }],
     },
   ],
+  crops: DEMO_CROPS,
 };
 
 /** Matches Rust Terrain enum byte order. */
 const TERRAIN_NAMES = ['deep_water', 'shallow_water', 'sand', 'grass', 'forest', 'rock', 'mountain'];
+const SEASON_IDS = ['spring', 'summer', 'autumn', 'winter'] as const;
 
 const TICKS_PER_SECOND = 20;
 const MOVE_SPEED_TILES_PER_SEC = 2;
@@ -61,6 +80,9 @@ const ENERGY_DECAY = 0.00005;
 const SOCIAL_DECAY = 0.00003;
 const WORK_CYCLE_TICKS = 40;
 const DEFAULT_JOB_PRIORITY = 10;
+const MINUTES_PER_TICK = 0.06;
+const MINUTES_PER_DAY = 1440;
+const DAYS_PER_SEASON = 28;
 
 function startingResources(): ResourceTotals {
   return { wood: 120, stone: 40, grain: 0, food: 0, gold: 0 };
@@ -89,6 +111,18 @@ interface DemoBuilding {
   rot: number;
   progressTicks: number;
   complete: boolean;
+}
+
+interface DemoCrop {
+  id: number;
+  kind: string;
+  kindIndex: number;
+  x: number;
+  y: number;
+  stage: number;
+  growthTicks: number;
+  watered: boolean;
+  readyEmitted: boolean;
 }
 
 interface DemoJob {
@@ -122,6 +156,16 @@ interface DemoVillager {
   workTicksRemaining: number;
 }
 
+interface DemoClock {
+  tick: number;
+  minuteAccum: number;
+  minute: number;
+  day: number;
+  season: number;
+  year: number;
+  speed: number;
+}
+
 function recomputeHappiness(needs: DemoNeeds): void {
   needs.happiness = Math.max(0, Math.min(1, (needs.hunger + needs.energy + needs.social) / 3));
 }
@@ -136,12 +180,23 @@ export class DemoWorld {
   readonly terrain: TerrainSnapshot;
   resources = startingResources();
   buildings: DemoBuilding[] = [];
+  crops: DemoCrop[] = [];
   private occupancy: Array<number | null>;
   private nextId = 1;
+  private nextCropId = 1;
   private nextJobId = 1;
-  private tick = 0;
   private villager: DemoVillager;
   private jobs: DemoJob[] = [];
+  private events: SimEvent[] = [];
+  private clock: DemoClock = {
+    tick: 0,
+    minuteAccum: 0,
+    minute: 0,
+    day: 1,
+    season: 0,
+    year: 1,
+    speed: 1,
+  };
 
   constructor(terrain: TerrainSnapshot) {
     this.terrain = terrain;
@@ -169,12 +224,32 @@ export class DemoWorld {
     return DEMO_CATALOG;
   }
 
+  get speed(): number {
+    return this.clock.speed;
+  }
+
   setViewport(_x: number, _y: number, _w: number, _h: number): void {
     // Browser demo does not viewport-cull yet; method kept for transport parity.
   }
 
+  setSpeed(speed: number): void {
+    if (speed < 0 || speed > 3) throw new Error(`invalid speed ${speed}`);
+    this.clock.speed = speed;
+  }
+
   advance(): TickSnapshot {
-    this.tick += 1;
+    if (this.clock.speed === 0) return this.snapshot();
+    this.events = [];
+    this.clock.tick += 1;
+    this.clock.minuteAccum += MINUTES_PER_TICK;
+    this.clock.minute = Math.floor(this.clock.minuteAccum);
+    if (this.clock.minuteAccum >= MINUTES_PER_DAY) {
+      this.clock.minuteAccum -= MINUTES_PER_DAY;
+      this.clock.minute = Math.floor(this.clock.minuteAccum);
+      this.rollDay();
+      this.clearAllCropWater();
+    }
+
     const newlyComplete: number[] = [];
     for (const building of this.buildings) {
       if (building.complete) continue;
@@ -187,6 +262,7 @@ export class DemoWorld {
     }
     for (const id of newlyComplete) this.advertiseJobsFor(id);
 
+    this.tickCrops();
     this.decayNeeds();
     this.tickVillager();
     return this.snapshot();
@@ -194,8 +270,22 @@ export class DemoWorld {
 
   snapshot(): TickSnapshot {
     const stateByte = this.villager.state === 'working' ? 2 : this.villager.state === 'moving' ? 1 : 0;
+    const clock: ClockView = {
+      minute: this.clock.minute,
+      day: this.clock.day,
+      season: this.clock.season,
+      year: this.clock.year,
+      speed: this.clock.speed,
+    };
+    const crops: CropView[] = this.crops.map((crop) => ({
+      id: crop.id,
+      x: crop.x,
+      y: crop.y,
+      kind: crop.kindIndex,
+      stage: crop.stage,
+    }));
     return {
-      tick: this.tick,
+      tick: this.clock.tick,
       villagers: [{
         id: this.villager.id,
         x: this.villager.x,
@@ -203,7 +293,10 @@ export class DemoWorld {
         state: stateByte,
       }],
       buildings: this.buildingViews(),
+      crops,
       resources: { ...this.resources },
+      clock,
+      events: [...this.events],
     };
   }
 
@@ -303,10 +396,14 @@ export class DemoWorld {
     const building = this.buildings[index];
     const def = DEMO_CATALOG.buildings[building.kindIndex];
     const [fw, fh] = rotatedFootprint(def, building.rot);
-    for (const [tx, ty] of footprintTiles(building.x, building.y, fw, fh)) {
+    const tiles = footprintTiles(building.x, building.y, fw, fh);
+    for (const [tx, ty] of tiles) {
       const tileIndex = ty * this.terrain.width + tx;
       if (this.occupancy[tileIndex] === entityId) this.occupancy[tileIndex] = null;
     }
+    this.crops = this.crops.filter(
+      (crop) => !tiles.some(([tx, ty]) => crop.x === tx && crop.y === ty),
+    );
     for (const [key, amount] of Object.entries(def.cost)) {
       const resourceKey = key as keyof ResourceTotals;
       this.resources[resourceKey] += amount;
@@ -320,6 +417,41 @@ export class DemoWorld {
       if (this.villager.state === 'working' || (this.villager.state === 'moving' && this.villager.purpose === 'work')) {
         this.clearToIdle();
       }
+    }
+  }
+
+  plantCrop(kind: string, x: number, y: number): void {
+    const kindIndex = DEMO_CROPS.findIndex((crop) => crop.id === kind);
+    if (kindIndex < 0) throw new Error(`unknown crop '${kind}'`);
+    if (this.completedFarmAt(x, y) == null) throw new Error('tile is not on a completed farm');
+    if (this.crops.some((crop) => crop.x === x && crop.y === y)) {
+      throw new Error('tile already has a crop');
+    }
+    const id = this.nextCropId;
+    this.nextCropId += 1;
+    this.crops.push({
+      id,
+      kind,
+      kindIndex,
+      x,
+      y,
+      stage: 0,
+      growthTicks: 0,
+      watered: false,
+      readyEmitted: false,
+    });
+  }
+
+  advanceClock(days: number, season: number | null): void {
+    for (let i = 0; i < days; i += 1) {
+      this.clock.minuteAccum = 0;
+      this.clock.minute = 0;
+      this.rollDay();
+      this.clearAllCropWater();
+    }
+    if (season != null) {
+      if (season < 0 || season > 3) throw new Error(`invalid season ${season}`);
+      this.clock.season = season;
     }
   }
 
@@ -467,11 +599,112 @@ export class DemoWorld {
       this.clearToIdle();
       return;
     }
+    if (this.villager.workTicksRemaining === WORK_CYCLE_TICKS) {
+      this.tendAutoPlant(this.villager.currentJob);
+    }
+    this.tendWaterCrops(this.villager.currentJob);
     if (this.villager.workTicksRemaining <= 1) {
       this.villager.workTicksRemaining = WORK_CYCLE_TICKS;
     } else {
       this.villager.workTicksRemaining -= 1;
     }
+  }
+
+  private rollDay(): void {
+    this.clock.day += 1;
+    if (this.clock.day > DAYS_PER_SEASON) {
+      this.clock.day = 1;
+      this.clock.season += 1;
+      if (this.clock.season > 3) {
+        this.clock.season = 0;
+        this.clock.year += 1;
+      }
+    }
+  }
+
+  private clearAllCropWater(): void {
+    for (const crop of this.crops) crop.watered = false;
+  }
+
+  private tickCrops(): void {
+    const seasonName = SEASON_IDS[this.clock.season];
+    for (const crop of this.crops) {
+      const def = DEMO_CROPS[crop.kindIndex];
+      if (!def) continue;
+      const maxStage = def.stages - 1;
+      if (crop.stage >= maxStage) continue;
+      if (!def.seasons.includes(seasonName)) continue;
+      if (def.waterRequired && !crop.watered) continue;
+      crop.growthTicks += 1;
+      if (crop.growthTicks < def.ticksPerStage) continue;
+      crop.growthTicks = 0;
+      crop.stage = Math.min(maxStage, crop.stage + 1);
+      if (crop.stage >= maxStage && !crop.readyEmitted) {
+        crop.readyEmitted = true;
+        this.events.push({ kind: 'cropReady', id: crop.id });
+      }
+    }
+  }
+
+  private completedFarmAt(x: number, y: number): number | null {
+    for (const building of this.buildings) {
+      if (!building.complete) continue;
+      const def = DEMO_CATALOG.buildings[building.kindIndex];
+      if (def.id !== 'farm') continue;
+      const [fw, fh] = rotatedFootprint(def, building.rot);
+      for (const [tx, ty] of footprintTiles(building.x, building.y, fw, fh)) {
+        if (tx === x && ty === y) return building.id;
+      }
+    }
+    return null;
+  }
+
+  private farmFootprintTiles(buildingId: number): Array<[number, number]> {
+    const building = this.buildings.find((entry) => entry.id === buildingId);
+    if (!building) return [];
+    const def = DEMO_CATALOG.buildings[building.kindIndex];
+    const [fw, fh] = rotatedFootprint(def, building.rot);
+    return footprintTiles(building.x, building.y, fw, fh);
+  }
+
+  private tendWaterCrops(jobId: number): void {
+    const job = this.jobs.find((entry) => entry.id === jobId);
+    if (!job) return;
+    const tiles = this.farmFootprintTiles(job.site);
+    for (const crop of this.crops) {
+      if (tiles.some(([tx, ty]) => crop.x === tx && crop.y === ty)) {
+        crop.watered = true;
+      }
+    }
+  }
+
+  private tendAutoPlant(jobId: number): void {
+    const job = this.jobs.find((entry) => entry.id === jobId);
+    if (!job) return;
+    const wheat = DEMO_CROPS.find((crop) => crop.id === 'wheat');
+    if (!wheat) return;
+    const seasonName = SEASON_IDS[this.clock.season];
+    if (!wheat.seasons.includes(seasonName)) return;
+    const kindIndex = DEMO_CROPS.findIndex((crop) => crop.id === 'wheat');
+    const tiles = this.farmFootprintTiles(job.site);
+    const empty = tiles.find(([tx, ty]) =>
+      this.completedFarmAt(tx, ty) === job.site
+      && !this.crops.some((crop) => crop.x === tx && crop.y === ty)
+    );
+    if (!empty) return;
+    const id = this.nextCropId;
+    this.nextCropId += 1;
+    this.crops.push({
+      id,
+      kind: 'wheat',
+      kindIndex,
+      x: empty[0],
+      y: empty[1],
+      stage: 0,
+      growthTicks: 0,
+      watered: false,
+      readyEmitted: false,
+    });
   }
 
   private tickMoving(target: [number, number], purpose: 'player' | 'work'): void {
