@@ -11,7 +11,7 @@ Last updated: 2026-07-22 (M6 in progress).
 | M3 — Building placement | Complete on `main` | #3 |
 | M4 — Pathfinding + villager FSM | Complete on `main` | #5 (+ follow-up) |
 | M5 — Needs and a single job | Complete on `main` | #8 |
-| **M6 — Clock and crops** | **In progress** | — |
+| **M6 — Clock and crops** | **In progress** | [#9](https://github.com/jimjamscott22/Villiage-Sims/pull/9) |
 | M7–M10 | Later | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
