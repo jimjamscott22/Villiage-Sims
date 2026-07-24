@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-07-24 (M7 in progress).
+Last updated: 2026-07-24 (M7 complete).
 
 ## Status
 
@@ -12,13 +12,13 @@ Last updated: 2026-07-24 (M7 in progress).
 | M4 — Pathfinding + villager FSM | Complete on `main` | #5 (+ follow-up) |
 | M5 — Needs and a single job | Complete on `main` | #8 |
 | M6 — Clock and crops | Complete on `main` | #9 |
-| **M7 — Utility AI** | **In progress** | [#10](https://github.com/jimjamscott22/Villiage-Sims/pull/10) |
+| **M7 — Utility AI** | **Complete** | [#10](https://github.com/jimjamscott22/Villiage-Sims/pull/10) (+ [#11](https://github.com/jimjamscott22/Villiage-Sims/pull/11) hysteresis fix) |
 | M8–M10 | Later | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 M7 design: [`docs/superpowers/specs/2026-07-24-milestone-7-design.md`](docs/superpowers/specs/2026-07-24-milestone-7-design.md).
 
-## What works today (M1–M6 + M7 WIP)
+## What works today (M1–M7)
 
 - Tauri 2 + React Canvas; Rust owns a 20 Hz sim thread; frontend interpolates at RAF.
 - Seeded `128×128` island terrain (`noise`), pan/zoom camera, offscreen terrain blit.
@@ -26,6 +26,7 @@ M7 design: [`docs/superpowers/specs/2026-07-24-milestone-7-design.md`](docs/supe
 - Five villagers with utility AI (Eat/Sleep/Work/Socialize/Wander) + hysteresis; A* pathfinding.
 - Right-click a tile → nearest villager walks there; place a building on the active path forces a repath (or Idle + cooldown).
 - Needs decay; completed farms advertise `TendCrops` jobs; villagers claim and work (job kept while eating).
+- Completed Eat/Sleep/Socialize clear `current_action` so hysteresis cannot re-enter or starve Wander.
 - `VillagerPanel` via `get_villager_detail` (click a villager to select; needs never in tick payload).
 - Clock (day/season/year) + speed controls; crops grow by stage when watered in-season; TendCrops auto-plants/waters.
 - Tick snapshots carry villagers (with `state`), buildings, crops, clock, resources, events.
@@ -44,10 +45,9 @@ M7 design: [`docs/superpowers/specs/2026-07-24-milestone-7-design.md`](docs/supe
 ```bash
 npm test && npm run build
 cargo test --manifest-path src-tauri/Cargo.toml --lib
-npm run dev   # five villagers wander/work; place farm → TendCrops; hunger → eat (food↓); click villager for panel
+npm run dev   # five villagers wander/work; place farm → TendCrops; hunger → eat (food↓ once); click villager for panel
 ```
 
-## Next after M7 demos
+## Next up
 
 Milestone 8 — Economy and production chains (gathering, recipes, mill→bakery, storage, hauling, ResourceBar).
-Do not start M8 until M7 demos cleanly.

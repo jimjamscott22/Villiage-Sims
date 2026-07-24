@@ -439,6 +439,11 @@ impl World {
                         }
                 ) {
                     self.villagers[index].clear_path_to_idle();
+                    // Drop Work hysteresis once the claim is gone — a 0 Work score
+                    // would otherwise block Wander via the 0.15 margin.
+                    if self.villagers[index].current_action == Some(ActionKind::Work) {
+                        self.villagers[index].current_action = None;
+                    }
                 }
             }
         }
@@ -478,6 +483,18 @@ impl World {
         }
         if !self.villagers[index].state.is_decidable() {
             return;
+        }
+
+        // Eat/Sleep/Socialize run to completion in their own states. Once Idle,
+        // retaining them as `current_action` feeds a near-zero live score into
+        // hysteresis and traps the villager (re-eat until food is gone, then stuck).
+        if matches!(self.villagers[index].state, AgentState::Idle) {
+            match self.villagers[index].current_action {
+                Some(ActionKind::Eat | ActionKind::Sleep | ActionKind::Socialize) => {
+                    self.villagers[index].current_action = None;
+                }
+                _ => {}
+            }
         }
 
         let from = self.pos_to_tile(self.villagers[index].pos);
@@ -617,6 +634,7 @@ impl World {
             self.villagers[index].needs.set_hunger(1.0);
             self.villagers[index].state = AgentState::Idle;
             self.villagers[index].path = None;
+            self.villagers[index].current_action = None;
         } else {
             self.villagers[index].state = AgentState::Eating {
                 ticks_remaining: ticks_remaining - 1,
@@ -629,6 +647,7 @@ impl World {
             self.villagers[index].needs.set_energy(1.0);
             self.villagers[index].state = AgentState::Idle;
             self.villagers[index].path = None;
+            self.villagers[index].current_action = None;
         } else {
             self.villagers[index].state = AgentState::Sleeping {
                 ticks_remaining: ticks_remaining - 1,
@@ -640,12 +659,14 @@ impl World {
         let from = self.pos_to_tile(self.villagers[index].pos);
         if !self.partner_in_range(index, from) {
             self.villagers[index].state = AgentState::Idle;
+            self.villagers[index].current_action = None;
             return;
         }
         if ticks_remaining <= 1 {
             self.villagers[index].needs.add_social(SOCIAL_RESTORE);
             self.villagers[index].state = AgentState::Idle;
             self.villagers[index].path = None;
+            self.villagers[index].current_action = None;
         } else {
             self.villagers[index].state = AgentState::Socializing {
                 ticks_remaining: ticks_remaining - 1,
@@ -759,6 +780,9 @@ impl World {
         if self.job_board.get(job).is_none() {
             self.villagers[index].current_job = None;
             self.villagers[index].state = AgentState::Idle;
+            if self.villagers[index].current_action == Some(ActionKind::Work) {
+                self.villagers[index].current_action = None;
+            }
             return;
         }
         if ticks_remaining == WORK_CYCLE_TICKS {
@@ -1248,9 +1272,10 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sim::agents::AgentState;
+    use crate::sim::agents::{AgentState, MovePurpose};
     use crate::sim::clock::{Clock, Season};
     use crate::sim::jobs::JobKind;
+    use crate::sim::needs::Needs;
     use crate::sim::terrain::Terrain;
     use crate::sim::utility::EAT_TICKS;
 
@@ -1622,6 +1647,61 @@ mod tests {
             }
         }
         assert!((world.villager().needs.hunger - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn completed_eat_clears_action_so_hysteresis_cannot_reenter() {
+        let mut world = grass_world();
+        world.resources.food = 3;
+        world.villager_mut().needs = Needs::full();
+        world.villager_mut().needs.set_hunger(0.0);
+        world.maybe_decide(0);
+        assert!(matches!(world.villager().state, AgentState::Eating { .. }));
+        assert_eq!(world.resources().food, 2);
+
+        for _ in 0..EAT_TICKS + 2 {
+            world.advance();
+            if matches!(world.villager().state, AgentState::Idle) {
+                break;
+            }
+        }
+        assert!(matches!(world.villager().state, AgentState::Idle));
+        assert!(world.villager().current_action.is_none());
+        assert!((world.villager().needs.hunger - 1.0).abs() < 1e-5);
+
+        let food_after_eat = world.resources().food;
+        for _ in 0..40 {
+            world.advance();
+        }
+        // Hunger is full — must not re-enter Eat via leftover hysteresis.
+        assert_eq!(world.resources().food, food_after_eat);
+        assert!(!matches!(world.villager().state, AgentState::Eating { .. }));
+    }
+
+    #[test]
+    fn stale_eat_action_while_idle_does_not_block_wander() {
+        let mut world = grass_world();
+        world.resources.food = 0;
+        world.villager_mut().needs = Needs::full();
+        world.villager_mut().current_action = Some(crate::sim::utility::ActionKind::Eat);
+        world.maybe_decide(0);
+        assert_ne!(
+            world.villager().current_action,
+            Some(crate::sim::utility::ActionKind::Eat)
+        );
+        assert!(
+            matches!(
+                world.villager().state,
+                AgentState::MovingTo {
+                    purpose: MovePurpose::Wander,
+                    ..
+                }
+            ) || world.villager().current_action
+                == Some(crate::sim::utility::ActionKind::Wander),
+            "expected wander after clearing stale Eat, got state={:?} action={:?}",
+            world.villager().state,
+            world.villager().current_action
+        );
     }
 
     #[test]
