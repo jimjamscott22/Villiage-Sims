@@ -376,6 +376,9 @@ export function Canvas({
 
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 1 && event.button !== 0) return;
+      const bounds = canvas.getBoundingClientRect();
+      pointerX = event.clientX - bounds.left;
+      pointerY = event.clientY - bounds.top;
       dragging = true;
       dragMoved = false;
       lastPointerX = event.clientX;
@@ -414,6 +417,9 @@ export function Canvas({
 
     const onPointerUp = async (event: PointerEvent) => {
       if (!dragging) return;
+      const bounds = canvas.getBoundingClientRect();
+      pointerX = event.clientX - bounds.left;
+      pointerY = event.clientY - bounds.top;
       dragging = false;
       if (canvas.hasPointerCapture(event.pointerId)) {
         canvas.releasePointerCapture(event.pointerId);
@@ -436,8 +442,13 @@ export function Canvas({
       if (kind) {
         try {
           const validity = await transport.validatePlacement(kind, tile[0], tile[1], rotationRef.current);
-          if (!validity.valid) return;
+          if (!validity.valid) {
+            fail(validity.reason || 'invalid placement');
+            return;
+          }
           await transport.placeBuilding(kind, tile[0], tile[1], rotationRef.current);
+          errorRef.current = null;
+          setError(null);
         } catch (cause) {
           fail(cause instanceof Error ? cause.message : String(cause));
         }
