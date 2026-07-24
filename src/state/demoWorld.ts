@@ -782,15 +782,6 @@ export class DemoWorld {
     ) {
       return;
     }
-    if (
-      picked.kind === villager.currentAction
-      && (
-        (picked.kind === 'work' && villager.state === 'working')
-        || (picked.kind === 'work' && villager.state === 'moving' && villager.purpose === 'work')
-      )
-    ) {
-      return;
-    }
 
     this.beginAction(index, picked.kind, picked.jobId);
   }

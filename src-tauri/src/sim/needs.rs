@@ -38,6 +38,21 @@ impl Needs {
         // Equal weights for M5; housing/social modifiers land in later milestones.
         self.happiness = ((self.hunger + self.energy + self.social) / 3.0).clamp(0.0, 1.0);
     }
+
+    pub fn set_hunger(&mut self, value: f32) {
+        self.hunger = value.clamp(0.0, 1.0);
+        self.recompute_happiness();
+    }
+
+    pub fn set_energy(&mut self, value: f32) {
+        self.energy = value.clamp(0.0, 1.0);
+        self.recompute_happiness();
+    }
+
+    pub fn add_social(&mut self, amount: f32) {
+        self.social = (self.social + amount).clamp(0.0, 1.0);
+        self.recompute_happiness();
+    }
 }
 
 #[cfg(test)]

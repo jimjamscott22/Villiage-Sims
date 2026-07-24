@@ -18,7 +18,7 @@ impl ResourceTotals {
             wood: 120,
             stone: 40,
             grain: 0,
-            food: 0,
+            food: 50,
             gold: 0,
         }
     }

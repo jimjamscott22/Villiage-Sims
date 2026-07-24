@@ -4,7 +4,7 @@ use crate::snapshot::{
 
 use super::agents::{
     AgentState, DEFAULT_JOB_PRIORITY, MOVE_SPEED_TILES_PER_SEC, MovePurpose, REPATH_COOLDOWN_TICKS,
-    Villager, WORK_CYCLE_TICKS,
+    STARTING_VILLAGER_NAMES, Villager, WORK_CYCLE_TICKS,
 };
 use super::buildings::{
     BuildState, Building, PlacementResult, PlacementValidity, footprint_tiles, rotated_footprint,
@@ -18,6 +18,10 @@ use super::jobs::JobBoard;
 use super::pathfind::{find_path, terrain_passable};
 use super::resources::ResourceTotals;
 use super::terrain::{Terrain, generate_terrain};
+use super::utility::{
+    ActionKind, SOCIAL_RANGE, SOCIAL_RESTORE, ScoreContext, chebyshev, night_from_clock, pick_action,
+    score_all, wander_tile,
+};
 
 const VIEWPORT_MARGIN_TILES: f32 = 4.0;
 const TICKS_PER_SECOND: f32 = 20.0;
@@ -41,7 +45,6 @@ pub struct World {
     height: u32,
     tile_size: u32,
     tiles: Vec<u8>,
-    #[allow(dead_code)]
     seed: u64,
     clock: Clock,
     catalog: Catalog,
@@ -51,7 +54,7 @@ pub struct World {
     resources: ResourceTotals,
     next_building_id: u32,
     next_crop_id: u32,
-    villager: Villager,
+    villagers: Vec<Villager>,
     job_board: JobBoard,
     events: Vec<SimEvent>,
     viewport: Viewport,
@@ -77,7 +80,7 @@ impl World {
             resources: ResourceTotals::starting(),
             next_building_id: 1,
             next_crop_id: 1,
-            villager: Villager::new(1, "Ash", (0.0, 0.0)),
+            villagers: Vec::new(),
             job_board: JobBoard::new(),
             events: Vec::new(),
             viewport: Viewport {
@@ -87,11 +90,50 @@ impl World {
                 h: world_h,
             },
         };
-        let spawn = world
-            .find_walkable_near(width as i32 / 2, height as i32 / 2)
-            .unwrap_or((width as i32 / 2, height as i32 / 2));
-        world.villager.pos = world.tile_center(spawn.0, spawn.1);
+        world.spawn_starting_villagers();
         world
+    }
+
+    fn spawn_starting_villagers(&mut self) {
+        let cx = self.width as i32 / 2;
+        let cy = self.height as i32 / 2;
+        let mut used = Vec::new();
+        for (i, name) in STARTING_VILLAGER_NAMES.iter().enumerate() {
+            let id = (i as u32) + 1;
+            let tile = self
+                .find_spawn_tile(cx, cy, &used)
+                .unwrap_or((cx + i as i32, cy));
+            used.push(tile);
+            let pos = self.tile_center(tile.0, tile.1);
+            self.villagers.push(Villager::new(id, *name, pos));
+        }
+    }
+
+    fn find_spawn_tile(&self, cx: i32, cy: i32, used: &[(i32, i32)]) -> Option<(i32, i32)> {
+        if let Some(tile) = self.find_walkable_near(cx, cy) {
+            if !used.contains(&tile) {
+                return Some(tile);
+            }
+        }
+        let max_r = self.width.max(self.height) as i32;
+        for r in 0..=max_r {
+            for dy in -r..=r {
+                for dx in -r..=r {
+                    if dx.abs() != r && dy.abs() != r && r > 0 {
+                        continue;
+                    }
+                    let x = cx + dx;
+                    let y = cy + dy;
+                    if used.contains(&(x, y)) {
+                        continue;
+                    }
+                    if self.is_spawn_candidate(x, y) {
+                        return Some((x, y));
+                    }
+                }
+            }
+        }
+        None
     }
 
     pub fn default_world() -> Self {
@@ -173,8 +215,13 @@ impl World {
         }
         self.complete_buildings();
         self.tick_crops();
-        self.villager.needs.tick_decay();
-        self.tick_villager();
+        for villager in &mut self.villagers {
+            villager.needs.tick_decay();
+        }
+        let count = self.villagers.len();
+        for index in 0..count {
+            self.tick_villager_at(index);
+        }
     }
 
     #[cfg(test)]
@@ -194,7 +241,17 @@ impl World {
 
     #[cfg(test)]
     pub fn villager(&self) -> &Villager {
-        &self.villager
+        &self.villagers[0]
+    }
+
+    #[cfg(test)]
+    pub fn villager_mut(&mut self) -> &mut Villager {
+        &mut self.villagers[0]
+    }
+
+    #[cfg(test)]
+    pub fn villagers(&self) -> &[Villager] {
+        &self.villagers
     }
 
     #[cfg(test)]
@@ -219,12 +276,16 @@ impl World {
     pub fn tick_snapshot(&self) -> TickSnapshot {
         TickSnapshot {
             tick: self.clock.tick,
-            villagers: vec![VillagerView {
-                id: self.villager.id,
-                x: self.villager.pos.0,
-                y: self.villager.pos.1,
-                state: self.villager.state.as_u8(),
-            }],
+            villagers: self
+                .villagers
+                .iter()
+                .map(|v| VillagerView {
+                    id: v.id,
+                    x: v.pos.0,
+                    y: v.pos.1,
+                    state: v.state.as_u8(),
+                })
+                .collect(),
             buildings: self.building_views(),
             crops: self.crops.iter().map(Crop::view).collect(),
             resources: self.resources.clone(),
@@ -234,24 +295,25 @@ impl World {
     }
 
     pub fn villager_detail(&self, id: u32) -> Result<VillagerDetail, String> {
-        if self.villager.id != id {
-            return Err(format!("unknown villager {id}"));
-        }
-        let (job_kind, job_site) = self
-            .villager
+        let villager = self
+            .villagers
+            .iter()
+            .find(|v| v.id == id)
+            .ok_or_else(|| format!("unknown villager {id}"))?;
+        let (job_kind, job_site) = villager
             .current_job
             .and_then(|job_id| self.job_board.get(job_id))
             .map(|job| (Some(job.kind.as_str().to_string()), Some(job.site)))
             .unwrap_or((None, None));
         Ok(VillagerDetail {
-            id: self.villager.id,
-            name: self.villager.name.clone(),
-            state: self.villager.state.as_u8(),
-            state_label: self.villager.state.label().to_string(),
-            hunger: self.villager.needs.hunger,
-            energy: self.villager.needs.energy,
-            social: self.villager.needs.social,
-            happiness: self.villager.needs.happiness,
+            id: villager.id,
+            name: villager.name.clone(),
+            state: villager.state.as_u8(),
+            state_label: villager.state.label().to_string(),
+            hunger: villager.needs.hunger,
+            energy: villager.needs.energy,
+            social: villager.needs.social,
+            happiness: villager.needs.happiness,
             job_kind,
             job_site,
         })
@@ -264,18 +326,35 @@ impl World {
         if !self.is_passable(x, y) {
             return Err("tile impassable".into());
         }
-        self.release_current_job();
-        let start = self.pos_to_tile(self.villager.pos);
+        let index = self
+            .nearest_villager_index_to(x, y)
+            .ok_or_else(|| "no villagers".to_string())?;
+        self.release_job_at(index);
+        let start = self.pos_to_tile(self.villagers[index].pos);
         let path = self
             .compute_path(start, (x, y))
             .ok_or_else(|| "no path".to_string())?;
-        self.villager.state = AgentState::MovingTo {
+        self.villagers[index].state = AgentState::MovingTo {
             target: (x, y),
             purpose: MovePurpose::PlayerOrder,
         };
-        self.villager.path = Some(path);
-        self.villager.repath_cooldown = 0;
+        self.villagers[index].path = Some(path);
+        self.villagers[index].repath_cooldown = 0;
+        self.villagers[index].current_action = None;
         Ok(())
+    }
+
+    fn nearest_villager_index_to(&self, x: i32, y: i32) -> Option<usize> {
+        let mut best: Option<(usize, i32)> = None;
+        for (index, villager) in self.villagers.iter().enumerate() {
+            let (vx, vy) = self.pos_to_tile(villager.pos);
+            let dist = (vx - x).abs() + (vy - y).abs();
+            match best {
+                Some((_, best_dist)) if dist >= best_dist => {}
+                _ => best = Some((index, dist)),
+            }
+        }
+        best.map(|(index, _)| index)
     }
 
     fn complete_buildings(&mut self) {
@@ -342,66 +421,243 @@ impl World {
         candidates
     }
 
-    fn tick_villager(&mut self) {
-        if self.villager.repath_cooldown > 0 {
-            self.villager.repath_cooldown -= 1;
+
+    fn tick_villager_at(&mut self, index: usize) {
+        if self.villagers[index].repath_cooldown > 0 {
+            self.villagers[index].repath_cooldown -= 1;
         }
 
-        // Drop claim if the job disappeared (demolished site).
-        if let Some(job_id) = self.villager.current_job {
+        if let Some(job_id) = self.villagers[index].current_job {
             if self.job_board.get(job_id).is_none() {
-                self.villager.current_job = None;
+                self.villagers[index].current_job = None;
                 if matches!(
-                    self.villager.state,
+                    self.villagers[index].state,
                     AgentState::Working { .. }
                         | AgentState::MovingTo {
                             purpose: MovePurpose::Work,
                             ..
                         }
                 ) {
-                    self.villager.clear_path_to_idle();
+                    self.villagers[index].clear_path_to_idle();
                 }
             }
         }
 
-        match self.villager.state.clone() {
-            AgentState::Idle => self.tick_idle(),
-            AgentState::MovingTo { target, purpose } => self.tick_moving(target, purpose),
-            AgentState::Working { job, ticks_remaining } => {
-                self.tick_working(job, ticks_remaining);
+        let state = self.villagers[index].state.clone();
+        match state {
+            AgentState::Eating { ticks_remaining } => {
+                self.tick_eating(index, ticks_remaining);
+            }
+            AgentState::Sleeping { ticks_remaining } => {
+                self.tick_sleeping(index, ticks_remaining);
+            }
+            AgentState::Socializing { ticks_remaining } => {
+                self.tick_socializing(index, ticks_remaining);
+            }
+            AgentState::MovingTo { target, purpose } => {
+                self.tick_moving(index, target, purpose);
+            }
+            AgentState::Idle | AgentState::Working { .. } => {
+                self.maybe_decide(index);
+                match self.villagers[index].state.clone() {
+                    AgentState::Working {
+                        job,
+                        ticks_remaining,
+                    } => self.tick_working(index, job, ticks_remaining),
+                    _ => {}
+                }
             }
         }
     }
 
-    fn tick_idle(&mut self) {
-        if self.villager.repath_cooldown > 0 {
+    fn maybe_decide(&mut self, index: usize) {
+        if self.villagers[index].repath_cooldown > 0
+            && matches!(self.villagers[index].state, AgentState::Idle)
+        {
             return;
         }
-        // Resume an existing claim if still valid.
-        if let Some(job_id) = self.villager.current_job {
-            if let Some(job) = self.job_board.get(job_id).cloned() {
-                self.begin_move_to_job(job.tile, job_id);
-                return;
-            }
-            self.villager.current_job = None;
+        if !self.villagers[index].state.is_decidable() {
+            return;
         }
-        let from = self.pos_to_tile(self.villager.pos);
-        if let Some(job_id) = self.job_board.claim_best(self.villager.id, from) {
-            let tile = self
-                .job_board
-                .get(job_id)
-                .map(|job| job.tile)
-                .expect("just claimed");
-            self.villager.current_job = Some(job_id);
-            self.begin_move_to_job(tile, job_id);
+
+        let from = self.pos_to_tile(self.villagers[index].pos);
+        let partner_in_range = self.partner_in_range(index, from);
+        let ctx = ScoreContext {
+            hunger: self.villagers[index].needs.hunger,
+            energy: self.villagers[index].needs.energy,
+            social: self.villagers[index].needs.social,
+            from,
+            food: self.resources.food,
+            night: night_from_clock(&self.clock),
+            partner_in_range,
+            job_board: &self.job_board,
+            villager_id: self.villagers[index].id,
+            current_job: self.villagers[index].current_job,
+        };
+        let scored = score_all(&ctx);
+        let current = self.villagers[index].current_action;
+        let picked = pick_action(&scored, current);
+
+        // Already executing the same work action — keep the work cycle going.
+        if picked.kind == ActionKind::Work
+            && matches!(self.villagers[index].state, AgentState::Working { .. })
+            && self.villagers[index].current_action == Some(ActionKind::Work)
+        {
+            return;
+        }
+        if Some(picked.kind) == self.villagers[index].current_action
+            && matches!(
+                (picked.kind, &self.villagers[index].state),
+                (ActionKind::Work, AgentState::Working { .. })
+                    | (ActionKind::Work, AgentState::MovingTo { purpose: MovePurpose::Work, .. })
+            )
+        {
+            return;
+        }
+
+        self.begin_action(index, picked.kind, picked.job_id);
+    }
+
+    fn partner_in_range(&self, index: usize, from: (i32, i32)) -> bool {
+        let id = self.villagers[index].id;
+        self.villagers.iter().any(|other| {
+            other.id != id && chebyshev(from, self.pos_to_tile(other.pos)) <= SOCIAL_RANGE
+        })
+    }
+
+    fn begin_action(&mut self, index: usize, kind: ActionKind, job_id: Option<u32>) {
+        match kind {
+            ActionKind::Eat => self.begin_eat(index),
+            ActionKind::Sleep => {
+                self.villagers[index].begin_sleeping();
+            }
+            ActionKind::Socialize => {
+                self.villagers[index].begin_socializing();
+            }
+            ActionKind::Work => self.begin_work(index, job_id),
+            ActionKind::Wander => self.begin_wander(index),
         }
     }
 
-    fn begin_move_to_job(&mut self, tile: (i32, i32), job_id: u32) {
-        let start = self.pos_to_tile(self.villager.pos);
+    fn begin_eat(&mut self, index: usize) {
+        if self.resources.food == 0 {
+            return;
+        }
+        self.resources.food -= 1;
+        self.villagers[index].begin_eating();
+    }
+
+    fn begin_work(&mut self, index: usize, job_id: Option<u32>) {
+        // Resume existing claim.
+        let villager_id = self.villagers[index].id;
+        let from = self.pos_to_tile(self.villagers[index].pos);
+
+        let resolved = if let Some(existing) = self.villagers[index].current_job {
+            if self.job_board.get(existing).is_some() {
+                Some(existing)
+            } else {
+                self.villagers[index].current_job = None;
+                None
+            }
+        } else {
+            None
+        };
+
+        let job_id = match resolved.or(job_id) {
+            Some(id) if self.job_board.claim_id(id, villager_id) => id,
+            _ => match self.job_board.claim_best(villager_id, from) {
+                Some(id) => id,
+                None => return,
+            },
+        };
+
+        self.villagers[index].current_job = Some(job_id);
+        self.villagers[index].current_action = Some(ActionKind::Work);
+        let tile = self
+            .job_board
+            .get(job_id)
+            .map(|job| job.tile)
+            .expect("claimed job");
+        self.begin_move_to_job(index, tile, job_id);
+    }
+
+    fn begin_wander(&mut self, index: usize) {
+        let from = self.pos_to_tile(self.villagers[index].pos);
+        let width = self.width as i32;
+        let height = self.height as i32;
+        let seed = self.seed;
+        let tick = self.clock.tick;
+        let villager_id = self.villagers[index].id;
+        let target = {
+            let passable = |x: i32, y: i32| self.is_passable(x, y);
+            wander_tile(from, seed, tick, villager_id, width, height, &passable)
+        };
+        let Some(target) = target else {
+            self.villagers[index].current_action = Some(ActionKind::Wander);
+            return;
+        };
+        match self.compute_path(from, target) {
+            Some(path) => {
+                self.villagers[index].state = AgentState::MovingTo {
+                    target,
+                    purpose: MovePurpose::Wander,
+                };
+                self.villagers[index].path = Some(path);
+                self.villagers[index].current_action = Some(ActionKind::Wander);
+            }
+            None => {
+                self.villagers[index].current_action = Some(ActionKind::Wander);
+                self.villagers[index].repath_cooldown = REPATH_COOLDOWN_TICKS;
+            }
+        }
+    }
+
+    fn tick_eating(&mut self, index: usize, ticks_remaining: u32) {
+        if ticks_remaining <= 1 {
+            self.villagers[index].needs.set_hunger(1.0);
+            self.villagers[index].state = AgentState::Idle;
+            self.villagers[index].path = None;
+        } else {
+            self.villagers[index].state = AgentState::Eating {
+                ticks_remaining: ticks_remaining - 1,
+            };
+        }
+    }
+
+    fn tick_sleeping(&mut self, index: usize, ticks_remaining: u32) {
+        if ticks_remaining <= 1 {
+            self.villagers[index].needs.set_energy(1.0);
+            self.villagers[index].state = AgentState::Idle;
+            self.villagers[index].path = None;
+        } else {
+            self.villagers[index].state = AgentState::Sleeping {
+                ticks_remaining: ticks_remaining - 1,
+            };
+        }
+    }
+
+    fn tick_socializing(&mut self, index: usize, ticks_remaining: u32) {
+        let from = self.pos_to_tile(self.villagers[index].pos);
+        if !self.partner_in_range(index, from) {
+            self.villagers[index].state = AgentState::Idle;
+            return;
+        }
+        if ticks_remaining <= 1 {
+            self.villagers[index].needs.add_social(SOCIAL_RESTORE);
+            self.villagers[index].state = AgentState::Idle;
+            self.villagers[index].path = None;
+        } else {
+            self.villagers[index].state = AgentState::Socializing {
+                ticks_remaining: ticks_remaining - 1,
+            };
+        }
+    }
+
+    fn begin_move_to_job(&mut self, index: usize, tile: (i32, i32), job_id: u32) {
+        let start = self.pos_to_tile(self.villagers[index].pos);
         if start == tile {
-            self.villager.path = None;
-            self.villager.state = AgentState::Working {
+            self.villagers[index].path = None;
+            self.villagers[index].state = AgentState::Working {
                 job: job_id,
                 ticks_remaining: WORK_CYCLE_TICKS,
             };
@@ -409,43 +665,50 @@ impl World {
         }
         match self.compute_path(start, tile) {
             Some(path) => {
-                self.villager.state = AgentState::MovingTo {
+                self.villagers[index].state = AgentState::MovingTo {
                     target: tile,
                     purpose: MovePurpose::Work,
                 };
-                self.villager.path = Some(path);
+                self.villagers[index].path = Some(path);
             }
             None => {
-                // Can't reach — release and cool down.
-                self.release_current_job();
-                self.villager.repath_cooldown = REPATH_COOLDOWN_TICKS;
+                self.release_job_at(index);
+                self.villagers[index].repath_cooldown = REPATH_COOLDOWN_TICKS;
+                self.villagers[index].clear_path_to_idle();
             }
         }
     }
 
-    fn tick_moving(&mut self, target: (i32, i32), purpose: MovePurpose) {
-        if self.path_is_blocked(target) {
-            self.try_repath(target, purpose);
-            if !matches!(self.villager.state, AgentState::MovingTo { .. }) {
+    fn tick_moving(&mut self, index: usize, target: (i32, i32), purpose: MovePurpose) {
+        if self.path_is_blocked_at(index, target) {
+            self.try_repath(index, target, purpose);
+            if !matches!(self.villagers[index].state, AgentState::MovingTo { .. }) {
                 return;
             }
         }
 
-        if self.villager.path.as_ref().is_none_or(|path| path.is_empty()) {
-            let start = self.pos_to_tile(self.villager.pos);
+        if self.villagers[index]
+            .path
+            .as_ref()
+            .is_none_or(|path| path.is_empty())
+        {
+            let start = self.pos_to_tile(self.villagers[index].pos);
             if start == target {
-                self.on_arrived(purpose, target);
+                self.on_arrived(index, purpose, target);
                 return;
             }
-            self.try_repath(target, purpose);
-            if self.villager.path.as_ref().is_none_or(|path| path.is_empty()) {
+            self.try_repath(index, target, purpose);
+            if self.villagers[index]
+                .path
+                .as_ref()
+                .is_none_or(|path| path.is_empty())
+            {
                 return;
             }
         }
 
         let speed_px = MOVE_SPEED_TILES_PER_SEC * self.tile_size as f32 / TICKS_PER_SECOND;
-        let Some(next) = self
-            .villager
+        let Some(next) = self.villagers[index]
             .path
             .as_ref()
             .and_then(|path| path.first().copied())
@@ -453,123 +716,120 @@ impl World {
             return;
         };
         let (cx, cy) = self.tile_center(next.0, next.1);
-        let dx = cx - self.villager.pos.0;
-        let dy = cy - self.villager.pos.1;
+        let dx = cx - self.villagers[index].pos.0;
+        let dy = cy - self.villagers[index].pos.1;
         let dist = (dx * dx + dy * dy).sqrt();
         if dist <= speed_px || dist <= ARRIVE_EPSILON_PX {
-            self.villager.pos = (cx, cy);
-            if let Some(path) = self.villager.path.as_mut() {
+            self.villagers[index].pos = (cx, cy);
+            if let Some(path) = self.villagers[index].path.as_mut() {
                 path.remove(0);
                 if path.is_empty() {
-                    self.on_arrived(purpose, target);
+                    self.on_arrived(index, purpose, target);
                 }
             }
         } else {
-            self.villager.pos.0 += dx / dist * speed_px;
-            self.villager.pos.1 += dy / dist * speed_px;
+            self.villagers[index].pos.0 += dx / dist * speed_px;
+            self.villagers[index].pos.1 += dy / dist * speed_px;
         }
     }
 
-    fn on_arrived(&mut self, purpose: MovePurpose, _target: (i32, i32)) {
-        self.villager.path = None;
+    fn on_arrived(&mut self, index: usize, purpose: MovePurpose, _target: (i32, i32)) {
+        self.villagers[index].path = None;
         match purpose {
-            MovePurpose::PlayerOrder => {
-                self.villager.state = AgentState::Idle;
+            MovePurpose::PlayerOrder | MovePurpose::Wander => {
+                self.villagers[index].state = AgentState::Idle;
             }
             MovePurpose::Work => {
-                if let Some(job_id) = self.villager.current_job {
+                if let Some(job_id) = self.villagers[index].current_job {
                     if self.job_board.get(job_id).is_some() {
-                        self.villager.state = AgentState::Working {
+                        self.villagers[index].state = AgentState::Working {
                             job: job_id,
                             ticks_remaining: WORK_CYCLE_TICKS,
                         };
                         return;
                     }
                 }
-                self.villager.current_job = None;
-                self.villager.state = AgentState::Idle;
+                self.villagers[index].current_job = None;
+                self.villagers[index].state = AgentState::Idle;
             }
         }
     }
 
-    fn tick_working(&mut self, job: u32, ticks_remaining: u32) {
+    fn tick_working(&mut self, index: usize, job: u32, ticks_remaining: u32) {
         if self.job_board.get(job).is_none() {
-            self.villager.current_job = None;
-            self.villager.state = AgentState::Idle;
+            self.villagers[index].current_job = None;
+            self.villagers[index].state = AgentState::Idle;
             return;
         }
-        // TendCrops: water every tick; auto-plant at the start of each work cycle.
         if ticks_remaining == WORK_CYCLE_TICKS {
             self.tend_auto_plant(job);
         }
         self.tend_water_crops(job);
         if ticks_remaining <= 1 {
-            // Loop the work cycle so tend_crops stays visibly active.
-            self.villager.state = AgentState::Working {
+            self.villagers[index].state = AgentState::Working {
                 job,
                 ticks_remaining: WORK_CYCLE_TICKS,
             };
         } else {
-            self.villager.state = AgentState::Working {
+            self.villagers[index].state = AgentState::Working {
                 job,
                 ticks_remaining: ticks_remaining - 1,
             };
         }
     }
 
-    fn release_current_job(&mut self) {
-        if let Some(job_id) = self.villager.current_job.take() {
-            self.job_board.release(job_id, self.villager.id);
+    fn release_job_at(&mut self, index: usize) {
+        if let Some(job_id) = self.villagers[index].current_job.take() {
+            let villager_id = self.villagers[index].id;
+            self.job_board.release(job_id, villager_id);
         }
     }
 
-    fn try_repath(&mut self, target: (i32, i32), purpose: MovePurpose) {
-        if self.villager.repath_cooldown > 0 {
-            if purpose == MovePurpose::Work {
-                // Keep the claim; retry after cooldown from Idle.
-                self.villager.clear_path_to_idle();
-            } else {
-                self.villager.clear_path_to_idle();
-            }
+    fn try_repath(&mut self, index: usize, target: (i32, i32), purpose: MovePurpose) {
+        if self.villagers[index].repath_cooldown > 0 {
+            self.villagers[index].clear_path_to_idle();
             return;
         }
-        let start = self.pos_to_tile(self.villager.pos);
+        let start = self.pos_to_tile(self.villagers[index].pos);
         match self.compute_path(start, target) {
             Some(path) => {
-                self.villager.path = Some(path);
-                self.villager.state = AgentState::MovingTo { target, purpose };
+                self.villagers[index].path = Some(path);
+                self.villagers[index].state = AgentState::MovingTo { target, purpose };
             }
             None => {
-                self.villager.clear_path_to_idle();
-                self.villager.repath_cooldown = REPATH_COOLDOWN_TICKS;
+                self.villagers[index].clear_path_to_idle();
+                self.villagers[index].repath_cooldown = REPATH_COOLDOWN_TICKS;
                 if purpose == MovePurpose::Work {
-                    // Unreachable work tile — free the job for later.
-                    self.release_current_job();
+                    self.release_job_at(index);
                 }
             }
         }
     }
 
-    fn path_is_blocked(&self, target: (i32, i32)) -> bool {
+    fn path_is_blocked_at(&self, index: usize, target: (i32, i32)) -> bool {
         if !self.is_passable(target.0, target.1) {
             return true;
         }
-        match &self.villager.path {
+        match &self.villagers[index].path {
             Some(path) => path.iter().any(|&(x, y)| !self.is_passable(x, y)),
             None => false,
         }
     }
 
-    fn invalidate_path_if_needed(&mut self) {
-        let Some(target) = self.villager.target_tile() else {
-            return;
-        };
-        let purpose = match self.villager.state {
-            AgentState::MovingTo { purpose, .. } => purpose,
-            _ => return,
-        };
-        if self.path_is_blocked(target) {
-            self.try_repath(target, purpose);
+    fn invalidate_paths_if_needed(&mut self) {
+        let movers: Vec<(usize, (i32, i32), MovePurpose)> = self
+            .villagers
+            .iter()
+            .enumerate()
+            .filter_map(|(index, villager)| match villager.state {
+                AgentState::MovingTo { target, purpose } => Some((index, target, purpose)),
+                _ => None,
+            })
+            .collect();
+        for (index, target, purpose) in movers {
+            if self.path_is_blocked_at(index, target) {
+                self.try_repath(index, target, purpose);
+            }
         }
     }
 
@@ -799,7 +1059,7 @@ impl World {
             rotation: rotation % 4,
             state: BuildState::UnderConstruction { progress_ticks: 0 },
         });
-        self.invalidate_path_if_needed();
+        self.invalidate_paths_if_needed();
         Ok(PlacementResult { id })
     }
 
@@ -935,6 +1195,7 @@ impl World {
             .retain(|crop| !tiles.iter().any(|&tile| tile == crop.tile));
     }
 
+
     pub fn demolish(&mut self, entity_id: u32) -> Result<(), String> {
         let index = self
             .buildings
@@ -961,21 +1222,23 @@ impl World {
         self.remove_crops_on_tiles(&tiles);
         self.resources.refund(&def.cost);
         let released = self.job_board.remove_site(entity_id);
-        if released.contains(&self.villager.id) {
-            self.villager.current_job = None;
-            if matches!(
-                self.villager.state,
-                AgentState::Working { .. }
-                    | AgentState::MovingTo {
-                        purpose: MovePurpose::Work,
-                        ..
-                    }
-            ) {
-                self.villager.clear_path_to_idle();
-            }
-        } else if let Some(job_id) = self.villager.current_job {
-            if self.job_board.get(job_id).is_none() {
-                self.villager.current_job = None;
+        for villager in &mut self.villagers {
+            if released.contains(&villager.id) {
+                villager.current_job = None;
+                if matches!(
+                    villager.state,
+                    AgentState::Working { .. }
+                        | AgentState::MovingTo {
+                            purpose: MovePurpose::Work,
+                            ..
+                        }
+                ) {
+                    villager.clear_path_to_idle();
+                }
+            } else if let Some(job_id) = villager.current_job {
+                if self.job_board.get(job_id).is_none() {
+                    villager.current_job = None;
+                }
             }
         }
         Ok(())
@@ -989,14 +1252,18 @@ mod tests {
     use crate::sim::clock::{Clock, Season};
     use crate::sim::jobs::JobKind;
     use crate::sim::terrain::Terrain;
+    use crate::sim::utility::EAT_TICKS;
 
     fn grass_world() -> World {
         let mut world = World::generate(8, 8, 32, 1);
         world.tiles = vec![Terrain::Grass as u8; 64];
         world.occupancy = vec![None; 64];
-        world.villager.pos = world.tile_center(0, 0);
-        world.villager.clear_path_to_idle();
-        world.villager.current_job = None;
+        // Single villager for path/move unit tests.
+        world.villagers.truncate(1);
+        world.villagers[0].pos = world.tile_center(0, 0);
+        world.villagers[0].clear_path_to_idle();
+        world.villagers[0].current_job = None;
+        world.villagers[0].current_action = None;
         world.job_board = JobBoard::new();
         world.crops.clear();
         world.events.clear();
@@ -1017,24 +1284,17 @@ mod tests {
     }
 
     #[test]
-    fn villager_spawns_idle_on_walkable_tile() {
+    fn spawns_five_villagers_on_walkable_tiles() {
         let world = World::default_world();
         let snap = world.tick_snapshot();
-        assert_eq!(snap.villagers.len(), 1);
-        assert_eq!(snap.villagers[0].state, 0);
-        let (tx, ty) = world.pos_to_tile(world.villager().pos);
-        assert!(world.is_passable(tx, ty));
-        assert!(
-            world.is_spawn_candidate(tx, ty),
-            "spawn ({tx},{ty}) should have a passable neighbor"
-        );
-        // Idle villager does not drift across ticks.
-        let mut world = world;
-        let before = world.villager().pos;
-        for _ in 0..10 {
-            world.advance();
+        assert_eq!(snap.villagers.len(), 5);
+        assert_eq!(world.villagers().len(), 5);
+        for villager in world.villagers() {
+            assert_eq!(villager.state.as_u8(), 0);
+            let (tx, ty) = world.pos_to_tile(villager.pos);
+            assert!(world.is_passable(tx, ty));
         }
-        assert_eq!(world.villager().pos, before);
+        assert_eq!(world.resources().food, 50);
     }
 
     #[test]
@@ -1050,24 +1310,33 @@ mod tests {
             world.advance();
         }
         assert!(world.villager().pos.0 > start_x + 10.0);
+        let mut arrived = false;
         for _ in 0..200 {
             world.advance();
+            let (tx, ty) = world.pos_to_tile(world.villager().pos);
+            if (tx, ty) == (5, 0)
+                && !matches!(
+                    world.villager().state,
+                    AgentState::MovingTo {
+                        purpose: MovePurpose::PlayerOrder,
+                        ..
+                    }
+                )
+            {
+                arrived = true;
+                break;
+            }
         }
-        let (tx, ty) = world.pos_to_tile(world.villager().pos);
-        assert_eq!((tx, ty), (5, 0));
-        assert!(matches!(world.villager().state, AgentState::Idle));
+        assert!(arrived, "villager should reach ordered tile before wandering");
     }
 
     #[test]
     fn placing_building_on_path_triggers_repath_or_idle() {
         let mut world = grass_world();
-        // Walk along y=0 from (0,0) to (7,0).
         world.order_move(7, 0).unwrap();
         let path_before = world.villager().path.clone().expect("path");
         assert!(path_before.contains(&(3, 0)));
-        // Block the corridor mid-path.
         world.place_building("hut", 3, 0, 0).unwrap();
-        // Either repathed around (3,0) or briefly idled with cooldown.
         if let Some(path) = &world.villager().path {
             assert!(!path.contains(&(3, 0)));
             assert!(matches!(world.villager().state, AgentState::MovingTo { .. }));
@@ -1123,6 +1392,7 @@ mod tests {
     #[test]
     fn hunger_decays_across_ticks() {
         let mut world = grass_world();
+        world.resources.food = 0; // prevent eating from restoring hunger
         let before = world.villager().needs.hunger;
         for _ in 0..500 {
             world.advance();
@@ -1135,7 +1405,6 @@ mod tests {
     #[test]
     fn completed_farm_advertises_tend_crops_and_villager_works() {
         let mut world = grass_world();
-        // Farm at (2,2) 3x3; villager at (0,0) can path to adjacent stand tiles.
         world.place_building("farm", 2, 2, 0).unwrap();
         for _ in 0..30 {
             world.advance();
@@ -1149,7 +1418,6 @@ mod tests {
                 .any(|job| job.kind == JobKind::TendCrops)
         );
 
-        // Allow claim + path + arrive.
         for _ in 0..400 {
             world.advance();
             if matches!(world.villager().state, AgentState::Working { .. }) {
@@ -1224,7 +1492,6 @@ mod tests {
         assert!(world.plant_crop("wheat", 2, 2).is_err());
         assert!(world.plant_crop("wheat", 0, 0).is_err());
 
-        // Water + grow through stages with a fast manual watered flag.
         world.crops[0].watered = true;
         let ticks_per_stage = world.catalog().find_crop("wheat").unwrap().1.ticks_per_stage;
         let stages = world.catalog().find_crop("wheat").unwrap().1.stages;
@@ -1302,7 +1569,6 @@ mod tests {
 
         let tick_before = world.clock().tick;
         world.clock.set_speed(0).unwrap();
-        // Sim loop skips advance when paused; exercise the same gate here.
         if !world.clock().speed.is_paused() {
             world.advance();
         }
@@ -1324,5 +1590,79 @@ mod tests {
         assert_eq!(snap.crops.len(), 1);
         assert_eq!(snap.crops[0].x, 4);
         assert_eq!(snap.crops[0].y, 4);
+        assert_eq!(snap.villagers.len(), 1);
+    }
+
+    #[test]
+    fn hungry_villager_eats_without_releasing_job() {
+        let mut world = grass_world();
+        world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..30 {
+            world.advance();
+        }
+        for _ in 0..400 {
+            world.advance();
+            if matches!(world.villager().state, AgentState::Working { .. }) {
+                break;
+            }
+        }
+        assert!(matches!(world.villager().state, AgentState::Working { .. }));
+        let job = world.villager().current_job;
+        assert!(job.is_some());
+        world.villager_mut().needs.set_hunger(0.0);
+        let food_before = world.resources().food;
+        world.maybe_decide(0);
+        assert!(matches!(world.villager().state, AgentState::Eating { .. }));
+        assert_eq!(world.villager().current_job, job);
+        assert_eq!(world.resources().food, food_before - 1);
+        for _ in 0..EAT_TICKS {
+            world.advance();
+            if !matches!(world.villager().state, AgentState::Eating { .. }) {
+                break;
+            }
+        }
+        assert!((world.villager().needs.hunger - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn two_villagers_can_claim_farm_slots() {
+        let mut world = World::generate(8, 8, 32, 1);
+        world.tiles = vec![Terrain::Grass as u8; 64];
+        world.occupancy = vec![None; 64];
+        world.villagers.truncate(2);
+        world.villagers[0].pos = world.tile_center(0, 0);
+        world.villagers[1].pos = world.tile_center(7, 7);
+        for v in &mut world.villagers {
+            v.clear_path_to_idle();
+            v.current_job = None;
+            v.current_action = None;
+        }
+        world.job_board = JobBoard::new();
+        world.clock = Clock::new();
+        world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..30 {
+            world.advance();
+        }
+        for _ in 0..500 {
+            world.advance();
+            let working = world
+                .villagers()
+                .iter()
+                .filter(|v| matches!(v.state, AgentState::Working { .. }))
+                .count();
+            if working >= 2 {
+                break;
+            }
+        }
+        let working = world
+            .villagers()
+            .iter()
+            .filter(|v| matches!(v.state, AgentState::Working { .. }))
+            .count();
+        assert!(
+            working >= 2,
+            "expected both villagers working, got {:?}",
+            world.villagers().iter().map(|v| &v.state).collect::<Vec<_>>()
+        );
     }
 }

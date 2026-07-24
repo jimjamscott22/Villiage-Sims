@@ -15,6 +15,7 @@ export default function App() {
   const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0);
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
+  const [selectedVillagerId, setSelectedVillagerId] = useState<number | null>(1);
   const [villagerDetail, setVillagerDetail] = useState<VillagerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,10 +27,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (selectedVillagerId == null) {
+      setVillagerDetail(null);
+      return;
+    }
     let cancelled = false;
+    const id = selectedVillagerId;
     const refresh = () => {
       void transport
-        .getVillagerDetail(1)
+        .getVillagerDetail(id)
         .then((detail) => {
           if (!cancelled) setVillagerDetail(detail);
         })
@@ -43,7 +49,7 @@ export default function App() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [selectedVillagerId]);
 
   const onSnapshot = (snapshot: TickSnapshot) => {
     setResources(snapshot.resources);
@@ -89,12 +95,14 @@ export default function App() {
           selectedCrop={selectedCrop}
           rotation={rotation}
           selectedBuildingId={selectedBuildingId}
+          selectedVillagerId={selectedVillagerId}
           onRotationChange={setRotation}
           onCancelBuild={() => {
             setSelectedKind(null);
             setSelectedCrop(null);
           }}
           onSelectBuilding={setSelectedBuildingId}
+          onSelectVillager={setSelectedVillagerId}
           onSnapshot={onSnapshot}
         />
         <BuildMenu
