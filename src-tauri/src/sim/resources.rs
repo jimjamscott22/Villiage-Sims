@@ -8,6 +8,7 @@ pub struct ResourceTotals {
     pub wood: u32,
     pub stone: u32,
     pub grain: u32,
+    pub flour: u32,
     pub food: u32,
     pub gold: u32,
 }
@@ -18,6 +19,7 @@ impl ResourceTotals {
             wood: 120,
             stone: 40,
             grain: 0,
+            flour: 0,
             food: 50,
             gold: 0,
         }
@@ -28,6 +30,7 @@ impl ResourceTotals {
             "wood" => self.wood,
             "stone" => self.stone,
             "grain" => self.grain,
+            "flour" => self.flour,
             "food" => self.food,
             "gold" => self.gold,
             _ => 0,
@@ -39,6 +42,7 @@ impl ResourceTotals {
             "wood" => self.wood = value,
             "stone" => self.stone = value,
             "grain" => self.grain = value,
+            "flour" => self.flour = value,
             "food" => self.food = value,
             "gold" => self.gold = value,
             _ => {}

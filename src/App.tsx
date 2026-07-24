@@ -4,6 +4,7 @@ import { transport } from './state/transport';
 import type { Catalog, ClockView, ResourceTotals, TickSnapshot, VillagerDetail } from './state/types';
 import { BuildMenu } from './ui/BuildMenu';
 import { ClockBar } from './ui/ClockBar';
+import { ResourceBar } from './ui/ResourceBar';
 
 const DETAIL_POLL_MS = 250;
 
@@ -83,6 +84,7 @@ export default function App() {
           {transport.mode === 'tauri' ? 'Simulation connected' : 'Browser demo'}
         </span>
       </header>
+      <ResourceBar resources={resources} />
       {error && (
         <p role="alert" className="bg-red-950/90 px-4 py-2 text-sm text-red-100">
           {error}
@@ -107,7 +109,6 @@ export default function App() {
         />
         <BuildMenu
           catalog={catalog}
-          resources={resources}
           selectedKind={selectedKind}
           selectedCrop={selectedCrop}
           selectedBuildingId={selectedBuildingId}

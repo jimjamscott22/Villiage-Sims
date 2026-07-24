@@ -28,6 +28,15 @@ pub struct BuildingDef {
     pub stores: Option<Vec<String>>,
     #[serde(default)]
     pub capacity: Option<u32>,
+    #[serde(default)]
+    pub recipe: Option<RecipeDef>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RecipeDef {
+    pub inputs: BTreeMap<String, u32>,
+    pub outputs: BTreeMap<String, u32>,
+    pub ticks: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -159,10 +168,16 @@ mod tests {
     #[test]
     fn builtin_catalog_loads_buildings_and_crops() {
         let catalog = Catalog::load_builtin().expect("catalog");
-        assert_eq!(catalog.buildings.len(), 3);
+        assert_eq!(catalog.buildings.len(), 5);
         assert!(catalog.find("hut").is_some());
         assert!(catalog.find("farm").is_some());
         assert!(catalog.find("granary").is_some());
+        assert!(catalog.find("mill").is_some());
+        assert!(catalog.find("bakery").is_some());
+        let mill = catalog.find("mill").unwrap().1;
+        assert!(mill.recipe.is_some());
+        let granary = catalog.find("granary").unwrap().1;
+        assert!(granary.stores.as_ref().unwrap().contains(&"grain".into()));
         assert_eq!(catalog.crops.len(), 1);
         assert!(catalog.find_crop("wheat").is_some());
     }

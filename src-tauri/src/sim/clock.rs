@@ -33,7 +33,7 @@ impl Season {
         self as u8
     }
 
-#[allow(dead_code)]
+    #[allow(dead_code)]
     pub fn name(self) -> &'static str {
         match self {
             Self::Spring => "spring",

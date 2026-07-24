@@ -67,7 +67,9 @@ mod tests {
         }
         assert!(needs.hunger < 1.0 - 0.05);
         assert!(needs.hunger > 0.0);
-        assert!((needs.happiness - (needs.hunger + needs.energy + needs.social) / 3.0).abs() < 1e-5);
+        assert!(
+            (needs.happiness - (needs.hunger + needs.energy + needs.social) / 3.0).abs() < 1e-5
+        );
     }
 
     #[test]

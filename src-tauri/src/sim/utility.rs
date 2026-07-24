@@ -147,8 +147,7 @@ fn work_candidate(ctx: &ScoreContext<'_>) -> ScoredAction {
             };
         }
     }
-    if let Some((job_id, priority, tile)) = ctx.job_board.peek_best(ctx.from) {
-        let dist = (tile.0 - ctx.from.0).abs() + (tile.1 - ctx.from.1).abs();
+    if let Some((job_id, priority, dist)) = ctx.job_board.peek_best(ctx.villager_id, ctx.from) {
         ScoredAction {
             kind: ActionKind::Work,
             score: score_work(priority, dist),
@@ -229,9 +228,9 @@ pub fn wander_tile(
             .wrapping_mul(0xBF58_476D_1CE4_E5B9)
             .wrapping_add(0x94D0_49BB_1331_11EB);
         let raw_dx = (hash % (2 * WANDER_RADIUS as u64 + 1)) as i32 - WANDER_RADIUS;
-        let raw_dy =
-            ((hash / (2 * WANDER_RADIUS as u64 + 1)) % (2 * WANDER_RADIUS as u64 + 1)) as i32
-                - WANDER_RADIUS;
+        let raw_dy = ((hash / (2 * WANDER_RADIUS as u64 + 1)) % (2 * WANDER_RADIUS as u64 + 1))
+            as i32
+            - WANDER_RADIUS;
         if raw_dx == 0 && raw_dy == 0 {
             continue;
         }
@@ -350,6 +349,7 @@ mod tests {
             tile: (3, 0),
             priority: 10,
             claimed_by: Some(1),
+            gather_tile: None,
         });
         let ctx = ScoreContext {
             hunger: 1.0,

@@ -1,23 +1,31 @@
-/// Job board: buildings advertise jobs; villagers claim them (Milestone 5).
-
+/// Job board: buildings advertise jobs; villagers claim them.
 use super::catalog::BuildingDef;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JobKind {
     TendCrops,
+    Gather,
+    Haul,
+    Produce,
 }
 
 impl JobKind {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::TendCrops => "tend_crops",
+            Self::Gather => "gather",
+            Self::Haul => "haul",
+            Self::Produce => "produce",
         }
     }
 
     pub fn from_catalog(kind: &str) -> Option<Self> {
         match kind {
             "tend_crops" => Some(Self::TendCrops),
-            _ => None, // haul etc. deferred to later milestones
+            "gather" => Some(Self::Gather),
+            "haul" => Some(Self::Haul),
+            "produce" => Some(Self::Produce),
+            _ => None,
         }
     }
 }
@@ -31,6 +39,8 @@ pub struct Job {
     pub tile: (i32, i32),
     pub priority: u8,
     pub claimed_by: Option<u32>,
+    /// For Gather jobs: the resource node tile.
+    pub gather_tile: Option<(i32, i32)>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -84,19 +94,73 @@ impl JobBoard {
                     tile,
                     priority,
                     claimed_by: None,
+                    gather_tile: None,
                 });
             }
         }
     }
 
-    pub fn remove_site(&mut self, site: u32) -> Vec<u32> {
-        let released: Vec<u32> = self
-            .jobs
+    pub fn advertise_gather(
+        &mut self,
+        stand: (i32, i32),
+        node_tile: (i32, i32),
+        priority: u8,
+    ) -> u32 {
+        let id = self.next_id;
+        self.next_id = self.next_id.saturating_add(1);
+        self.jobs.push(Job {
+            id,
+            kind: JobKind::Gather,
+            site: 0,
+            tile: stand,
+            priority,
+            claimed_by: None,
+            gather_tile: Some(node_tile),
+        });
+        id
+    }
+
+    pub fn remove_gather_jobs_for_node(&mut self, node_tile: (i32, i32)) -> Vec<u32> {
+        let mut released = Vec::new();
+        self.jobs.retain(|job| {
+            if job.kind == JobKind::Gather && job.gather_tile == Some(node_tile) {
+                if let Some(villager) = job.claimed_by {
+                    released.push(villager);
+                }
+                false
+            } else {
+                true
+            }
+        });
+        released
+    }
+
+    pub fn gather_job_count(&self) -> usize {
+        self.jobs
             .iter()
-            .filter(|job| job.site == site)
-            .filter_map(|job| job.claimed_by)
-            .collect();
-        self.jobs.retain(|job| job.site != site);
+            .filter(|job| job.kind == JobKind::Gather)
+            .count()
+    }
+
+    pub fn has_gather_for_node(&self, node_tile: (i32, i32)) -> bool {
+        self.jobs
+            .iter()
+            .any(|job| job.kind == JobKind::Gather && job.gather_tile == Some(node_tile))
+    }
+
+    /// Remove all jobs for a building site; return villager ids that held claims.
+    pub fn remove_site(&mut self, site: u32) -> Vec<u32> {
+        let mut released = Vec::new();
+        self.jobs.retain(|job| {
+            if job.site == site && job.kind != JobKind::Gather {
+                if let Some(villager) = job.claimed_by {
+                    released.push(villager);
+                }
+                false
+            } else {
+                true
+            }
+        });
         released
     }
 
@@ -108,54 +172,59 @@ impl JobBoard {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn release_villager(&mut self, villager_id: u32) {
-        for job in &mut self.jobs {
-            if job.claimed_by == Some(villager_id) {
-                job.claimed_by = None;
+    pub fn claim_id(&mut self, job_id: u32, villager_id: u32) -> bool {
+        let Some(job) = self.jobs.iter_mut().find(|job| job.id == job_id) else {
+            return false;
+        };
+        match job.claimed_by {
+            None => {
+                job.claimed_by = Some(villager_id);
+                true
             }
+            Some(id) if id == villager_id => true,
+            Some(_) => false,
         }
     }
 
-    /// Peek at the best unclaimed job without claiming.
-    /// Returns `(job_id, priority, tile)`.
-    pub fn peek_best(&self, from: (i32, i32)) -> Option<(u32, u8, (i32, i32))> {
-        let mut best: Option<(usize, f32)> = None;
-        for (index, job) in self.jobs.iter().enumerate() {
+    /// Claim the best unclaimed job by priority / (1 + manhattan distance).
+    pub fn claim_best(&mut self, villager_id: u32, from: (i32, i32)) -> Option<u32> {
+        let mut best: Option<(u32, f32)> = None;
+        for job in &self.jobs {
             if job.claimed_by.is_some() {
                 continue;
             }
             let dist = (job.tile.0 - from.0).abs() + (job.tile.1 - from.1).abs();
             let score = f32::from(job.priority) / (1.0 + dist as f32);
             match best {
-                Some((_, best_score)) if score <= best_score => {}
-                _ => best = Some((index, score)),
+                None => best = Some((job.id, score)),
+                Some((_, best_score)) if score > best_score => best = Some((job.id, score)),
+                _ => {}
             }
         }
-        let (index, _) = best?;
-        let job = &self.jobs[index];
-        Some((job.id, job.priority, job.tile))
+        let job_id = best.map(|(id, _)| id)?;
+        self.claim_id(job_id, villager_id).then_some(job_id)
     }
 
-    /// Claim the best unclaimed job by `priority / (1 + manhattan_distance)`.
-    pub fn claim_best(&mut self, villager_id: u32, from: (i32, i32)) -> Option<u32> {
-        let (job_id, _, _) = self.peek_best(from)?;
-        if let Some(job) = self.jobs.iter_mut().find(|job| job.id == job_id) {
-            job.claimed_by = Some(villager_id);
-            return Some(job_id);
-        }
-        None
-    }
-
-    /// Claim a specific unclaimed job if still free.
-    pub fn claim_id(&mut self, job_id: u32, villager_id: u32) -> bool {
-        if let Some(job) = self.jobs.iter_mut().find(|job| job.id == job_id) {
-            if job.claimed_by.is_none() || job.claimed_by == Some(villager_id) {
-                job.claimed_by = Some(villager_id);
-                return true;
+    /// Peek best unclaimed (or already claimed by this villager) job without claiming.
+    pub fn peek_best(&self, villager_id: u32, from: (i32, i32)) -> Option<(u32, u8, i32)> {
+        let mut best: Option<(u32, u8, i32, f32)> = None;
+        for job in &self.jobs {
+            if let Some(owner) = job.claimed_by {
+                if owner != villager_id {
+                    continue;
+                }
+            }
+            let dist = (job.tile.0 - from.0).abs() + (job.tile.1 - from.1).abs();
+            let score = f32::from(job.priority) / (1.0 + dist as f32);
+            match best {
+                None => best = Some((job.id, job.priority, dist, score)),
+                Some((_, _, _, best_score)) if score > best_score => {
+                    best = Some((job.id, job.priority, dist, score));
+                }
+                _ => {}
             }
         }
-        false
+        best.map(|(id, priority, dist, _)| (id, priority, dist))
     }
 
     #[cfg(test)]
@@ -176,7 +245,7 @@ mod tests {
         let mut board = JobBoard::new();
         let tiles = [(1, 0), (2, 0), (3, 0)];
         board.advertise_for_building(10, farm, &tiles, 10);
-        assert_eq!(board.jobs().len(), 2); // farm has slots: 2
+        assert_eq!(board.jobs().len(), 2);
         assert!(board.jobs().iter().all(|j| j.kind == JobKind::TendCrops));
         assert!(board.jobs().iter().all(|j| j.site == 10));
         assert!(board.jobs().iter().all(|j| j.claimed_by.is_none()));
@@ -192,6 +261,7 @@ mod tests {
             tile: (10, 0),
             priority: 10,
             claimed_by: None,
+            gather_tile: None,
         });
         board.jobs.push(Job {
             id: 2,
@@ -200,6 +270,7 @@ mod tests {
             tile: (1, 0),
             priority: 10,
             claimed_by: None,
+            gather_tile: None,
         });
         let claimed = board.claim_best(7, (0, 0)).unwrap();
         assert_eq!(claimed, 2);
@@ -217,6 +288,7 @@ mod tests {
             tile: (0, 0),
             priority: 10,
             claimed_by: Some(3),
+            gather_tile: None,
         });
         let released = board.remove_site(5);
         assert_eq!(released, vec![3]);
@@ -224,11 +296,23 @@ mod tests {
     }
 
     #[test]
-    fn granary_haul_not_advertised_in_m5() {
+    fn granary_advertises_haul_in_m8() {
         let catalog = Catalog::load_builtin().unwrap();
         let granary = catalog.find("granary").unwrap().1;
         let mut board = JobBoard::new();
         board.advertise_for_building(1, granary, &[(0, 0)], 5);
-        assert!(board.jobs().is_empty());
+        assert_eq!(board.jobs().len(), 1);
+        assert_eq!(board.jobs()[0].kind, JobKind::Haul);
+    }
+
+    #[test]
+    fn mill_advertises_produce_and_haul() {
+        let catalog = Catalog::load_builtin().unwrap();
+        let mill = catalog.find("mill").unwrap().1;
+        let mut board = JobBoard::new();
+        board.advertise_for_building(2, mill, &[(0, 0), (1, 0)], 10);
+        assert_eq!(board.jobs().len(), 2);
+        assert!(board.jobs().iter().any(|j| j.kind == JobKind::Produce));
+        assert!(board.jobs().iter().any(|j| j.kind == JobKind::Haul));
     }
 }

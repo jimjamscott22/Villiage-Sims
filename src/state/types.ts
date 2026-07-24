@@ -58,6 +58,7 @@ export interface ResourceTotals {
   wood: number;
   stone: number;
   grain: number;
+  flour: number;
   food: number;
   gold: number;
 }
@@ -72,6 +73,12 @@ export interface TickSnapshot {
   events: SimEvent[];
 }
 
+export interface RecipeDef {
+  inputs: Record<string, number>;
+  outputs: Record<string, number>;
+  ticks: number;
+}
+
 export interface BuildingDef {
   id: string;
   name: string;
@@ -84,6 +91,7 @@ export interface BuildingDef {
   jobs?: { kind: string; slots: number }[];
   stores?: string[];
   capacity?: number;
+  recipe?: RecipeDef;
 }
 
 export interface CropDef {
