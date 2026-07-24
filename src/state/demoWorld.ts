@@ -58,10 +58,46 @@ export const DEMO_CATALOG: Catalog = {
       cost: { wood: 40, stone: 10 },
       buildTicks: 60,
       category: 'storage',
-      stores: ['food'],
+      stores: ['grain', 'flour', 'food'],
       capacity: 500,
       validTerrain: ['grass', 'sand'],
       jobs: [{ kind: 'haul', slots: 1 }],
+    },
+    {
+      id: 'mill',
+      name: 'Mill',
+      footprint: [2, 2],
+      cost: { wood: 30, stone: 20 },
+      buildTicks: 80,
+      category: 'production',
+      validTerrain: ['grass', 'sand'],
+      recipe: {
+        inputs: { grain: 2 },
+        outputs: { flour: 2 },
+        ticks: 80,
+      },
+      jobs: [
+        { kind: 'produce', slots: 1 },
+        { kind: 'haul', slots: 1 },
+      ],
+    },
+    {
+      id: 'bakery',
+      name: 'Bakery',
+      footprint: [2, 2],
+      cost: { wood: 25, stone: 15 },
+      buildTicks: 80,
+      category: 'production',
+      validTerrain: ['grass', 'sand'],
+      recipe: {
+        inputs: { flour: 1 },
+        outputs: { food: 2 },
+        ticks: 100,
+      },
+      jobs: [
+        { kind: 'produce', slots: 1 },
+        { kind: 'haul', slots: 1 },
+      ],
     },
   ],
   crops: DEMO_CROPS,
@@ -84,6 +120,13 @@ const DEFAULT_JOB_PRIORITY = 10;
 const MINUTES_PER_TICK = 0.06;
 const MINUTES_PER_DAY = 1440;
 const DAYS_PER_SEASON = 28;
+const PRODUCTION_BUFFER_CAP = 30;
+const CARRY_STACK_MAX = 5;
+const NODE_REGEN_TICKS = 200;
+const FOREST_NODE_MAX = 5;
+const ROCK_NODE_MAX = 4;
+const MAX_GATHER_JOBS = 6;
+const GATHER_PRIORITY = 8;
 
 const HYSTERESIS = 0.15;
 const WORK_BASELINE = 0.4;
@@ -102,6 +145,21 @@ const DEMO_SEED = 42;
 type ActionKind = 'eat' | 'sleep' | 'work' | 'socialize' | 'wander';
 type MovePurpose = 'player' | 'work' | 'wander';
 type AgentStateName = 'idle' | 'moving' | 'working' | 'eating' | 'sleeping' | 'socializing';
+type DemoJobKind = 'tend_crops' | 'gather' | 'haul' | 'produce';
+type HaulEndpoint = 'stockpile' | number;
+
+interface CarryStack {
+  resource: string;
+  amount: number;
+  dest: HaulEndpoint;
+}
+
+interface HaulTask {
+  resource: string;
+  amount: number;
+  from: HaulEndpoint;
+  to: HaulEndpoint;
+}
 
 const ACTION_ORDER: ActionKind[] = ['eat', 'sleep', 'work', 'socialize', 'wander'];
 
@@ -110,7 +168,64 @@ function actionRank(kind: ActionKind): number {
 }
 
 function startingResources(): ResourceTotals {
-  return { wood: 120, stone: 40, grain: 0, food: 50, gold: 0 };
+  return { wood: 120, stone: 40, grain: 0, flour: 0, food: 50, gold: 0 };
+}
+
+function resourceGet(resources: ResourceTotals, key: string): number {
+  return resources[key as keyof ResourceTotals] ?? 0;
+}
+
+function resourceSet(resources: ResourceTotals, key: string, value: number): void {
+  if (key in resources) resources[key as keyof ResourceTotals] = value;
+}
+
+function canAfford(resources: ResourceTotals, cost: Record<string, number>): boolean {
+  return Object.entries(cost).every(([key, amount]) => resourceGet(resources, key) >= amount);
+}
+
+function inventoryGet(inv: Record<string, number>, key: string): number {
+  return inv[key] ?? 0;
+}
+
+function inventoryTotal(inv: Record<string, number>): number {
+  return Object.values(inv).reduce((sum, amount) => sum + amount, 0);
+}
+
+function inventoryAdd(inv: Record<string, number>, key: string, amount: number): void {
+  if (amount <= 0) return;
+  inv[key] = (inv[key] ?? 0) + amount;
+}
+
+function inventoryTake(inv: Record<string, number>, key: string, amount: number): number {
+  const available = inv[key] ?? 0;
+  const taken = Math.min(available, amount);
+  if (taken <= 0) return 0;
+  const remaining = available - taken;
+  if (remaining > 0) inv[key] = remaining;
+  else delete inv[key];
+  return taken;
+}
+
+function storageAccepts(def: BuildingDef, resource: string): boolean {
+  return def.category === 'storage' && (def.stores ?? []).includes(resource);
+}
+
+function storageFreeCapacity(def: BuildingDef, inv: Record<string, number>): number {
+  return Math.max(0, (def.capacity ?? 0) - inventoryTotal(inv));
+}
+
+function productionFreeCapacity(inv: Record<string, number>): number {
+  return Math.max(0, PRODUCTION_BUFFER_CAP - inventoryTotal(inv));
+}
+
+function recipeAllowsResource(def: BuildingDef, resource: string): boolean {
+  const recipe = def.recipe;
+  if (!recipe) return false;
+  return resource in recipe.inputs || resource in recipe.outputs;
+}
+
+function stockpileAccepts(resource: string): boolean {
+  return ['wood', 'stone', 'food', 'grain', 'flour'].includes(resource);
 }
 
 function rotatedFootprint(def: BuildingDef, rotation: number): [number, number] {
@@ -206,6 +321,8 @@ interface DemoBuilding {
   rot: number;
   progressTicks: number;
   complete: boolean;
+  inventory: Record<string, number>;
+  recipeTicks: number;
 }
 
 interface DemoCrop {
@@ -222,11 +339,20 @@ interface DemoCrop {
 
 interface DemoJob {
   id: number;
-  kind: 'tend_crops';
+  kind: DemoJobKind;
   site: number;
   tile: [number, number];
   priority: number;
   claimedBy: number | null;
+  gatherTile?: [number, number];
+}
+
+interface ResourceNode {
+  tile: [number, number];
+  resource: 'wood' | 'stone';
+  amount: number;
+  max: number;
+  regenAcc: number;
 }
 
 interface DemoNeeds {
@@ -251,6 +377,7 @@ interface DemoVillager {
   workTicksRemaining: number;
   activityTicks: number;
   currentAction: ActionKind | null;
+  carrying: CarryStack | null;
 }
 
 interface DemoClock {
@@ -327,6 +454,7 @@ export class DemoWorld {
   resources = startingResources();
   buildings: DemoBuilding[] = [];
   crops: DemoCrop[] = [];
+  nodes: ResourceNode[] = [];
   private occupancy: Array<number | null>;
   private nextId = 1;
   private nextCropId = 1;
@@ -349,6 +477,7 @@ export class DemoWorld {
   constructor(terrain: TerrainSnapshot) {
     this.terrain = terrain;
     this.occupancy = new Array(terrain.width * terrain.height).fill(null);
+    this.nodes = this.generateNodes();
     this.spawnStartingVillagers();
   }
 
@@ -378,6 +507,7 @@ export class DemoWorld {
         workTicksRemaining: 0,
         activityTicks: 0,
         currentAction: null,
+        carrying: null,
       });
     }
   }
@@ -449,6 +579,8 @@ export class DemoWorld {
     for (const id of newlyComplete) this.advertiseJobsFor(id);
 
     this.tickCrops();
+    this.tickNodes();
+    this.refreshGatherJobs();
     this.decayNeeds();
     for (let i = 0; i < this.villagers.length; i += 1) {
       this.tickVillagerAt(i);
@@ -457,6 +589,7 @@ export class DemoWorld {
   }
 
   snapshot(): TickSnapshot {
+    const resources = this.deriveTotals();
     const clock: ClockView = {
       minute: this.clock.minute,
       day: this.clock.day,
@@ -481,7 +614,7 @@ export class DemoWorld {
       })),
       buildings: this.buildingViews(),
       crops,
-      resources: { ...this.resources },
+      resources,
       clock,
       events: [...this.events],
     };
@@ -505,6 +638,99 @@ export class DemoWorld {
       jobKind: job?.kind ?? null,
       jobSite: job?.site ?? null,
     };
+  }
+
+  private generateNodes(): ResourceNode[] {
+    const nodes: ResourceNode[] = [];
+    for (let y = 0; y < this.terrain.height; y += 1) {
+      for (let x = 0; x < this.terrain.width; x += 1) {
+        const terrain = this.terrain.tiles[y * this.terrain.width + x];
+        if (terrain === 4) {
+          nodes.push({ tile: [x, y], resource: 'wood', amount: FOREST_NODE_MAX, max: FOREST_NODE_MAX, regenAcc: 0 });
+        } else if (terrain === 5) {
+          nodes.push({ tile: [x, y], resource: 'stone', amount: ROCK_NODE_MAX, max: ROCK_NODE_MAX, regenAcc: 0 });
+        }
+      }
+    }
+    return nodes;
+  }
+
+  private deriveTotals(): ResourceTotals {
+    const totals = { ...this.resources };
+    for (const building of this.buildings) {
+      const def = DEMO_CATALOG.buildings[building.kindIndex];
+      if (def.category !== 'storage') continue;
+      for (const resource of def.stores ?? []) {
+        resourceSet(totals, resource, resourceGet(totals, resource) + inventoryGet(building.inventory, resource));
+      }
+    }
+    return totals;
+  }
+
+  private withdraw(resource: string, amount: number): number {
+    let remaining = amount;
+    const stockpileTake = Math.min(resourceGet(this.resources, resource), remaining);
+    if (stockpileTake > 0) {
+      resourceSet(this.resources, resource, resourceGet(this.resources, resource) - stockpileTake);
+      remaining -= stockpileTake;
+    }
+    if (remaining === 0) return amount;
+
+    const indexes = this.buildings
+      .map((_building, index) => index)
+      .sort((a, b) => this.buildings[a].id - this.buildings[b].id);
+    for (const index of indexes) {
+      if (remaining === 0) break;
+      const building = this.buildings[index];
+      const def = DEMO_CATALOG.buildings[building.kindIndex];
+      if (!storageAccepts(def, resource)) continue;
+      const taken = inventoryTake(building.inventory, resource, remaining);
+      remaining -= taken;
+    }
+    return amount - remaining;
+  }
+
+  private withdrawCost(cost: Record<string, number>): boolean {
+    if (!canAfford(this.deriveTotals(), cost)) return false;
+    for (const [resource, amount] of Object.entries(cost)) {
+      if (this.withdraw(resource, amount) !== amount) return false;
+    }
+    return true;
+  }
+
+  private depositToStockpile(resource: string, amount: number): void {
+    if (amount <= 0) return;
+    resourceSet(this.resources, resource, resourceGet(this.resources, resource) + amount);
+  }
+
+  private depositToStorage(endpoint: HaulEndpoint, resource: string, amount: number): number {
+    if (amount <= 0) return 0;
+    if (endpoint === 'stockpile') {
+      this.depositToStockpile(resource, amount);
+      return amount;
+    }
+    const building = this.buildings.find((entry) => entry.id === endpoint);
+    if (!building) return 0;
+    const def = DEMO_CATALOG.buildings[building.kindIndex];
+    let room = 0;
+    if (storageAccepts(def, resource)) {
+      room = storageFreeCapacity(def, building.inventory);
+    } else if (recipeAllowsResource(def, resource)) {
+      room = productionFreeCapacity(building.inventory);
+    }
+    const deposited = Math.min(amount, room);
+    inventoryAdd(building.inventory, resource, deposited);
+    return deposited;
+  }
+
+  private takeFromEndpoint(endpoint: HaulEndpoint, resource: string, amount: number): number {
+    if (endpoint === 'stockpile') {
+      const taken = Math.min(resourceGet(this.resources, resource), amount);
+      resourceSet(this.resources, resource, resourceGet(this.resources, resource) - taken);
+      return taken;
+    }
+    const building = this.buildings.find((entry) => entry.id === endpoint);
+    return building ? inventoryTake(building.inventory, resource, amount) : 0;
   }
 
   moveVillagerTo(x: number, y: number): void {
@@ -556,7 +782,7 @@ export class DemoWorld {
       if (this.occupancy[index] != null) return { valid: false, reason: 'tile occupied' };
     }
     for (const [key, amount] of Object.entries(def.cost)) {
-      if ((this.resources[key as keyof ResourceTotals] ?? 0) < amount) {
+      if (resourceGet(this.deriveTotals(), key) < amount) {
         return { valid: false, reason: 'insufficient resources' };
       }
     }
@@ -569,10 +795,7 @@ export class DemoWorld {
     const kindIndex = DEMO_CATALOG.buildings.findIndex((building) => building.id === kind);
     const def = DEMO_CATALOG.buildings[kindIndex];
     const [fw, fh] = rotatedFootprint(def, rotation);
-    for (const [key, amount] of Object.entries(def.cost)) {
-      const resourceKey = key as keyof ResourceTotals;
-      this.resources[resourceKey] -= amount;
-    }
+    if (!this.withdrawCost(def.cost)) throw new Error('insufficient resources');
     const id = this.nextId;
     this.nextId += 1;
     for (const [tx, ty] of footprintTiles(x, y, fw, fh)) {
@@ -586,6 +809,8 @@ export class DemoWorld {
       rot: rotation % 4,
       progressTicks: 0,
       complete: false,
+      inventory: {},
+      recipeTicks: 0,
     });
     this.invalidatePathsIfNeeded();
     return { id };
@@ -606,8 +831,10 @@ export class DemoWorld {
       (crop) => !tiles.some(([tx, ty]) => crop.x === tx && crop.y === ty),
     );
     for (const [key, amount] of Object.entries(def.cost)) {
-      const resourceKey = key as keyof ResourceTotals;
-      this.resources[resourceKey] += amount;
+      this.depositToStockpile(key, amount);
+    }
+    for (const [key, amount] of Object.entries(building.inventory)) {
+      this.depositToStockpile(key, amount);
     }
     this.buildings.splice(index, 1);
     const released = this.jobs
@@ -683,7 +910,7 @@ export class DemoWorld {
     const standTiles = this.adjacentStandTiles(building.x, building.y, fw, fh);
     let tileIndex = 0;
     for (const jobDef of def.jobs ?? []) {
-      if (jobDef.kind !== 'tend_crops') continue;
+      if (!['tend_crops', 'gather', 'haul', 'produce'].includes(jobDef.kind)) continue;
       for (let slot = 0; slot < jobDef.slots; slot += 1) {
         if (tileIndex >= standTiles.length) return;
         const tile = standTiles[tileIndex];
@@ -692,7 +919,7 @@ export class DemoWorld {
         this.nextJobId += 1;
         this.jobs.push({
           id,
-          kind: 'tend_crops',
+          kind: jobDef.kind as DemoJobKind,
           site: buildingId,
           tile,
           priority: DEFAULT_JOB_PRIORITY,
@@ -803,7 +1030,7 @@ export class DemoWorld {
   private scoreAll(index: number, from: [number, number], partnerInRange: boolean): ScoredAction[] {
     const villager = this.villagers[index];
     const actions: ScoredAction[] = [
-      { kind: 'eat', score: scoreEat(villager.needs.hunger, this.resources.food), jobId: null },
+      { kind: 'eat', score: scoreEat(villager.needs.hunger, this.deriveTotals().food), jobId: null },
       { kind: 'sleep', score: scoreSleep(villager.needs.energy, isNight(this.clock.minute)), jobId: null },
       { kind: 'socialize', score: scoreSocialize(villager.needs.social, partnerInRange), jobId: null },
       { kind: 'wander', score: scoreWander(), jobId: null },
@@ -870,8 +1097,7 @@ export class DemoWorld {
   }
 
   private beginEat(index: number): void {
-    if (this.resources.food < 1) return;
-    this.resources.food -= 1;
+    if (this.withdraw('food', 1) === 0) return;
     const villager = this.villagers[index];
     villager.path = null;
     villager.target = null;
@@ -1050,7 +1276,7 @@ export class DemoWorld {
 
   private tickWorking(index: number): void {
     const villager = this.villagers[index];
-    if (villager.currentJob == null || !this.jobs.some((job) => job.id === villager.currentJob)) {
+    if (villager.currentJob == null) {
       villager.currentJob = null;
       this.clearToIdle(villager);
       if (villager.currentAction === 'work') {
@@ -1058,15 +1284,43 @@ export class DemoWorld {
       }
       return;
     }
-    if (villager.workTicksRemaining === WORK_CYCLE_TICKS) {
-      this.tendAutoPlant(villager.currentJob);
+    const job = this.jobs.find((entry) => entry.id === villager.currentJob);
+    if (!job) {
+      villager.currentJob = null;
+      this.clearToIdle(villager);
+      if (villager.currentAction === 'work') {
+        villager.currentAction = null;
+      }
+      return;
     }
-    this.tendWaterCrops(villager.currentJob);
+    switch (job.kind) {
+      case 'tend_crops':
+        this.tickTendCrops(job.id, villager.workTicksRemaining);
+        break;
+      case 'gather':
+        this.tickGather(job.id, villager.workTicksRemaining);
+        break;
+      case 'produce':
+        this.tickProduce(job.id);
+        break;
+      case 'haul':
+        this.tickHaul(index);
+        break;
+    }
+    if (villager.state !== 'working' || villager.currentJob !== job.id) return;
     if (villager.workTicksRemaining <= 1) {
       villager.workTicksRemaining = WORK_CYCLE_TICKS;
     } else {
       villager.workTicksRemaining -= 1;
     }
+  }
+
+  private tickTendCrops(jobId: number, ticksRemaining: number): void {
+    if (ticksRemaining === WORK_CYCLE_TICKS) {
+      this.tendHarvestReadyCrop(jobId);
+      this.tendAutoPlant(jobId);
+    }
+    this.tendWaterCrops(jobId);
   }
 
   private rollDay(): void {
@@ -1137,6 +1391,50 @@ export class DemoWorld {
     }
   }
 
+  private tendHarvestReadyCrop(jobId: number): void {
+    const job = this.jobs.find((entry) => entry.id === jobId);
+    if (!job) return;
+    const tiles = this.farmFootprintTiles(job.site);
+    const cropIndex = this.crops.findIndex((crop) => {
+      const def = DEMO_CROPS[crop.kindIndex];
+      return tiles.some(([tx, ty]) => crop.x === tx && crop.y === ty)
+        && crop.stage >= def.stages - 1;
+    });
+    if (cropIndex < 0) return;
+    const crop = this.crops[cropIndex];
+    const def = DEMO_CROPS[crop.kindIndex];
+    const building = this.buildings.find((entry) => entry.id === job.site);
+    if (building) {
+      let free = productionFreeCapacity(building.inventory);
+      for (const [resource, amount] of Object.entries(def.yield ?? {})) {
+        if (free === 0) break;
+        const added = Math.min(amount, free);
+        inventoryAdd(building.inventory, resource, added);
+        free -= added;
+      }
+    }
+    this.crops.splice(cropIndex, 1);
+  }
+
+  private spendSeedCost(farmId: number, seedCost: Record<string, number>): boolean {
+    const entries = Object.entries(seedCost);
+    if (entries.length === 0) return true;
+    const farm = this.buildings.find((entry) => entry.id === farmId);
+    if (!farm) return false;
+    const canPay = entries.every(
+      ([resource, amount]) => inventoryGet(farm.inventory, resource) + resourceGet(this.resources, resource) >= amount,
+    );
+    if (!canPay) return false;
+    for (const [resource, amount] of entries) {
+      const fromFarm = inventoryTake(farm.inventory, resource, amount);
+      const remaining = amount - fromFarm;
+      if (remaining > 0) {
+        resourceSet(this.resources, resource, resourceGet(this.resources, resource) - remaining);
+      }
+    }
+    return true;
+  }
+
   private tendAutoPlant(jobId: number): void {
     const job = this.jobs.find((entry) => entry.id === jobId);
     if (!job) return;
@@ -1151,6 +1449,7 @@ export class DemoWorld {
       && !this.crops.some((crop) => crop.x === tx && crop.y === ty)
     );
     if (!empty) return;
+    this.spendSeedCost(job.site, wheat.seedCost ?? {});
     const id = this.nextCropId;
     this.nextCropId += 1;
     this.crops.push({
@@ -1164,6 +1463,303 @@ export class DemoWorld {
       watered: false,
       readyEmitted: false,
     });
+  }
+
+  private tickNodes(): void {
+    for (const node of this.nodes) {
+      if (node.amount >= node.max) {
+        node.regenAcc = 0;
+        continue;
+      }
+      node.regenAcc += 1;
+      if (node.regenAcc >= NODE_REGEN_TICKS) {
+        node.regenAcc = 0;
+        node.amount = Math.min(node.max, node.amount + 1);
+      }
+    }
+  }
+
+  private gatherStandTile(node: ResourceNode): [number, number] | null {
+    const [x, y] = node.tile;
+    if (node.resource === 'wood') {
+      return this.isPassable(x, y) ? [x, y] : null;
+    }
+    for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]] as const) {
+      const stand: [number, number] = [x + dx, y + dy];
+      if (this.isPassable(stand[0], stand[1])) return stand;
+    }
+    return null;
+  }
+
+  private sameTile(a: [number, number] | undefined, b: [number, number]): boolean {
+    return a != null && a[0] === b[0] && a[1] === b[1];
+  }
+
+  private removeGatherJobsForNode(nodeTile: [number, number]): number[] {
+    const released: number[] = [];
+    this.jobs = this.jobs.filter((job) => {
+      if (job.kind === 'gather' && this.sameTile(job.gatherTile, nodeTile)) {
+        if (job.claimedBy != null) released.push(job.claimedBy);
+        return false;
+      }
+      return true;
+    });
+    return released;
+  }
+
+  private clearReleasedWorkClaims(released: number[]): void {
+    for (const villagerId of released) {
+      const villager = this.villagers.find((entry) => entry.id === villagerId);
+      if (!villager) continue;
+      villager.currentJob = null;
+      if (villager.state === 'working' || (villager.state === 'moving' && villager.purpose === 'work')) {
+        this.clearToIdle(villager);
+        if (villager.currentAction === 'work') villager.currentAction = null;
+      }
+    }
+  }
+
+  private refreshGatherJobs(): void {
+    for (const node of this.nodes) {
+      if (node.amount === 0) {
+        this.clearReleasedWorkClaims(this.removeGatherJobsForNode(node.tile));
+      }
+    }
+
+    let count = this.jobs.filter((job) => job.kind === 'gather').length;
+    if (count >= MAX_GATHER_JOBS) return;
+    for (const node of this.nodes) {
+      if (node.amount === 0 || count >= MAX_GATHER_JOBS) continue;
+      if (this.jobs.some((job) => job.kind === 'gather' && this.sameTile(job.gatherTile, node.tile))) continue;
+      const stand = this.gatherStandTile(node);
+      if (!stand) continue;
+      const id = this.nextJobId;
+      this.nextJobId += 1;
+      this.jobs.push({
+        id,
+        kind: 'gather',
+        site: 0,
+        tile: stand,
+        priority: GATHER_PRIORITY,
+        claimedBy: null,
+        gatherTile: node.tile,
+      });
+      count += 1;
+    }
+  }
+
+  private tickGather(jobId: number, ticksRemaining: number): void {
+    if (ticksRemaining !== WORK_CYCLE_TICKS) return;
+    const job = this.jobs.find((entry) => entry.id === jobId);
+    if (!job?.gatherTile) return;
+    const node = this.nodes.find((entry) => this.sameTile(entry.tile, job.gatherTile!));
+    if (!node) {
+      this.clearReleasedWorkClaims(this.removeGatherJobsForNode(job.gatherTile));
+      return;
+    }
+    if (node.amount > 0) {
+      node.amount -= 1;
+      this.depositToStockpile(node.resource, 1);
+    }
+    if (node.amount === 0) {
+      this.clearReleasedWorkClaims(this.removeGatherJobsForNode(node.tile));
+    }
+  }
+
+  private buildingStandTile(buildingId: number): [number, number] | null {
+    const building = this.buildings.find((entry) => entry.id === buildingId);
+    if (!building) return null;
+    const def = DEMO_CATALOG.buildings[building.kindIndex];
+    const [fw, fh] = rotatedFootprint(def, building.rot);
+    return this.adjacentStandTiles(building.x, building.y, fw, fh)[0] ?? null;
+  }
+
+  private stockpileStand(): [number, number] | null {
+    return this.findWalkableNear(Math.floor(this.terrain.width / 2), Math.floor(this.terrain.height / 2));
+  }
+
+  private endpointStandTile(endpoint: HaulEndpoint): [number, number] | null {
+    return endpoint === 'stockpile' ? this.stockpileStand() : this.buildingStandTile(endpoint);
+  }
+
+  private nearestStorageFor(resource: string, from: [number, number]): { id: number; free: number } | null {
+    let best: { id: number; free: number; dist: number } | null = null;
+    for (const building of this.buildings) {
+      if (!building.complete) continue;
+      const def = DEMO_CATALOG.buildings[building.kindIndex];
+      if (!storageAccepts(def, resource)) continue;
+      const free = storageFreeCapacity(def, building.inventory);
+      if (free === 0) continue;
+      const stand = this.buildingStandTile(building.id);
+      if (!stand) continue;
+      const dist = Math.abs(stand[0] - from[0]) + Math.abs(stand[1] - from[1]);
+      if (!best || dist < best.dist || (dist === best.dist && building.id < best.id)) {
+        best = { id: building.id, free, dist };
+      }
+    }
+    return best ? { id: best.id, free: best.free } : null;
+  }
+
+  private findHaulTask(): HaulTask | null {
+    for (const source of this.buildings) {
+      if (!source.complete) continue;
+      const def = DEMO_CATALOG.buildings[source.kindIndex];
+      if (def.category !== 'production') continue;
+      const sourceStand = this.buildingStandTile(source.id);
+      if (!sourceStand) continue;
+      for (const [resource, available] of Object.entries(source.inventory)) {
+        if (available <= 0) continue;
+        if (def.recipe && !(resource in def.recipe.outputs)) continue;
+        const storage = this.nearestStorageFor(resource, sourceStand);
+        if (storage) {
+          return {
+            resource,
+            amount: Math.min(available, CARRY_STACK_MAX, storage.free),
+            from: source.id,
+            to: storage.id,
+          };
+        }
+        if (stockpileAccepts(resource)) {
+          return {
+            resource,
+            amount: Math.min(available, CARRY_STACK_MAX),
+            from: source.id,
+            to: 'stockpile',
+          };
+        }
+      }
+    }
+
+    for (const dest of this.buildings) {
+      if (!dest.complete) continue;
+      const def = DEMO_CATALOG.buildings[dest.kindIndex];
+      const recipe = def.recipe;
+      if (!recipe) continue;
+      const room = productionFreeCapacity(dest.inventory);
+      if (room === 0 || !this.buildingStandTile(dest.id)) continue;
+      for (const [resource, required] of Object.entries(recipe.inputs)) {
+        const have = inventoryGet(dest.inventory, resource);
+        if (have >= required) continue;
+        const needed = required - have;
+        if (stockpileAccepts(resource)) {
+          const available = resourceGet(this.resources, resource);
+          if (available > 0 && this.stockpileStand()) {
+            return {
+              resource,
+              amount: Math.min(available, needed, room, CARRY_STACK_MAX),
+              from: 'stockpile',
+              to: dest.id,
+            };
+          }
+        }
+        for (const source of this.buildings) {
+          if (!source.complete) continue;
+          const available = inventoryGet(source.inventory, resource);
+          if (available === 0) continue;
+          const sourceDef = DEMO_CATALOG.buildings[source.kindIndex];
+          if (!storageAccepts(sourceDef, resource) || !this.buildingStandTile(source.id)) continue;
+          return {
+            resource,
+            amount: Math.min(available, needed, room, CARRY_STACK_MAX),
+            from: source.id,
+            to: dest.id,
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  private tickProduce(jobId: number): void {
+    const job = this.jobs.find((entry) => entry.id === jobId);
+    if (!job) return;
+    const building = this.buildings.find((entry) => entry.id === job.site);
+    if (!building) return;
+    const recipe = DEMO_CATALOG.buildings[building.kindIndex].recipe;
+    if (!recipe) return;
+    if (building.recipeTicks === 0) {
+      const hasInputs = Object.entries(recipe.inputs).every(
+        ([resource, amount]) => inventoryGet(building.inventory, resource) >= amount,
+      );
+      if (hasInputs) {
+        for (const [resource, amount] of Object.entries(recipe.inputs)) {
+          inventoryTake(building.inventory, resource, amount);
+        }
+        building.recipeTicks = recipe.ticks;
+      }
+      return;
+    }
+    building.recipeTicks -= 1;
+    if (building.recipeTicks === 0) {
+      let free = productionFreeCapacity(building.inventory);
+      for (const [resource, amount] of Object.entries(recipe.outputs)) {
+        if (free === 0) break;
+        const added = Math.min(amount, free);
+        inventoryAdd(building.inventory, resource, added);
+        free -= added;
+      }
+    }
+  }
+
+  private tickHaul(index: number): void {
+    const villager = this.villagers[index];
+    const from = this.posToTile(villager.x, villager.y);
+    if (villager.carrying) {
+      const destStand = this.endpointStandTile(villager.carrying.dest);
+      if (!destStand) {
+        this.depositToStockpile(villager.carrying.resource, villager.carrying.amount);
+        villager.carrying = null;
+        return;
+      }
+      if (from[0] === destStand[0] && from[1] === destStand[1]) {
+        const deposited = this.depositToStorage(
+          villager.carrying.dest,
+          villager.carrying.resource,
+          villager.carrying.amount,
+        );
+        if (deposited < villager.carrying.amount) {
+          this.depositToStockpile(villager.carrying.resource, villager.carrying.amount - deposited);
+        }
+        villager.carrying = null;
+        return;
+      }
+      this.moveWorkingVillagerTo(index, destStand);
+      return;
+    }
+
+    const task = this.findHaulTask();
+    if (!task) return;
+    const sourceStand = this.endpointStandTile(task.from);
+    if (!sourceStand) return;
+    if (from[0] === sourceStand[0] && from[1] === sourceStand[1]) {
+      const taken = this.takeFromEndpoint(task.from, task.resource, Math.min(task.amount, CARRY_STACK_MAX));
+      if (taken > 0) {
+        villager.carrying = { resource: task.resource, amount: taken, dest: task.to };
+      }
+      return;
+    }
+    this.moveWorkingVillagerTo(index, sourceStand);
+  }
+
+  private moveWorkingVillagerTo(index: number, tile: [number, number]): void {
+    const villager = this.villagers[index];
+    const start = this.posToTile(villager.x, villager.y);
+    if (start[0] === tile[0] && start[1] === tile[1]) return;
+    const path = this.computePath(start, tile);
+    if (path) {
+      villager.state = 'moving';
+      villager.purpose = 'work';
+      villager.target = tile;
+      villager.path = path;
+      return;
+    }
+    this.releaseJobAt(index);
+    villager.repathCooldown = REPATH_COOLDOWN_TICKS;
+    if (villager.carrying) {
+      this.depositToStockpile(villager.carrying.resource, villager.carrying.amount);
+      villager.carrying = null;
+    }
+    this.clearToIdle(villager);
   }
 
   private tickMoving(index: number, target: [number, number], purpose: MovePurpose): void {

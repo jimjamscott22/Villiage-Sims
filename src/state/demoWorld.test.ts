@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { generateDemoTerrain } from './demoTerrain';
-import { DemoWorld } from './demoWorld';
+import { DEMO_CATALOG, DemoWorld } from './demoWorld';
+
+function grassTerrain(width = 16, height = 16) {
+  return {
+    width,
+    height,
+    tileSize: 32,
+    tiles: new Array(width * height).fill(3),
+  };
+}
 
 function nearestVillagerId(world: DemoWorld, x: number, y: number): number {
   const snap = world.snapshot();
@@ -22,6 +31,31 @@ function villagerById(world: DemoWorld, id: number) {
   const found = world.snapshot().villagers.find((v) => v.id === id);
   if (!found) throw new Error(`missing villager ${id}`);
   return found;
+}
+
+function inventoryGet(inv: Record<string, number>, key: string): number {
+  return inv[key] ?? 0;
+}
+
+function inventoryAdd(inv: Record<string, number>, key: string, amount: number): void {
+  inv[key] = (inv[key] ?? 0) + amount;
+}
+
+function completeBuilding(world: DemoWorld, kind: string, x: number, y: number): number {
+  const placed = world.placeBuilding(kind, x, y, 0);
+  const building = world.buildings.find((entry) => entry.id === placed.id);
+  if (!building) throw new Error(`missing building ${placed.id}`);
+  building.complete = true;
+  building.progressTicks = DEMO_CATALOG.buildings[building.kindIndex].buildTicks;
+  (world as unknown as { advertiseJobsFor(id: number): void }).advertiseJobsFor(placed.id);
+  return placed.id;
+}
+
+function jobIdFor(world: DemoWorld, site: number, kind: string): number {
+  const job = (world as unknown as { jobs: Array<{ id: number; site: number; kind: string }> }).jobs
+    .find((entry) => entry.site === site && entry.kind === kind);
+  if (!job) throw new Error(`missing ${kind} job for ${site}`);
+  return job.id;
 }
 
 describe('DemoWorld pathfinding', () => {
@@ -215,5 +249,116 @@ describe('DemoWorld pathfinding', () => {
     for (let i = 0; i < 40; i += 1) world.advance();
     expect(world.resources.food).toBe(foodAfter);
     expect(villager.state).not.toBe('eating');
+  });
+
+  it('loads the M8 demo catalog with flour storage and recipes', () => {
+    expect(DEMO_CATALOG.buildings).toHaveLength(5);
+    expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'granary')?.stores).toEqual(['grain', 'flour', 'food']);
+    expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'mill')?.recipe).toEqual({
+      inputs: { grain: 2 },
+      outputs: { flour: 2 },
+      ticks: 80,
+    });
+    expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'bakery')?.recipe).toEqual({
+      inputs: { flour: 1 },
+      outputs: { food: 2 },
+      ticks: 100,
+    });
+    expect(new DemoWorld(grassTerrain()).snapshot().resources.flour).toBe(0);
+  });
+
+  it('harvests ready wheat into farm inventory without counting it in totals', () => {
+    const world = new DemoWorld(grassTerrain());
+    const farmId = completeBuilding(world, 'farm', 2, 2);
+    world.plantCrop('wheat', 2, 2);
+    world.crops[0].stage = 3;
+
+    (world as unknown as { tendHarvestReadyCrop(jobId: number): void }).tendHarvestReadyCrop(
+      jobIdFor(world, farmId, 'tend_crops'),
+    );
+
+    const farm = world.buildings.find((entry) => entry.id === farmId)!;
+    expect(inventoryGet(farm.inventory, 'grain')).toBe(3);
+    expect(world.crops).toHaveLength(0);
+    expect(world.snapshot().resources.grain).toBe(0);
+  });
+
+  it('derives totals from stockpile plus storage inventories only', () => {
+    const world = new DemoWorld(grassTerrain());
+    const farmId = completeBuilding(world, 'farm', 0, 0);
+    const granaryId = completeBuilding(world, 'granary', 4, 0);
+    world.resources.grain = 1;
+    inventoryAdd(world.buildings.find((entry) => entry.id === farmId)!.inventory, 'grain', 9);
+    inventoryAdd(world.buildings.find((entry) => entry.id === granaryId)!.inventory, 'grain', 4);
+    inventoryAdd(world.buildings.find((entry) => entry.id === granaryId)!.inventory, 'flour', 2);
+
+    const resources = world.snapshot().resources;
+
+    expect(resources.grain).toBe(5);
+    expect(resources.flour).toBe(2);
+  });
+
+  it('finds a haul task that moves grain from farm to granary', () => {
+    const world = new DemoWorld(grassTerrain());
+    const farmId = completeBuilding(world, 'farm', 0, 0);
+    const granaryId = completeBuilding(world, 'granary', 4, 0);
+    inventoryAdd(world.buildings.find((entry) => entry.id === farmId)!.inventory, 'grain', 6);
+    const internals = world as unknown as {
+      findHaulTask(): { resource: string; amount: number; from: number | 'stockpile'; to: number | 'stockpile' } | null;
+      takeFromEndpoint(endpoint: number | 'stockpile', resource: string, amount: number): number;
+      depositToStorage(endpoint: number | 'stockpile', resource: string, amount: number): number;
+    };
+
+    const task = internals.findHaulTask();
+    expect(task).toEqual({ resource: 'grain', amount: 5, from: farmId, to: granaryId });
+    const taken = internals.takeFromEndpoint(task!.from, task!.resource, task!.amount);
+    const deposited = internals.depositToStorage(task!.to, task!.resource, taken);
+
+    expect(deposited).toBe(5);
+    expect(inventoryGet(world.buildings.find((entry) => entry.id === farmId)!.inventory, 'grain')).toBe(1);
+    expect(inventoryGet(world.buildings.find((entry) => entry.id === granaryId)!.inventory, 'grain')).toBe(5);
+    expect(world.snapshot().resources.grain).toBe(5);
+  });
+
+  it('produces flour in the mill and food in the bakery', () => {
+    const world = new DemoWorld(grassTerrain());
+    world.resources.wood = 500;
+    world.resources.stone = 500;
+    const millId = completeBuilding(world, 'mill', 0, 2);
+    const bakeryId = completeBuilding(world, 'bakery', 3, 2);
+    const internals = world as unknown as { tickProduce(jobId: number): void };
+
+    inventoryAdd(world.buildings.find((entry) => entry.id === millId)!.inventory, 'grain', 2);
+    const millJob = jobIdFor(world, millId, 'produce');
+    internals.tickProduce(millJob);
+    for (let i = 0; i < 80; i += 1) internals.tickProduce(millJob);
+    expect(inventoryGet(world.buildings.find((entry) => entry.id === millId)!.inventory, 'grain')).toBe(0);
+    expect(inventoryGet(world.buildings.find((entry) => entry.id === millId)!.inventory, 'flour')).toBe(2);
+
+    inventoryAdd(world.buildings.find((entry) => entry.id === bakeryId)!.inventory, 'flour', 1);
+    const bakeryJob = jobIdFor(world, bakeryId, 'produce');
+    internals.tickProduce(bakeryJob);
+    for (let i = 0; i < 100; i += 1) internals.tickProduce(bakeryJob);
+    expect(inventoryGet(world.buildings.find((entry) => entry.id === bakeryId)!.inventory, 'flour')).toBe(0);
+    expect(inventoryGet(world.buildings.find((entry) => entry.id === bakeryId)!.inventory, 'food')).toBe(2);
+  });
+
+  it('gathers wood from a forest node into the stockpile', () => {
+    const terrain = grassTerrain(8, 8);
+    terrain.tiles[1] = 4;
+    const world = new DemoWorld(terrain);
+    world.resources.wood = 0;
+    const internals = world as unknown as {
+      refreshGatherJobs(): void;
+      tickGather(jobId: number, ticksRemaining: number): void;
+      jobs: Array<{ id: number; kind: string }>;
+    };
+    internals.refreshGatherJobs();
+    const job = internals.jobs.find((entry) => entry.kind === 'gather');
+
+    internals.tickGather(job!.id, 40);
+
+    expect(world.resources.wood).toBe(1);
+    expect(world.nodes[0].amount).toBe(4);
   });
 });

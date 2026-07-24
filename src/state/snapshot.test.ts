@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SnapshotBuffer } from './snapshot';
 import type { ResourceTotals, TickSnapshot } from './types';
 
-const resources: ResourceTotals = { wood: 120, stone: 40, grain: 0, food: 0, gold: 0 };
+const resources: ResourceTotals = { wood: 120, stone: 40, grain: 0, flour: 0, food: 0, gold: 0 };
 
 const tick = (number: number, x: number): TickSnapshot => ({
   tick: number,
