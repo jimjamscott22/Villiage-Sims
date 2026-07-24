@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-07-22 (M6 in progress).
+Last updated: 2026-07-24 (M7 in progress).
 
 ## Status
 
@@ -11,30 +11,31 @@ Last updated: 2026-07-22 (M6 in progress).
 | M3 — Building placement | Complete on `main` | #3 |
 | M4 — Pathfinding + villager FSM | Complete on `main` | #5 (+ follow-up) |
 | M5 — Needs and a single job | Complete on `main` | #8 |
-| **M6 — Clock and crops** | **In progress** | [#9](https://github.com/jimjamscott22/Villiage-Sims/pull/9) |
-| M7–M10 | Later | — |
+| M6 — Clock and crops | Complete on `main` | #9 |
+| **M7 — Utility AI** | **In progress** | [#10](https://github.com/jimjamscott22/Villiage-Sims/pull/10) |
+| M8–M10 | Later | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
-M6 design: [`docs/superpowers/specs/2026-07-20-milestone-6-design.md`](docs/superpowers/specs/2026-07-20-milestone-6-design.md).
+M7 design: [`docs/superpowers/specs/2026-07-24-milestone-7-design.md`](docs/superpowers/specs/2026-07-24-milestone-7-design.md).
 
-## What works today (M1–M5 + M6 WIP)
+## What works today (M1–M6 + M7 WIP)
 
 - Tauri 2 + React Canvas; Rust owns a 20 Hz sim thread; frontend interpolates at RAF.
 - Seeded `128×128` island terrain (`noise`), pan/zoom camera, offscreen terrain blit.
 - `buildings.json` catalog (hut/farm/granary); BuildMenu; ghost preview; place/demolish with costs/refunds.
-- Single villager with Idle/MovingTo/Working FSM; A* pathfinding around water/buildings.
-- Right-click a tile → villager walks there; place a building on the path → repath or Idle+cooldown.
-- Needs decay (hunger/energy/social/happiness); completed farms advertise `TendCrops` jobs; villager claims and works.
-- `VillagerPanel` via `get_villager_detail` (polled; needs never in tick payload).
-- **M6:** `Clock` (day/season/year) + speed controls; `crops.json` / crop entities; plant mode; growth + seasonal stall; TendCrops auto-plant/water; day-rollover clears water.
+- Five villagers with utility AI (Eat/Sleep/Work/Socialize/Wander) + hysteresis; A* pathfinding.
+- Right-click a tile → nearest villager walks there; place a building on the active path forces a repath (or Idle + cooldown).
+- Needs decay; completed farms advertise `TendCrops` jobs; villagers claim and work (job kept while eating).
+- `VillagerPanel` via `get_villager_detail` (click a villager to select; needs never in tick payload).
+- Clock (day/season/year) + speed controls; crops grow by stage when watered in-season; TendCrops auto-plants/waters.
 - Tick snapshots carry villagers (with `state`), buildings, crops, clock, resources, events.
-- Browser-demo transport mirrors move, jobs, needs, clock, crops, and detail for headless/cloud testing.
+- Browser-demo transport mirrors utility AI, multi-villager, clock, crops, and detail for headless/cloud testing.
 
 ### Key paths
 
 - Spec: `docs/villagesim-spec.md`
 - Designs/plans: `docs/superpowers/specs/`, `docs/superpowers/plans/`
-- Rust sim: `src-tauri/src/sim/` (`clock.rs`, `crops.rs`, `needs.rs`, `jobs.rs`, `agents.rs`, `pathfind.rs`, `world.rs`, …)
+- Rust sim: `src-tauri/src/sim/` (`utility.rs`, `agents.rs`, `clock.rs`, `crops.rs`, `needs.rs`, `jobs.rs`, `world.rs`, …)
 - Frontend: `src/render/`, `src/state/`, `src/ui/` (`ClockBar`, `BuildMenu`, `VillagerPanel`)
 - Cloud notes: `AGENTS.md`
 
@@ -43,10 +44,10 @@ M6 design: [`docs/superpowers/specs/2026-07-20-milestone-6-design.md`](docs/supe
 ```bash
 npm test && npm run build
 cargo test --manifest-path src-tauri/Cargo.toml --lib
-npm run dev   # place a farm → plant wheat (or wait for auto-plant) → watch stages; Pause/2×; jump season via advance_clock in tests
+npm run dev   # five villagers wander/work; place farm → TendCrops; hunger → eat (food↓); click villager for panel
 ```
 
-## Next after M6 demos
+## Next after M7 demos
 
-Milestone 7 — Utility AI (Eat/Sleep/Work/Socialize/Wander, hysteresis, multiple villagers).
-Do not start M7 until M6 demos cleanly.
+Milestone 8 — Economy and production chains (gathering, recipes, mill→bakery, storage, hauling, ResourceBar).
+Do not start M8 until M7 demos cleanly.

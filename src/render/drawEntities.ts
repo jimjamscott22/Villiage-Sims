@@ -8,16 +8,18 @@ export function drawVillagers(
   ctx: CanvasRenderingContext2D,
   villagers: VillagerView[],
   zoom = 1,
+  selectedId: number | null = null,
 ): void {
   const radius = Math.max(6, 11 / Math.max(zoom, 0.01));
   const lineWidth = Math.max(1.5, 3 / Math.max(zoom, 0.01));
   for (const villager of villagers) {
+    const selected = selectedId != null && villager.id === selectedId;
     ctx.beginPath();
     ctx.arc(villager.x, villager.y, radius, 0, Math.PI * 2);
     ctx.fillStyle = '#f4c95d';
     ctx.fill();
-    ctx.lineWidth = lineWidth;
-    ctx.strokeStyle = '#352f25';
+    ctx.lineWidth = selected ? lineWidth * 1.4 : lineWidth;
+    ctx.strokeStyle = selected ? '#fff6d5' : '#352f25';
     ctx.stroke();
   }
 }

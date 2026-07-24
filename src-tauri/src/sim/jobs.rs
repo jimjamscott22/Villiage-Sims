@@ -117,8 +117,9 @@ impl JobBoard {
         }
     }
 
-    /// Claim the best unclaimed job by `priority / (1 + manhattan_distance)`.
-    pub fn claim_best(&mut self, villager_id: u32, from: (i32, i32)) -> Option<u32> {
+    /// Peek at the best unclaimed job without claiming.
+    /// Returns `(job_id, priority, tile)`.
+    pub fn peek_best(&self, from: (i32, i32)) -> Option<(u32, u8, (i32, i32))> {
         let mut best: Option<(usize, f32)> = None;
         for (index, job) in self.jobs.iter().enumerate() {
             if job.claimed_by.is_some() {
@@ -132,8 +133,34 @@ impl JobBoard {
             }
         }
         let (index, _) = best?;
-        self.jobs[index].claimed_by = Some(villager_id);
-        Some(self.jobs[index].id)
+        let job = &self.jobs[index];
+        Some((job.id, job.priority, job.tile))
+    }
+
+    /// Claim the best unclaimed job by `priority / (1 + manhattan_distance)`.
+    pub fn claim_best(&mut self, villager_id: u32, from: (i32, i32)) -> Option<u32> {
+        let (job_id, _, _) = self.peek_best(from)?;
+        if let Some(job) = self.jobs.iter_mut().find(|job| job.id == job_id) {
+            job.claimed_by = Some(villager_id);
+            return Some(job_id);
+        }
+        None
+    }
+
+    /// Claim a specific unclaimed job if still free.
+    pub fn claim_id(&mut self, job_id: u32, villager_id: u32) -> bool {
+        if let Some(job) = self.jobs.iter_mut().find(|job| job.id == job_id) {
+            if job.claimed_by.is_none() || job.claimed_by == Some(villager_id) {
+                job.claimed_by = Some(villager_id);
+                return true;
+            }
+        }
+        false
+    }
+
+    #[cfg(test)]
+    pub fn jobs_mut_for_test(&mut self) -> &mut Vec<Job> {
+        &mut self.jobs
     }
 }
 

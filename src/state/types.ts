@@ -9,7 +9,7 @@ export interface VillagerView {
   id: number;
   x: number;
   y: number;
-  /** 0 = Idle, 1 = Moving, 2 = Working (M5 FSM). */
+  /** 0 Idle, 1 Moving, 2 Working, 3 Eating, 4 Sleeping, 5 Socializing. */
   state?: number;
 }
 

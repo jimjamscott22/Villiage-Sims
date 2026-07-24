@@ -19,9 +19,11 @@ interface CanvasProps {
   selectedCrop: string | null;
   rotation: number;
   selectedBuildingId: number | null;
+  selectedVillagerId: number | null;
   onRotationChange: (rotation: number) => void;
   onCancelBuild: () => void;
   onSelectBuilding: (id: number | null) => void;
+  onSelectVillager: (id: number | null) => void;
   onSnapshot: (snapshot: TickSnapshot) => void;
 }
 
@@ -51,9 +53,11 @@ export function Canvas({
   selectedCrop,
   rotation,
   selectedBuildingId,
+  selectedVillagerId,
   onRotationChange,
   onCancelBuild,
   onSelectBuilding,
+  onSelectVillager,
   onSnapshot,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -66,8 +70,10 @@ export function Canvas({
   const rotationRef = useRef(rotation);
   const catalogRef = useRef(catalog);
   const selectedBuildingIdRef = useRef(selectedBuildingId);
+  const selectedVillagerIdRef = useRef(selectedVillagerId);
   const onSnapshotRef = useRef(onSnapshot);
   const onSelectBuildingRef = useRef(onSelectBuilding);
+  const onSelectVillagerRef = useRef(onSelectVillager);
   const onRotationChangeRef = useRef(onRotationChange);
   const onCancelBuildRef = useRef(onCancelBuild);
 
@@ -87,11 +93,17 @@ export function Canvas({
     selectedBuildingIdRef.current = selectedBuildingId;
   }, [selectedBuildingId]);
   useEffect(() => {
+    selectedVillagerIdRef.current = selectedVillagerId;
+  }, [selectedVillagerId]);
+  useEffect(() => {
     onSnapshotRef.current = onSnapshot;
   }, [onSnapshot]);
   useEffect(() => {
     onSelectBuildingRef.current = onSelectBuilding;
   }, [onSelectBuilding]);
+  useEffect(() => {
+    onSelectVillagerRef.current = onSelectVillager;
+  }, [onSelectVillager]);
   useEffect(() => {
     onRotationChangeRef.current = onRotationChange;
   }, [onRotationChange]);
@@ -230,7 +242,7 @@ export function Canvas({
         );
         drawBuildings(ctx, rendered.buildings, terrain.tileSize, footprints);
         drawCrops(ctx, rendered.crops ?? [], terrain.tileSize);
-        drawVillagers(ctx, rendered.villagers, camera.zoom);
+        drawVillagers(ctx, rendered.villagers, camera.zoom, selectedVillagerIdRef.current);
       }
 
       const kind = selectedKindRef.current;
@@ -347,6 +359,7 @@ export function Canvas({
       if (event.key === 'Escape') {
         onCancelBuildRef.current();
         onSelectBuildingRef.current(null);
+        onSelectVillagerRef.current(null);
         hoverTile = null;
         return;
       }
@@ -433,6 +446,20 @@ export function Canvas({
 
       const snapshot = rendered ?? buffer.interpolate(performance.now(), TICK_MS);
       if (!snapshot) return;
+      const [worldX, worldY] = camera.screenToWorld(pointerX, pointerY);
+      const hitRadius = Math.max(10, 14 / Math.max(camera.zoom, 0.01));
+      let closestVillager: { id: number; dist: number } | null = null;
+      for (const villager of snapshot.villagers) {
+        const dist = Math.hypot(villager.x - worldX, villager.y - worldY);
+        if (dist <= hitRadius && (closestVillager == null || dist < closestVillager.dist)) {
+          closestVillager = { id: villager.id, dist };
+        }
+      }
+      if (closestVillager) {
+        onSelectVillagerRef.current(closestVillager.id);
+        onSelectBuildingRef.current(null);
+        return;
+      }
       const hit = snapshot.buildings.find((building) => {
         const def = catalogRef.current?.buildings[building.kind];
         if (!def) return false;
@@ -443,6 +470,7 @@ export function Canvas({
           && tile[1] < building.y + fh;
       });
       onSelectBuildingRef.current(hit?.id ?? null);
+      if (hit) onSelectVillagerRef.current(null);
     };
 
     const onPointerLeave = () => {

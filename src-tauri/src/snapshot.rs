@@ -36,7 +36,7 @@ pub struct VillagerView {
     pub id: u32,
     pub x: f32,
     pub y: f32,
-    /// 0 = Idle, 1 = Moving, 2 = Working (M5 FSM).
+    /// 0 Idle, 1 Moving, 2 Working, 3 Eating, 4 Sleeping, 5 Socializing.
     #[serde(default)]
     pub state: u8,
 }
