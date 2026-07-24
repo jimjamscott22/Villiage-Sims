@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-07-24 (M8 in progress).
+Last updated: 2026-07-24 (M8 complete).
 
 ## Status
 
@@ -13,13 +13,13 @@ Last updated: 2026-07-24 (M8 in progress).
 | M5 — Needs and a single job | Complete on `main` | #8 |
 | M6 — Clock and crops | Complete on `main` | #9 |
 | M7 — Utility AI | Complete on `main` | [#10](https://github.com/jimjamscott22/Villiage-Sims/pull/10) (+ [#11](https://github.com/jimjamscott22/Villiage-Sims/pull/11) hysteresis fix) |
-| **M8 — Economy and production chains** | **In progress** | [#12](https://github.com/jimjamscott22/Villiage-Sims/pull/12) |
+| **M8 — Economy and production chains** | **Complete** | [#12](https://github.com/jimjamscott22/Villiage-Sims/pull/12) |
 | M9–M10 | Later | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 M8 design: [`docs/superpowers/specs/2026-07-24-milestone-8-design.md`](docs/superpowers/specs/2026-07-24-milestone-8-design.md).
 
-## What works today (M1–M8 draft)
+## What works today (M1–M8)
 
 - Tauri 2 + React Canvas; Rust owns a 20 Hz sim thread; frontend interpolates at RAF.
 - Seeded `128×128` island terrain (`noise`), pan/zoom camera, offscreen terrain blit.
@@ -53,4 +53,4 @@ npm run dev   # ResourceBar live; place farm/mill/bakery/granary; gather + haul 
 
 ## Next up
 
-Finish M8 acceptance (browser smoke of full grain→food chain), then Milestone 9 — Population and progression.
+Milestone 9 — Population and progression.

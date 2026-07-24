@@ -361,4 +361,133 @@ describe('DemoWorld pathfinding', () => {
     expect(world.resources.wood).toBe(1);
     expect(world.nodes[0].amount).toBe(4);
   });
+
+  it('advertises reachable gather work for both wood and stone', () => {
+    const terrain = grassTerrain(12, 12);
+    const world = new DemoWorld(terrain);
+    world.nodes = [
+      ...Array.from({ length: 6 }, (_, i) => ({
+        tile: [i + 1, 1] as [number, number],
+        resource: 'wood' as const,
+        amount: 5,
+        max: 5,
+        regenAcc: 0,
+      })),
+      ...Array.from({ length: 6 }, (_, i) => ({
+        tile: [i + 1, 9] as [number, number],
+        resource: 'stone' as const,
+        amount: 4,
+        max: 4,
+        regenAcc: 0,
+      })),
+    ];
+    const internals = world as unknown as {
+      refreshGatherJobs(): void;
+      jobs: Array<{ kind: string; gatherTile?: [number, number] }>;
+    };
+
+    internals.refreshGatherJobs();
+
+    const resources = internals.jobs
+      .filter((job) => job.kind === 'gather')
+      .map((job) => world.nodes.find((node) =>
+        node.tile[0] === job.gatherTile?.[0] && node.tile[1] === job.gatherTile?.[1])?.resource);
+    expect(resources.filter((resource) => resource === 'wood')).toHaveLength(3);
+    expect(resources.filter((resource) => resource === 'stone')).toHaveLength(3);
+  });
+
+  it('skips an unreachable preferred job and claims reachable work', () => {
+    const terrain = grassTerrain(8, 8);
+    for (let y = 0; y < terrain.height; y += 1) terrain.tiles[y * terrain.width + 3] = 0;
+    const world = new DemoWorld(terrain);
+    const internals = world as unknown as {
+      villagers: Array<{
+        id: number;
+        x: number;
+        y: number;
+        state: string;
+        currentJob: number | null;
+        currentAction: string | null;
+        repathCooldown: number;
+      }>;
+      jobs: Array<{
+        id: number;
+        kind: string;
+        site: number;
+        tile: [number, number];
+        priority: number;
+        claimedBy: number | null;
+        gatherTile?: [number, number];
+      }>;
+      beginWork(index: number, jobId: number | null): void;
+    };
+    internals.villagers.splice(1);
+    Object.assign(internals.villagers[0], {
+      x: 16,
+      y: 16,
+      state: 'idle',
+      currentJob: null,
+      currentAction: null,
+      repathCooldown: 0,
+    });
+    world.nodes = [
+      { tile: [4, 0], resource: 'wood', amount: 5, max: 5, regenAcc: 0 },
+      { tile: [0, 4], resource: 'stone', amount: 4, max: 4, regenAcc: 0 },
+    ];
+    internals.jobs = [
+      {
+        id: 1,
+        kind: 'gather',
+        site: 0,
+        tile: [4, 0],
+        priority: 10,
+        claimedBy: null,
+        gatherTile: [4, 0],
+      },
+      {
+        id: 2,
+        kind: 'gather',
+        site: 0,
+        tile: [0, 4],
+        priority: 8,
+        claimedBy: null,
+        gatherTile: [0, 4],
+      },
+    ];
+
+    internals.beginWork(0, 1);
+
+    expect(internals.villagers[0].currentJob).toBe(2);
+    expect(internals.jobs[0].claimedBy).toBeNull();
+    expect(internals.jobs[1].claimedBy).toBe(internals.villagers[0].id);
+  });
+
+  it('runs the farm to bakery chain without manual job assignment', () => {
+    const world = new DemoWorld(grassTerrain(24, 24));
+    (world as unknown as { villagers: unknown[] }).villagers.splice(1);
+    world.resources.wood = 500;
+    world.resources.stone = 500;
+    completeBuilding(world, 'farm', 7, 7);
+    completeBuilding(world, 'granary', 12, 7);
+    completeBuilding(world, 'mill', 12, 11);
+    completeBuilding(world, 'bakery', 8, 12);
+    let sawGrain = false;
+    let sawFlour = false;
+    let sawBakeryFood = false;
+
+    for (let i = 0; i < 20_000; i += 1) {
+      world.advance();
+      sawGrain ||= world.buildings.some((building) => inventoryGet(building.inventory, 'grain') > 0);
+      sawFlour ||= world.buildings.some((building) => inventoryGet(building.inventory, 'flour') > 0);
+      const bakery = world.buildings.find(
+        (building) => DEMO_CATALOG.buildings[building.kindIndex].id === 'bakery',
+      );
+      sawBakeryFood ||= bakery != null && inventoryGet(bakery.inventory, 'food') > 0;
+      if (sawGrain && sawFlour && sawBakeryFood) break;
+    }
+
+    expect(sawGrain).toBe(true);
+    expect(sawFlour).toBe(true);
+    expect(sawBakeryFood).toBe(true);
+  });
 });
