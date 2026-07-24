@@ -12,7 +12,7 @@ Last updated: 2026-07-24 (M7 in progress).
 | M4 — Pathfinding + villager FSM | Complete on `main` | #5 (+ follow-up) |
 | M5 — Needs and a single job | Complete on `main` | #8 |
 | M6 — Clock and crops | Complete on `main` | #9 |
-| **M7 — Utility AI** | **In progress** | — |
+| **M7 — Utility AI** | **In progress** | [#10](https://github.com/jimjamscott22/Villiage-Sims/pull/10) |
 | M8–M10 | Later | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
