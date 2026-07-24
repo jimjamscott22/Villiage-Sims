@@ -27,9 +27,45 @@
     "cost": { "wood": 40, "stone": 10 },
     "build_ticks": 60,
     "category": "storage",
-    "stores": ["food"],
+    "stores": ["grain", "flour", "food"],
     "capacity": 500,
     "valid_terrain": ["grass", "sand"],
     "jobs": [{ "kind": "haul", "slots": 1 }]
+  },
+  {
+    "id": "mill",
+    "name": "Mill",
+    "footprint": [2, 2],
+    "cost": { "wood": 30, "stone": 20 },
+    "build_ticks": 80,
+    "category": "production",
+    "valid_terrain": ["grass", "sand"],
+    "recipe": {
+      "inputs": { "grain": 2 },
+      "outputs": { "flour": 2 },
+      "ticks": 80
+    },
+    "jobs": [
+      { "kind": "produce", "slots": 1 },
+      { "kind": "haul", "slots": 1 }
+    ]
+  },
+  {
+    "id": "bakery",
+    "name": "Bakery",
+    "footprint": [2, 2],
+    "cost": { "wood": 25, "stone": 15 },
+    "build_ticks": 80,
+    "category": "production",
+    "valid_terrain": ["grass", "sand"],
+    "recipe": {
+      "inputs": { "flour": 1 },
+      "outputs": { "food": 2 },
+      "ticks": 100
+    },
+    "jobs": [
+      { "kind": "produce", "slots": 1 },
+      { "kind": "haul", "slots": 1 }
+    ]
   }
 ]

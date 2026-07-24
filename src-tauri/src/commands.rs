@@ -109,7 +109,11 @@ pub(crate) async fn demolish(state: State<'_, AppState>, entity_id: u32) -> Resu
 }
 
 #[tauri::command]
-pub(crate) async fn move_villager_to(state: State<'_, AppState>, x: i32, y: i32) -> Result<(), String> {
+pub(crate) async fn move_villager_to(
+    state: State<'_, AppState>,
+    x: i32,
+    y: i32,
+) -> Result<(), String> {
     let (reply, receiver) = oneshot::channel();
     state
         .commands
@@ -192,7 +196,7 @@ mod tests {
             Catalog::load_builtin().unwrap(),
             tx,
         );
-        assert_eq!(state.catalog.buildings.len(), 3);
+        assert_eq!(state.catalog.buildings.len(), 5);
         assert_eq!(state.catalog.crops.len(), 1);
     }
 }

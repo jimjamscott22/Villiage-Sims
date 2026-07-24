@@ -1,3 +1,4 @@
+use super::economy::CarryStack;
 use super::needs::Needs;
 
 pub use super::utility::{ActionKind, EAT_TICKS, SLEEP_TICKS, SOCIALIZE_TICKS};
@@ -94,6 +95,8 @@ pub struct Villager {
     pub repath_cooldown: u32,
     /// Last chosen utility action (for hysteresis).
     pub current_action: Option<ActionKind>,
+    /// Goods in transit for a Haul job.
+    pub carrying: Option<CarryStack>,
 }
 
 impl Villager {
@@ -108,6 +111,7 @@ impl Villager {
             path: None,
             repath_cooldown: 0,
             current_action: None,
+            carrying: None,
         }
     }
 

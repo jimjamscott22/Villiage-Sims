@@ -38,6 +38,10 @@ pub struct Building {
     pub origin: (i32, i32),
     pub rotation: u8,
     pub state: BuildState,
+    /// Local buffer / storage contents.
+    pub inventory: std::collections::BTreeMap<String, u32>,
+    /// Remaining ticks on the active craft (0 = idle / needs inputs).
+    pub recipe_ticks: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

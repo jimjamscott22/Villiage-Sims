@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::snapshot::{
     BuildingView, SimEvent, TerrainSnapshot, TickSnapshot, VillagerDetail, VillagerView,
 };
@@ -14,13 +16,19 @@ use super::catalog::Catalog;
 use super::clock::Clock;
 use super::commands::SimCommand;
 use super::crops::{Crop, tick_crop};
-use super::jobs::JobBoard;
+use super::economy::{
+    CARRY_STACK_MAX, CarryStack, HaulEndpoint, HaulTask, derive_totals, inventory_add,
+    inventory_get, inventory_take, production_free_capacity, recipe_allows_resource,
+    storage_accepts, storage_free_capacity,
+};
+use super::jobs::{JobBoard, JobKind};
+use super::nodes::{GATHER_PRIORITY, MAX_GATHER_JOBS, ResourceNode, generate_nodes};
 use super::pathfind::{find_path, terrain_passable};
 use super::resources::ResourceTotals;
 use super::terrain::{Terrain, generate_terrain};
 use super::utility::{
-    ActionKind, SOCIAL_RANGE, SOCIAL_RESTORE, ScoreContext, chebyshev, night_from_clock, pick_action,
-    score_all, wander_tile,
+    ActionKind, SOCIAL_RANGE, SOCIAL_RESTORE, ScoreContext, chebyshev, night_from_clock,
+    pick_action, score_all, wander_tile,
 };
 
 const VIEWPORT_MARGIN_TILES: f32 = 4.0;
@@ -50,6 +58,7 @@ pub struct World {
     catalog: Catalog,
     buildings: Vec<Building>,
     crops: Vec<Crop>,
+    nodes: Vec<ResourceNode>,
     occupancy: Vec<Option<u32>>,
     resources: ResourceTotals,
     next_building_id: u32,
@@ -63,6 +72,7 @@ pub struct World {
 impl World {
     pub fn generate(width: u32, height: u32, tile_size: u32, seed: u64) -> Self {
         let tiles = generate_terrain(width, height, seed);
+        let nodes = generate_nodes(width, height, &tiles);
         let occupancy = vec![None; (width * height) as usize];
         let world_w = width as f32 * tile_size as f32;
         let world_h = height as f32 * tile_size as f32;
@@ -76,6 +86,7 @@ impl World {
             catalog: Catalog::load_builtin().expect("builtin buildings catalog"),
             buildings: Vec::new(),
             crops: Vec::new(),
+            nodes,
             occupancy,
             resources: ResourceTotals::starting(),
             next_building_id: 1,
@@ -215,6 +226,8 @@ impl World {
         }
         self.complete_buildings();
         self.tick_crops();
+        self.tick_nodes();
+        self.refresh_gather_jobs();
         for villager in &mut self.villagers {
             villager.needs.tick_decay();
         }
@@ -274,6 +287,11 @@ impl World {
     }
 
     pub fn tick_snapshot(&self) -> TickSnapshot {
+        let building_inventories: Vec<_> = self
+            .buildings
+            .iter()
+            .map(|building| (building.id, building.kind_index, &building.inventory))
+            .collect();
         TickSnapshot {
             tick: self.clock.tick,
             villagers: self
@@ -288,7 +306,7 @@ impl World {
                 .collect(),
             buildings: self.building_views(),
             crops: self.crops.iter().map(Crop::view).collect(),
-            resources: self.resources.clone(),
+            resources: derive_totals(&self.resources, &building_inventories, &self.catalog),
             clock: self.clock.view(),
             events: self.events.clone(),
         }
@@ -421,6 +439,290 @@ impl World {
         candidates
     }
 
+    fn derived_resources(&self) -> ResourceTotals {
+        let building_inventories: Vec<_> = self
+            .buildings
+            .iter()
+            .map(|building| (building.id, building.kind_index, &building.inventory))
+            .collect();
+        derive_totals(&self.resources, &building_inventories, &self.catalog)
+    }
+
+    fn available_food(&self) -> u32 {
+        self.derived_resources().food
+    }
+
+    fn withdraw(&mut self, resource: &str, amount: u32) -> u32 {
+        let mut remaining = amount;
+        let stockpile_take = self.resources.get(resource).min(remaining);
+        if stockpile_take > 0 {
+            self.resources
+                .set(resource, self.resources.get(resource) - stockpile_take);
+            remaining -= stockpile_take;
+        }
+        if remaining == 0 {
+            return amount;
+        }
+
+        let mut indexes: Vec<_> = (0..self.buildings.len()).collect();
+        indexes.sort_by_key(|&index| self.buildings[index].id);
+        for index in indexes {
+            if remaining == 0 {
+                break;
+            }
+            let accepts = self
+                .catalog
+                .get(self.buildings[index].kind_index)
+                .is_some_and(|def| storage_accepts(def, resource));
+            if !accepts {
+                continue;
+            }
+            let taken = inventory_take(&mut self.buildings[index].inventory, resource, remaining);
+            remaining -= taken;
+        }
+        amount - remaining
+    }
+
+    fn withdraw_cost(&mut self, cost: &BTreeMap<String, u32>) -> Result<(), String> {
+        if !self.derived_resources().can_afford(cost) {
+            return Err("insufficient resources".into());
+        }
+        for (resource, amount) in cost {
+            if self.withdraw(resource, *amount) != *amount {
+                return Err("insufficient resources".into());
+            }
+        }
+        Ok(())
+    }
+
+    fn deposit_to_stockpile(&mut self, resource: &str, amount: u32) {
+        if amount == 0 {
+            return;
+        }
+        self.resources.set(
+            resource,
+            self.resources.get(resource).saturating_add(amount),
+        );
+    }
+
+    fn deposit_to_storage(&mut self, endpoint: HaulEndpoint, resource: &str, amount: u32) -> u32 {
+        if amount == 0 {
+            return 0;
+        }
+        match endpoint {
+            HaulEndpoint::Stockpile => {
+                self.deposit_to_stockpile(resource, amount);
+                amount
+            }
+            HaulEndpoint::Building(building_id) => {
+                let Some(index) = self
+                    .buildings
+                    .iter()
+                    .position(|building| building.id == building_id)
+                else {
+                    return 0;
+                };
+                let Some(def) = self.catalog.get(self.buildings[index].kind_index) else {
+                    return 0;
+                };
+                let room = if storage_accepts(def, resource) {
+                    storage_free_capacity(def, &self.buildings[index].inventory)
+                } else if def
+                    .recipe
+                    .as_ref()
+                    .is_some_and(|recipe| recipe_allows_resource(recipe, resource))
+                {
+                    production_free_capacity(&self.buildings[index].inventory)
+                } else {
+                    0
+                };
+                let deposited = amount.min(room);
+                inventory_add(&mut self.buildings[index].inventory, resource, deposited);
+                deposited
+            }
+        }
+    }
+
+    fn take_from_endpoint(&mut self, endpoint: HaulEndpoint, resource: &str, amount: u32) -> u32 {
+        match endpoint {
+            HaulEndpoint::Stockpile => {
+                let taken = self.resources.get(resource).min(amount);
+                self.resources
+                    .set(resource, self.resources.get(resource) - taken);
+                taken
+            }
+            HaulEndpoint::Building(building_id) => self
+                .buildings
+                .iter_mut()
+                .find(|building| building.id == building_id)
+                .map(|building| inventory_take(&mut building.inventory, resource, amount))
+                .unwrap_or(0),
+        }
+    }
+
+    fn building_stand_tile(&self, building_id: u32) -> Option<(i32, i32)> {
+        let building = self
+            .buildings
+            .iter()
+            .find(|building| building.id == building_id)?;
+        let def = self.catalog.get(building.kind_index)?;
+        let footprint = rotated_footprint(def, building.rotation);
+        self.adjacent_stand_tiles(building.origin, footprint)
+            .into_iter()
+            .next()
+    }
+
+    fn stockpile_stand(&self) -> Option<(i32, i32)> {
+        self.find_walkable_near(self.width as i32 / 2, self.height as i32 / 2)
+    }
+
+    fn endpoint_stand_tile(&self, endpoint: HaulEndpoint) -> Option<(i32, i32)> {
+        match endpoint {
+            HaulEndpoint::Stockpile => self.stockpile_stand(),
+            HaulEndpoint::Building(id) => self.building_stand_tile(id),
+        }
+    }
+
+    fn stockpile_accepts(resource: &str) -> bool {
+        matches!(resource, "wood" | "stone" | "food" | "grain" | "flour")
+    }
+
+    fn nearest_storage_for(&self, resource: &str, from: (i32, i32)) -> Option<(u32, u32)> {
+        let mut best: Option<(i32, u32, u32)> = None;
+        for building in &self.buildings {
+            if building.state != BuildState::Complete {
+                continue;
+            }
+            let Some(def) = self.catalog.get(building.kind_index) else {
+                continue;
+            };
+            if !storage_accepts(def, resource) {
+                continue;
+            }
+            let free = storage_free_capacity(def, &building.inventory);
+            if free == 0 {
+                continue;
+            }
+            let Some(stand) = self.building_stand_tile(building.id) else {
+                continue;
+            };
+            let dist = (stand.0 - from.0).abs() + (stand.1 - from.1).abs();
+            match best {
+                Some((best_dist, best_id, _))
+                    if dist > best_dist || (dist == best_dist && building.id >= best_id) => {}
+                _ => best = Some((dist, building.id, free)),
+            }
+        }
+        best.map(|(_, id, free)| (id, free))
+    }
+
+    fn find_haul_task(&self) -> Option<HaulTask> {
+        for source in &self.buildings {
+            if source.state != BuildState::Complete {
+                continue;
+            }
+            let Some(def) = self.catalog.get(source.kind_index) else {
+                continue;
+            };
+            if def.category != "production" {
+                continue;
+            }
+            let Some(source_stand) = self.building_stand_tile(source.id) else {
+                continue;
+            };
+            for (resource, available) in &source.inventory {
+                if *available == 0 {
+                    continue;
+                }
+                if def
+                    .recipe
+                    .as_ref()
+                    .is_some_and(|recipe| !recipe.outputs.contains_key(resource))
+                {
+                    continue;
+                }
+                if let Some((storage_id, free)) = self.nearest_storage_for(resource, source_stand) {
+                    return Some(HaulTask {
+                        resource: resource.clone(),
+                        amount: (*available).min(CARRY_STACK_MAX).min(free),
+                        from: HaulEndpoint::Building(source.id),
+                        to: HaulEndpoint::Building(storage_id),
+                    });
+                }
+                if Self::stockpile_accepts(resource) {
+                    return Some(HaulTask {
+                        resource: resource.clone(),
+                        amount: (*available).min(CARRY_STACK_MAX),
+                        from: HaulEndpoint::Building(source.id),
+                        to: HaulEndpoint::Stockpile,
+                    });
+                }
+            }
+        }
+
+        for dest in &self.buildings {
+            if dest.state != BuildState::Complete {
+                continue;
+            }
+            let Some(def) = self.catalog.get(dest.kind_index) else {
+                continue;
+            };
+            let Some(recipe) = &def.recipe else {
+                continue;
+            };
+            let room = production_free_capacity(&dest.inventory);
+            if room == 0 {
+                continue;
+            }
+            if self.building_stand_tile(dest.id).is_none() {
+                continue;
+            }
+            for (resource, required) in &recipe.inputs {
+                let have = inventory_get(&dest.inventory, resource);
+                if have >= *required {
+                    continue;
+                }
+                let needed = required - have;
+                if Self::stockpile_accepts(resource) {
+                    let available = self.resources.get(resource);
+                    if available > 0 && self.stockpile_stand().is_some() {
+                        return Some(HaulTask {
+                            resource: resource.clone(),
+                            amount: available.min(needed).min(room).min(CARRY_STACK_MAX),
+                            from: HaulEndpoint::Stockpile,
+                            to: HaulEndpoint::Building(dest.id),
+                        });
+                    }
+                }
+                for source in &self.buildings {
+                    if source.state != BuildState::Complete {
+                        continue;
+                    }
+                    let available = inventory_get(&source.inventory, resource);
+                    if available == 0 {
+                        continue;
+                    }
+                    let Some(source_def) = self.catalog.get(source.kind_index) else {
+                        continue;
+                    };
+                    if !storage_accepts(source_def, resource) {
+                        continue;
+                    }
+                    if self.building_stand_tile(source.id).is_none() {
+                        continue;
+                    }
+                    return Some(HaulTask {
+                        resource: resource.clone(),
+                        amount: available.min(needed).min(room).min(CARRY_STACK_MAX),
+                        from: HaulEndpoint::Building(source.id),
+                        to: HaulEndpoint::Building(dest.id),
+                    });
+                }
+            }
+        }
+
+        None
+    }
 
     fn tick_villager_at(&mut self, index: usize) {
         if self.villagers[index].repath_cooldown > 0 {
@@ -504,7 +806,7 @@ impl World {
             energy: self.villagers[index].needs.energy,
             social: self.villagers[index].needs.social,
             from,
-            food: self.resources.food,
+            food: self.available_food(),
             night: night_from_clock(&self.clock),
             partner_in_range,
             job_board: &self.job_board,
@@ -526,7 +828,13 @@ impl World {
             && matches!(
                 (picked.kind, &self.villagers[index].state),
                 (ActionKind::Work, AgentState::Working { .. })
-                    | (ActionKind::Work, AgentState::MovingTo { purpose: MovePurpose::Work, .. })
+                    | (
+                        ActionKind::Work,
+                        AgentState::MovingTo {
+                            purpose: MovePurpose::Work,
+                            ..
+                        }
+                    )
             )
         {
             return;
@@ -557,10 +865,9 @@ impl World {
     }
 
     fn begin_eat(&mut self, index: usize) {
-        if self.resources.food == 0 {
+        if self.withdraw("food", 1) == 0 {
             return;
         }
-        self.resources.food -= 1;
         self.villagers[index].begin_eating();
     }
 
@@ -777,18 +1084,29 @@ impl World {
     }
 
     fn tick_working(&mut self, index: usize, job: u32, ticks_remaining: u32) {
-        if self.job_board.get(job).is_none() {
+        let Some(job_record) = self.job_board.get(job).cloned() else {
             self.villagers[index].current_job = None;
             self.villagers[index].state = AgentState::Idle;
             if self.villagers[index].current_action == Some(ActionKind::Work) {
                 self.villagers[index].current_action = None;
             }
             return;
+        };
+        match job_record.kind {
+            JobKind::TendCrops => self.tick_tend_crops(job, ticks_remaining),
+            JobKind::Gather => self.tick_gather(job, ticks_remaining),
+            JobKind::Produce => self.tick_produce(job),
+            JobKind::Haul => self.tick_haul(index),
         }
-        if ticks_remaining == WORK_CYCLE_TICKS {
-            self.tend_auto_plant(job);
+        if !matches!(
+            self.villagers[index].state,
+            AgentState::Working {
+                job: active,
+                ..
+            } if active == job
+        ) {
+            return;
         }
-        self.tend_water_crops(job);
         if ticks_remaining <= 1 {
             self.villagers[index].state = AgentState::Working {
                 job,
@@ -799,6 +1117,151 @@ impl World {
                 job,
                 ticks_remaining: ticks_remaining - 1,
             };
+        }
+    }
+
+    fn tick_tend_crops(&mut self, job_id: u32, ticks_remaining: u32) {
+        if ticks_remaining == WORK_CYCLE_TICKS {
+            self.tend_harvest_ready_crop(job_id);
+            self.tend_auto_plant(job_id);
+        }
+        self.tend_water_crops(job_id);
+    }
+
+    fn tick_gather(&mut self, job_id: u32, ticks_remaining: u32) {
+        if ticks_remaining != WORK_CYCLE_TICKS {
+            return;
+        }
+        let Some(job) = self.job_board.get(job_id).cloned() else {
+            return;
+        };
+        let Some(node_tile) = job.gather_tile else {
+            return;
+        };
+        let Some(node_index) = self.nodes.iter().position(|node| node.tile == node_tile) else {
+            let released = self.job_board.remove_gather_jobs_for_node(node_tile);
+            self.clear_released_work_claims(released);
+            return;
+        };
+        let harvested = self.nodes[node_index].harvest_one();
+        if let Some(resource) = harvested {
+            self.deposit_to_stockpile(resource, 1);
+        }
+        if self.nodes[node_index].amount == 0 {
+            let released = self.job_board.remove_gather_jobs_for_node(node_tile);
+            self.clear_released_work_claims(released);
+        }
+    }
+
+    fn tick_produce(&mut self, job_id: u32) {
+        let Some(job) = self.job_board.get(job_id).cloned() else {
+            return;
+        };
+        let Some(index) = self
+            .buildings
+            .iter()
+            .position(|building| building.id == job.site)
+        else {
+            return;
+        };
+        let Some(recipe) = self
+            .catalog
+            .get(self.buildings[index].kind_index)
+            .and_then(|def| def.recipe.clone())
+        else {
+            return;
+        };
+
+        if self.buildings[index].recipe_ticks == 0 {
+            let has_inputs = recipe.inputs.iter().all(|(resource, amount)| {
+                inventory_get(&self.buildings[index].inventory, resource) >= *amount
+            });
+            if has_inputs {
+                for (resource, amount) in &recipe.inputs {
+                    inventory_take(&mut self.buildings[index].inventory, resource, *amount);
+                }
+                self.buildings[index].recipe_ticks = recipe.ticks;
+            }
+            return;
+        }
+
+        self.buildings[index].recipe_ticks -= 1;
+        if self.buildings[index].recipe_ticks == 0 {
+            let mut free = production_free_capacity(&self.buildings[index].inventory);
+            for (resource, amount) in &recipe.outputs {
+                if free == 0 {
+                    break;
+                }
+                let added = (*amount).min(free);
+                inventory_add(&mut self.buildings[index].inventory, resource, added);
+                free -= added;
+            }
+        }
+    }
+
+    fn tick_haul(&mut self, index: usize) {
+        let from = self.pos_to_tile(self.villagers[index].pos);
+        if let Some(carrying) = self.villagers[index].carrying.clone() {
+            let Some(dest_stand) = self.endpoint_stand_tile(carrying.dest) else {
+                self.deposit_to_stockpile(&carrying.resource, carrying.amount);
+                self.villagers[index].carrying = None;
+                return;
+            };
+            if from == dest_stand {
+                let deposited =
+                    self.deposit_to_storage(carrying.dest, &carrying.resource, carrying.amount);
+                if deposited < carrying.amount {
+                    self.deposit_to_stockpile(&carrying.resource, carrying.amount - deposited);
+                }
+                self.villagers[index].carrying = None;
+                return;
+            }
+            self.move_working_villager_to(index, dest_stand);
+            return;
+        }
+
+        let Some(task) = self.find_haul_task() else {
+            return;
+        };
+        let Some(source_stand) = self.endpoint_stand_tile(task.from) else {
+            return;
+        };
+        if from == source_stand {
+            let amount = task.amount.min(CARRY_STACK_MAX);
+            let taken = self.take_from_endpoint(task.from, &task.resource, amount);
+            if taken > 0 {
+                self.villagers[index].carrying = Some(CarryStack {
+                    resource: task.resource,
+                    amount: taken,
+                    dest: task.to,
+                });
+            }
+            return;
+        }
+        self.move_working_villager_to(index, source_stand);
+    }
+
+    fn move_working_villager_to(&mut self, index: usize, tile: (i32, i32)) {
+        let start = self.pos_to_tile(self.villagers[index].pos);
+        if start == tile {
+            return;
+        }
+        match self.compute_path(start, tile) {
+            Some(path) => {
+                self.villagers[index].state = AgentState::MovingTo {
+                    target: tile,
+                    purpose: MovePurpose::Work,
+                };
+                self.villagers[index].path = Some(path);
+            }
+            None => {
+                self.release_job_at(index);
+                self.villagers[index].repath_cooldown = REPATH_COOLDOWN_TICKS;
+                if let Some(carrying) = self.villagers[index].carrying.take() {
+                    self.deposit_to_stockpile(&carrying.resource, carrying.amount);
+                }
+                self.villagers[index].clear_path_to_idle();
+            }
         }
     }
 
@@ -1038,7 +1501,7 @@ impl World {
             }
         }
 
-        if !self.resources.can_afford(&def.cost) {
+        if !self.derived_resources().can_afford(&def.cost) {
             return PlacementValidity {
                 valid: false,
                 reason: "insufficient resources".into(),
@@ -1062,13 +1525,19 @@ impl World {
         if !validity.valid {
             return Err(validity.reason);
         }
-        let (kind_index, def) = self
-            .catalog
-            .find(kind)
-            .ok_or_else(|| format!("unknown building '{kind}'"))?;
-        let footprint = rotated_footprint(def, rotation);
+        let (kind_index, footprint, cost) = {
+            let (kind_index, def) = self
+                .catalog
+                .find(kind)
+                .ok_or_else(|| format!("unknown building '{kind}'"))?;
+            (
+                kind_index,
+                rotated_footprint(def, rotation),
+                def.cost.clone(),
+            )
+        };
         let tiles = footprint_tiles((x, y), footprint);
-        self.resources.spend(&def.cost)?;
+        self.withdraw_cost(&cost)?;
 
         let id = self.next_building_id;
         self.next_building_id = self.next_building_id.saturating_add(1);
@@ -1082,6 +1551,8 @@ impl World {
             origin: (x, y),
             rotation: rotation % 4,
             state: BuildState::UnderConstruction { progress_ticks: 0 },
+            inventory: BTreeMap::new(),
+            recipe_ticks: 0,
         });
         self.invalidate_paths_if_needed();
         Ok(PlacementResult { id })
@@ -1139,6 +1610,89 @@ impl World {
         }
     }
 
+    fn tick_nodes(&mut self) {
+        for node in &mut self.nodes {
+            node.tick_regen();
+        }
+    }
+
+    fn gather_stand_tile(&self, node: &ResourceNode) -> Option<(i32, i32)> {
+        if node.resource == "wood" {
+            return self
+                .is_passable(node.tile.0, node.tile.1)
+                .then_some(node.tile);
+        }
+        for (dx, dy) in [(0, -1), (-1, 0), (1, 0), (0, 1)] {
+            let stand = (node.tile.0 + dx, node.tile.1 + dy);
+            if self.is_passable(stand.0, stand.1) {
+                return Some(stand);
+            }
+        }
+        None
+    }
+
+    fn clear_released_work_claims(&mut self, released: Vec<u32>) {
+        for villager_id in released {
+            for villager in &mut self.villagers {
+                if villager.id != villager_id {
+                    continue;
+                }
+                villager.current_job = None;
+                if matches!(
+                    villager.state,
+                    AgentState::Working { .. }
+                        | AgentState::MovingTo {
+                            purpose: MovePurpose::Work,
+                            ..
+                        }
+                ) {
+                    villager.clear_path_to_idle();
+                    if villager.current_action == Some(ActionKind::Work) {
+                        villager.current_action = None;
+                    }
+                }
+            }
+        }
+    }
+
+    fn refresh_gather_jobs(&mut self) {
+        let depleted: Vec<_> = self
+            .nodes
+            .iter()
+            .filter(|node| node.amount == 0)
+            .map(|node| node.tile)
+            .collect();
+        for tile in depleted {
+            let released = self.job_board.remove_gather_jobs_for_node(tile);
+            self.clear_released_work_claims(released);
+        }
+
+        let mut count = self.job_board.gather_job_count();
+        if count >= MAX_GATHER_JOBS {
+            return;
+        }
+        let mut adverts = Vec::new();
+        for node in &self.nodes {
+            if node.amount == 0
+                || self.job_board.has_gather_for_node(node.tile)
+                || count + adverts.len() >= MAX_GATHER_JOBS
+            {
+                continue;
+            }
+            if let Some(stand) = self.gather_stand_tile(node) {
+                adverts.push((stand, node.tile));
+            }
+        }
+        for (stand, node_tile) in adverts {
+            self.job_board
+                .advertise_gather(stand, node_tile, GATHER_PRIORITY);
+            count += 1;
+            if count >= MAX_GATHER_JOBS {
+                break;
+            }
+        }
+    }
+
     fn clear_all_crop_water(&mut self) {
         for crop in &mut self.crops {
             crop.watered = false;
@@ -1190,6 +1744,45 @@ impl World {
         }
     }
 
+    fn tend_harvest_ready_crop(&mut self, job_id: u32) {
+        let Some(job) = self.job_board.get(job_id).cloned() else {
+            return;
+        };
+        let tiles = self.farm_footprint_tiles(job.site);
+        let Some(crop_index) = self.crops.iter().position(|crop| {
+            tiles.iter().any(|&tile| tile == crop.tile)
+                && self
+                    .catalog
+                    .get_crop(crop.kind_index)
+                    .is_some_and(|def| crop.stage >= def.max_stage())
+        }) else {
+            return;
+        };
+        let Some(def) = self
+            .catalog
+            .get_crop(self.crops[crop_index].kind_index)
+            .cloned()
+        else {
+            return;
+        };
+        if let Some(building) = self
+            .buildings
+            .iter_mut()
+            .find(|building| building.id == job.site)
+        {
+            let mut free = production_free_capacity(&building.inventory);
+            for (resource, amount) in &def.r#yield {
+                if free == 0 {
+                    break;
+                }
+                let added = (*amount).min(free);
+                inventory_add(&mut building.inventory, resource, added);
+                free -= added;
+            }
+        }
+        self.crops.remove(crop_index);
+    }
+
     fn tend_auto_plant(&mut self, job_id: u32) {
         let Some(job) = self.job_board.get(job_id).cloned() else {
             return;
@@ -1200,6 +1793,7 @@ impl World {
         if !def.grows_in(self.clock.season) {
             return;
         }
+        let seed_cost = def.seed_cost.clone();
         let tiles = self.farm_footprint_tiles(job.site);
         let empty = tiles.into_iter().find(|&tile| {
             self.completed_farm_at(tile.0, tile.1) == Some(job.site)
@@ -1208,17 +1802,48 @@ impl World {
         let Some(tile) = empty else {
             return;
         };
+        self.spend_seed_cost(job.site, &seed_cost);
         let id = self.next_crop_id;
         self.next_crop_id = self.next_crop_id.saturating_add(1);
         self.crops
             .push(Crop::new(id, "wheat".to_string(), kind_index, tile));
     }
 
+    fn spend_seed_cost(&mut self, farm_id: u32, seed_cost: &BTreeMap<String, u32>) -> bool {
+        if seed_cost.is_empty() {
+            return true;
+        }
+        let Some(farm_index) = self
+            .buildings
+            .iter()
+            .position(|building| building.id == farm_id)
+        else {
+            return false;
+        };
+        let can_afford = seed_cost.iter().all(|(resource, amount)| {
+            inventory_get(&self.buildings[farm_index].inventory, resource)
+                .saturating_add(self.resources.get(resource))
+                >= *amount
+        });
+        if !can_afford {
+            return false;
+        }
+        for (resource, amount) in seed_cost {
+            let from_farm =
+                inventory_take(&mut self.buildings[farm_index].inventory, resource, *amount);
+            let remaining = amount - from_farm;
+            if remaining > 0 {
+                self.resources
+                    .set(resource, self.resources.get(resource) - remaining);
+            }
+        }
+        true
+    }
+
     fn remove_crops_on_tiles(&mut self, tiles: &[(i32, i32)]) {
         self.crops
             .retain(|crop| !tiles.iter().any(|&tile| tile == crop.tile));
     }
-
 
     pub fn demolish(&mut self, entity_id: u32) -> Result<(), String> {
         let index = self
@@ -1244,6 +1869,9 @@ impl World {
             }
         }
         self.remove_crops_on_tiles(&tiles);
+        for (resource, amount) in building.inventory {
+            self.deposit_to_stockpile(&resource, amount);
+        }
         self.resources.refund(&def.cost);
         let released = self.job_board.remove_site(entity_id);
         for villager in &mut self.villagers {
@@ -1291,9 +1919,32 @@ mod tests {
         world.villagers[0].current_action = None;
         world.job_board = JobBoard::new();
         world.crops.clear();
+        world.nodes.clear();
         world.events.clear();
         world.clock = Clock::new();
         world
+    }
+
+    fn place_complete(world: &mut World, kind: &str, x: i32, y: i32) -> u32 {
+        let id = world.place_building(kind, x, y, 0).unwrap().id;
+        world
+            .buildings
+            .iter_mut()
+            .find(|building| building.id == id)
+            .unwrap()
+            .state = BuildState::Complete;
+        world.advertise_jobs_for(id);
+        id
+    }
+
+    fn job_for(world: &World, site: u32, kind: JobKind) -> u32 {
+        world
+            .job_board()
+            .jobs()
+            .iter()
+            .find(|job| job.site == site && job.kind == kind)
+            .map(|job| job.id)
+            .unwrap()
     }
 
     #[test]
@@ -1352,7 +2003,10 @@ mod tests {
                 break;
             }
         }
-        assert!(arrived, "villager should reach ordered tile before wandering");
+        assert!(
+            arrived,
+            "villager should reach ordered tile before wandering"
+        );
     }
 
     #[test]
@@ -1364,7 +2018,10 @@ mod tests {
         world.place_building("hut", 3, 0, 0).unwrap();
         if let Some(path) = &world.villager().path {
             assert!(!path.contains(&(3, 0)));
-            assert!(matches!(world.villager().state, AgentState::MovingTo { .. }));
+            assert!(matches!(
+                world.villager().state,
+                AgentState::MovingTo { .. }
+            ));
         } else {
             assert!(matches!(world.villager().state, AgentState::Idle));
             assert!(world.villager().repath_cooldown > 0);
@@ -1516,9 +2173,18 @@ mod tests {
         assert_eq!(world.crops().len(), 1);
         assert!(world.plant_crop("wheat", 2, 2).is_err());
         assert!(world.plant_crop("wheat", 0, 0).is_err());
+        world.job_board = JobBoard::new();
+        world.villager_mut().current_job = None;
+        world.villager_mut().current_action = None;
+        world.villager_mut().clear_path_to_idle();
 
         world.crops[0].watered = true;
-        let ticks_per_stage = world.catalog().find_crop("wheat").unwrap().1.ticks_per_stage;
+        let ticks_per_stage = world
+            .catalog()
+            .find_crop("wheat")
+            .unwrap()
+            .1
+            .ticks_per_stage;
         let stages = world.catalog().find_crop("wheat").unwrap().1.stages;
         for _ in 0..(ticks_per_stage * u32::from(stages)) {
             world.crops[0].watered = true;
@@ -1696,8 +2362,7 @@ mod tests {
                     purpose: MovePurpose::Wander,
                     ..
                 }
-            ) || world.villager().current_action
-                == Some(crate::sim::utility::ActionKind::Wander),
+            ) || world.villager().current_action == Some(crate::sim::utility::ActionKind::Wander),
             "expected wander after clearing stale Eat, got state={:?} action={:?}",
             world.villager().state,
             world.villager().current_action
@@ -1709,6 +2374,7 @@ mod tests {
         let mut world = World::generate(8, 8, 32, 1);
         world.tiles = vec![Terrain::Grass as u8; 64];
         world.occupancy = vec![None; 64];
+        world.nodes.clear();
         world.villagers.truncate(2);
         world.villagers[0].pos = world.tile_center(0, 0);
         world.villagers[1].pos = world.tile_center(7, 7);
@@ -1742,7 +2408,228 @@ mod tests {
         assert!(
             working >= 2,
             "expected both villagers working, got {:?}",
-            world.villagers().iter().map(|v| &v.state).collect::<Vec<_>>()
+            world
+                .villagers()
+                .iter()
+                .map(|v| &v.state)
+                .collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn tend_crops_harvests_ready_crop_into_farm_inventory() {
+        let mut world = grass_world();
+        let farm_id = place_complete(&mut world, "farm", 2, 2);
+        world.plant_crop("wheat", 2, 2).unwrap();
+        let wheat = world.catalog().find_crop("wheat").unwrap().1;
+        world.crops[0].stage = wheat.max_stage();
+        let job = job_for(&world, farm_id, JobKind::TendCrops);
+
+        world.tend_harvest_ready_crop(job);
+
+        let farm = world
+            .buildings()
+            .iter()
+            .find(|building| building.id == farm_id)
+            .unwrap();
+        assert_eq!(inventory_get(&farm.inventory, "grain"), 3);
+        assert!(world.crops().is_empty());
+    }
+
+    #[test]
+    fn derived_totals_ignore_farm_buffer_and_include_granary() {
+        let mut world = grass_world();
+        let farm_id = place_complete(&mut world, "farm", 0, 0);
+        let granary_id = place_complete(&mut world, "granary", 4, 0);
+        world.resources.grain = 1;
+        inventory_add(
+            &mut world
+                .buildings
+                .iter_mut()
+                .find(|building| building.id == farm_id)
+                .unwrap()
+                .inventory,
+            "grain",
+            9,
+        );
+        inventory_add(
+            &mut world
+                .buildings
+                .iter_mut()
+                .find(|building| building.id == granary_id)
+                .unwrap()
+                .inventory,
+            "grain",
+            4,
+        );
+
+        let snapshot = world.tick_snapshot();
+
+        assert_eq!(snapshot.resources.grain, 5);
+    }
+
+    #[test]
+    fn haul_task_moves_grain_from_farm_to_granary() {
+        let mut world = grass_world();
+        let farm_id = place_complete(&mut world, "farm", 0, 0);
+        let granary_id = place_complete(&mut world, "granary", 4, 0);
+        inventory_add(
+            &mut world
+                .buildings
+                .iter_mut()
+                .find(|building| building.id == farm_id)
+                .unwrap()
+                .inventory,
+            "grain",
+            6,
+        );
+
+        let task = world.find_haul_task().expect("haul task");
+        assert_eq!(task.from, HaulEndpoint::Building(farm_id));
+        assert_eq!(task.to, HaulEndpoint::Building(granary_id));
+        assert_eq!(task.resource, "grain");
+        assert_eq!(task.amount, CARRY_STACK_MAX);
+
+        let taken = world.take_from_endpoint(task.from, &task.resource, task.amount);
+        let deposited = world.deposit_to_storage(task.to, &task.resource, taken);
+
+        let farm = world
+            .buildings()
+            .iter()
+            .find(|building| building.id == farm_id)
+            .unwrap();
+        let granary = world
+            .buildings()
+            .iter()
+            .find(|building| building.id == granary_id)
+            .unwrap();
+        assert_eq!(deposited, CARRY_STACK_MAX);
+        assert_eq!(inventory_get(&farm.inventory, "grain"), 1);
+        assert_eq!(inventory_get(&granary.inventory, "grain"), CARRY_STACK_MAX);
+    }
+
+    #[test]
+    fn mill_and_bakery_produce_outputs_from_inputs() {
+        let mut world = grass_world();
+        let mill_id = place_complete(&mut world, "mill", 0, 2);
+        let bakery_id = place_complete(&mut world, "bakery", 3, 2);
+        inventory_add(
+            &mut world
+                .buildings
+                .iter_mut()
+                .find(|building| building.id == mill_id)
+                .unwrap()
+                .inventory,
+            "grain",
+            2,
+        );
+        let mill_job = job_for(&world, mill_id, JobKind::Produce);
+        world.tick_produce(mill_job);
+        for _ in 0..80 {
+            world.tick_produce(mill_job);
+        }
+        let mill = world
+            .buildings()
+            .iter()
+            .find(|building| building.id == mill_id)
+            .unwrap();
+        assert_eq!(inventory_get(&mill.inventory, "grain"), 0);
+        assert_eq!(inventory_get(&mill.inventory, "flour"), 2);
+
+        inventory_add(
+            &mut world
+                .buildings
+                .iter_mut()
+                .find(|building| building.id == bakery_id)
+                .unwrap()
+                .inventory,
+            "flour",
+            1,
+        );
+        let bakery_job = job_for(&world, bakery_id, JobKind::Produce);
+        world.tick_produce(bakery_job);
+        for _ in 0..100 {
+            world.tick_produce(bakery_job);
+        }
+        let bakery = world
+            .buildings()
+            .iter()
+            .find(|building| building.id == bakery_id)
+            .unwrap();
+        assert_eq!(inventory_get(&bakery.inventory, "flour"), 0);
+        assert_eq!(inventory_get(&bakery.inventory, "food"), 2);
+    }
+
+    #[test]
+    fn gather_job_adds_wood_to_stockpile() {
+        let mut world = grass_world();
+        world.tiles[1] = Terrain::Forest as u8;
+        world.nodes = vec![ResourceNode::forest((1, 0))];
+        world.resources.wood = 0;
+        world.refresh_gather_jobs();
+        let job = world
+            .job_board()
+            .jobs()
+            .iter()
+            .find(|job| job.kind == JobKind::Gather)
+            .map(|job| job.id)
+            .unwrap();
+
+        world.tick_gather(job, WORK_CYCLE_TICKS);
+
+        assert_eq!(world.resources().wood, 1);
+        assert_eq!(world.nodes[0].amount, 4);
+    }
+
+    #[test]
+    fn produced_food_can_be_withdrawn_for_eating() {
+        let mut world = grass_world();
+        world.resources.stone = 100;
+        let mill_id = place_complete(&mut world, "mill", 0, 2);
+        let bakery_id = place_complete(&mut world, "bakery", 3, 2);
+        let granary_id = place_complete(&mut world, "granary", 5, 2);
+        world.resources.food = 0;
+
+        inventory_add(
+            &mut world
+                .buildings
+                .iter_mut()
+                .find(|building| building.id == mill_id)
+                .unwrap()
+                .inventory,
+            "grain",
+            2,
+        );
+        let mill_job = job_for(&world, mill_id, JobKind::Produce);
+        world.tick_produce(mill_job);
+        for _ in 0..80 {
+            world.tick_produce(mill_job);
+        }
+        let flour = world.take_from_endpoint(HaulEndpoint::Building(mill_id), "flour", 1);
+        assert_eq!(
+            world.deposit_to_storage(HaulEndpoint::Building(bakery_id), "flour", flour),
+            1
+        );
+
+        let bakery_job = job_for(&world, bakery_id, JobKind::Produce);
+        world.tick_produce(bakery_job);
+        for _ in 0..100 {
+            world.tick_produce(bakery_job);
+        }
+        let food = world.take_from_endpoint(HaulEndpoint::Building(bakery_id), "food", 2);
+        assert_eq!(
+            world.deposit_to_storage(HaulEndpoint::Building(granary_id), "food", food),
+            2
+        );
+
+        world.begin_eat(0);
+
+        let granary = world
+            .buildings()
+            .iter()
+            .find(|building| building.id == granary_id)
+            .unwrap();
+        assert!(matches!(world.villager().state, AgentState::Eating { .. }));
+        assert_eq!(inventory_get(&granary.inventory, "food"), 1);
     }
 }
