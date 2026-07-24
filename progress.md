@@ -19,7 +19,7 @@ Last updated: 2026-07-24 (M8 complete).
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 M8 design: [`docs/superpowers/specs/2026-07-24-milestone-8-design.md`](docs/superpowers/specs/2026-07-24-milestone-8-design.md).
 
-## What works today (M1–M8 draft)
+## What works today (M1–M8)
 
 - Tauri 2 + React Canvas; Rust owns a 20 Hz sim thread; frontend interpolates at RAF.
 - Seeded `128×128` island terrain (`noise`), pan/zoom camera, offscreen terrain blit.
