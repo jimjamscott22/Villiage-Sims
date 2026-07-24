@@ -53,15 +53,15 @@ Pick max score. If `best != current` and `best_score < current_score + 0.15`, ke
 
 Begin: if `food >= 1`, spend 1 food, set `AgentState::Eating { ticks_remaining: 60 }`, set `current_action = Eat`. Do not release job.
 
-Each tick: decrement; at 0 set hunger to `1.0`, recompute happiness, go Idle (keep `current_action` for hysteresis).
+Each tick: decrement; at 0 set hunger to `1.0`, recompute happiness, go Idle and **clear** `current_action` (completed needs actions must not retain hysteresis — their restored score is ~0 and would trap Wander below the 0.15 margin).
 
 ### Sleep
 
-Begin: `Sleeping { ticks_remaining: 100 }`. At end set energy to `1.0`, Idle.
+Begin: `Sleeping { ticks_remaining: 100 }`. At end set energy to `1.0`, Idle, clear `current_action`.
 
 ### Socialize
 
-Begin: `Socializing { ticks_remaining: 40 }` while partner still within 8 (else abort to Idle). At end: `social = min(1, social + 0.5)`, Idle.
+Begin: `Socializing { ticks_remaining: 40 }` while partner still within 8 (else abort to Idle and clear `current_action`). At end: `social = min(1, social + 0.5)`, Idle, clear `current_action`.
 
 ### Work
 
@@ -95,6 +95,7 @@ No new commands required. `get_villager_detail(id)` works for any of the five. O
 - Utility unit: Eat/Sleep/Work/Socialize/Wander curves + hysteresis holds weaker alternative.
 - Eat consumes food and restores hunger; Sleep restores energy.
 - Working villager switches to Eat when hunger low and food available without releasing claim.
+- Completed Eat/Sleep/Socialize clears `current_action` so hysteresis cannot re-enter or starve Wander.
 - World spawns 5 villagers; two can claim different TendCrops slots on one farm.
 - No flicker: forced borderline scores keep current action across ticks.
 

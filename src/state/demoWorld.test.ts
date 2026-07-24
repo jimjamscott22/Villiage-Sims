@@ -166,4 +166,54 @@ describe('DemoWorld pathfinding', () => {
     world.advance();
     expect(world.snapshot().tick).toBe(before);
   });
+
+  it('clears eat action after finishing so hysteresis cannot drain food', () => {
+    const terrain = {
+      width: 16,
+      height: 8,
+      tileSize: 32,
+      tiles: new Array(16 * 8).fill(3),
+    };
+    const world = new DemoWorld(terrain);
+    // Keep a single villager so only one eater can consume stock.
+    const internals = world as unknown as {
+      villagers: Array<{
+        needs: { hunger: number; energy: number; social: number; happiness: number };
+        currentAction: string | null;
+        state: string;
+      }>;
+    };
+    internals.villagers.splice(1);
+    world.resources.food = 3;
+    const villager = internals.villagers[0];
+    villager.needs.hunger = 0;
+    villager.needs.energy = 1;
+    villager.needs.social = 1;
+    villager.needs.happiness = 1 / 3;
+
+    // Drive one decide+eat cycle via normal ticks.
+    let ate = false;
+    for (let i = 0; i < 5; i += 1) {
+      world.advance();
+      if (villager.state === 'eating') {
+        ate = true;
+        break;
+      }
+    }
+    expect(ate).toBe(true);
+    expect(world.resources.food).toBe(2);
+
+    for (let i = 0; i < 80; i += 1) {
+      world.advance();
+      if (villager.state === 'idle') break;
+    }
+    expect(villager.state).toBe('idle');
+    expect(villager.currentAction).toBeNull();
+    expect(villager.needs.hunger).toBe(1);
+
+    const foodAfter = world.resources.food;
+    for (let i = 0; i < 40; i += 1) world.advance();
+    expect(world.resources.food).toBe(foodAfter);
+    expect(villager.state).not.toBe('eating');
+  });
 });

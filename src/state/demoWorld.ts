@@ -737,6 +737,9 @@ export class DemoWorld {
         || (villager.state === 'moving' && villager.purpose === 'work')
       ) {
         this.clearToIdle(villager);
+        if (villager.currentAction === 'work') {
+          villager.currentAction = null;
+        }
       }
     }
 
@@ -769,6 +772,17 @@ export class DemoWorld {
     const villager = this.villagers[index];
     if (villager.repathCooldown > 0 && villager.state === 'idle') return;
     if (villager.state !== 'idle' && villager.state !== 'working') return;
+
+    // Completed needs actions must not retain hysteresis while Idle — their
+    // restored needs make the live score ~0, which traps Wander below 0.15.
+    if (
+      villager.state === 'idle'
+      && (villager.currentAction === 'eat'
+        || villager.currentAction === 'sleep'
+        || villager.currentAction === 'socialize')
+    ) {
+      villager.currentAction = null;
+    }
 
     const from = this.posToTile(villager.x, villager.y);
     const partnerInRange = this.partnerInRange(index, from);
@@ -968,6 +982,7 @@ export class DemoWorld {
       villager.path = null;
       villager.target = null;
       villager.purpose = null;
+      villager.currentAction = null;
     } else {
       villager.activityTicks -= 1;
     }
@@ -982,6 +997,7 @@ export class DemoWorld {
       villager.path = null;
       villager.target = null;
       villager.purpose = null;
+      villager.currentAction = null;
     } else {
       villager.activityTicks -= 1;
     }
@@ -992,6 +1008,7 @@ export class DemoWorld {
     const from = this.posToTile(villager.x, villager.y);
     if (!this.partnerInRange(index, from)) {
       villager.state = 'idle';
+      villager.currentAction = null;
       return;
     }
     if (villager.activityTicks <= 1) {
@@ -1001,6 +1018,7 @@ export class DemoWorld {
       villager.path = null;
       villager.target = null;
       villager.purpose = null;
+      villager.currentAction = null;
     } else {
       villager.activityTicks -= 1;
     }
@@ -1035,6 +1053,9 @@ export class DemoWorld {
     if (villager.currentJob == null || !this.jobs.some((job) => job.id === villager.currentJob)) {
       villager.currentJob = null;
       this.clearToIdle(villager);
+      if (villager.currentAction === 'work') {
+        villager.currentAction = null;
+      }
       return;
     }
     if (villager.workTicksRemaining === WORK_CYCLE_TICKS) {
