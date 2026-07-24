@@ -50,13 +50,18 @@ export class Camera {
   }
 
   applyTransform(ctx: CanvasRenderingContext2D, dpr: number): void {
+    // Round the translation to whole device pixels so bitmap blits (the
+    // pre-rendered terrain layer) land on the physical pixel grid instead of
+    // being resampled at a fractional offset, which is what reads as "blurry"
+    // despite imageSmoothingEnabled = false. Scale is left as-is; rounding it
+    // too would fight the zoom-anchored-to-cursor math in `zoomAt`.
     ctx.setTransform(
       this.zoom * dpr,
       0,
       0,
       this.zoom * dpr,
-      -this.x * this.zoom * dpr,
-      -this.y * this.zoom * dpr,
+      Math.round(-this.x * this.zoom * dpr),
+      Math.round(-this.y * this.zoom * dpr),
     );
   }
 
