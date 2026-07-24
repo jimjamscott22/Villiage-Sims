@@ -70,6 +70,7 @@ export const DEMO_CATALOG: Catalog = {
 /** Matches Rust Terrain enum byte order. */
 const TERRAIN_NAMES = ['deep_water', 'shallow_water', 'sand', 'grass', 'forest', 'rock', 'mountain'];
 const SEASON_IDS = ['spring', 'summer', 'autumn', 'winter'] as const;
+const STARTING_VILLAGER_NAMES = ['Ash', 'Briar', 'Cora', 'Dale', 'Ellis'] as const;
 
 const TICKS_PER_SECOND = 20;
 const MOVE_SPEED_TILES_PER_SEC = 2;
@@ -84,8 +85,32 @@ const MINUTES_PER_TICK = 0.06;
 const MINUTES_PER_DAY = 1440;
 const DAYS_PER_SEASON = 28;
 
+const HYSTERESIS = 0.15;
+const WORK_BASELINE = 0.4;
+const WANDER_SCORE = 0.05;
+const NIGHT_BONUS = 1.5;
+const NIGHT_START_MINUTE = 20 * 60;
+const NIGHT_END_MINUTE = 6 * 60;
+const SOCIAL_RANGE = 8;
+const EAT_TICKS = 60;
+const SLEEP_TICKS = 100;
+const SOCIALIZE_TICKS = 40;
+const SOCIAL_RESTORE = 0.5;
+const WANDER_RADIUS = 6;
+const DEMO_SEED = 42;
+
+type ActionKind = 'eat' | 'sleep' | 'work' | 'socialize' | 'wander';
+type MovePurpose = 'player' | 'work' | 'wander';
+type AgentStateName = 'idle' | 'moving' | 'working' | 'eating' | 'sleeping' | 'socializing';
+
+const ACTION_ORDER: ActionKind[] = ['eat', 'sleep', 'work', 'socialize', 'wander'];
+
+function actionRank(kind: ActionKind): number {
+  return ACTION_ORDER.indexOf(kind);
+}
+
 function startingResources(): ResourceTotals {
-  return { wood: 120, stone: 40, grain: 0, food: 0, gold: 0 };
+  return { wood: 120, stone: 40, grain: 0, food: 50, gold: 0 };
 }
 
 function rotatedFootprint(def: BuildingDef, rotation: number): [number, number] {
@@ -101,6 +126,76 @@ function footprintTiles(x: number, y: number, fw: number, fh: number): Array<[nu
     }
   }
   return tiles;
+}
+
+function isNight(minute: number): boolean {
+  return minute >= NIGHT_START_MINUTE || minute < NIGHT_END_MINUTE;
+}
+
+function distanceFactor(dist: number): number {
+  return 1 / (1 + dist * 0.05);
+}
+
+function scoreEat(hunger: number, food: number): number {
+  if (food < 1) return 0;
+  const deficit = Math.max(0, Math.min(1, 1 - hunger));
+  return deficit * deficit;
+}
+
+function scoreSleep(energy: number, night: boolean): number {
+  const deficit = Math.max(0, Math.min(1, 1 - energy));
+  const base = deficit * deficit;
+  return night ? Math.min(1, base * NIGHT_BONUS) : base;
+}
+
+function scoreWork(priority: number, dist: number): number {
+  const priorityScale = priority / 10;
+  return Math.max(0, Math.min(1, WORK_BASELINE * priorityScale * distanceFactor(dist)));
+}
+
+function scoreSocialize(social: number, partnerInRange: boolean): number {
+  if (!partnerInRange) return 0;
+  const deficit = Math.max(0, Math.min(1, 1 - social));
+  return deficit ** 1.5;
+}
+
+function scoreWander(): number {
+  return WANDER_SCORE;
+}
+
+function chebyshev(a: [number, number], b: [number, number]): number {
+  return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
+}
+
+function wrapU64(n: bigint): bigint {
+  return n & 0xffff_ffff_ffff_ffffn;
+}
+
+function wanderTile(
+  from: [number, number],
+  seed: number,
+  tick: number,
+  villagerId: number,
+  width: number,
+  height: number,
+  isPassable: (x: number, y: number) => boolean,
+): [number, number] | null {
+  let hash = wrapU64(
+    BigInt(seed) * 0x9e37_79b9_7f4a_7c15n
+      + BigInt(tick)
+      + BigInt(villagerId) * 0xc2b2_ae3d_27d4_eb4fn,
+  );
+  const span = BigInt(2 * WANDER_RADIUS + 1);
+  for (let i = 0; i < 16; i += 1) {
+    hash = wrapU64(hash * 0xbf58_476d_1ce4_e5b9n + 0x94d0_49bb_1331_11ebn);
+    const rawDx = Number(hash % span) - WANDER_RADIUS;
+    const rawDy = Number((hash / span) % span) - WANDER_RADIUS;
+    if (rawDx === 0 && rawDy === 0) continue;
+    const x = Math.max(0, Math.min(width - 1, from[0] + rawDx));
+    const y = Math.max(0, Math.min(height - 1, from[1] + rawDy));
+    if ((x !== from[0] || y !== from[1]) && isPassable(x, y)) return [x, y];
+  }
+  return null;
 }
 
 interface DemoBuilding {
@@ -146,14 +241,16 @@ interface DemoVillager {
   name: string;
   x: number;
   y: number;
-  state: 'idle' | 'moving' | 'working';
-  purpose: 'player' | 'work' | null;
+  state: AgentStateName;
+  purpose: MovePurpose | null;
   target: [number, number] | null;
   path: Array<[number, number]> | null;
   repathCooldown: number;
   needs: DemoNeeds;
   currentJob: number | null;
   workTicksRemaining: number;
+  activityTicks: number;
+  currentAction: ActionKind | null;
 }
 
 interface DemoClock {
@@ -166,6 +263,12 @@ interface DemoClock {
   speed: number;
 }
 
+interface ScoredAction {
+  kind: ActionKind;
+  score: number;
+  jobId: number | null;
+}
+
 function recomputeHappiness(needs: DemoNeeds): void {
   needs.happiness = Math.max(0, Math.min(1, (needs.hunger + needs.energy + needs.social) / 3));
 }
@@ -174,6 +277,49 @@ function fullNeeds(): DemoNeeds {
   const needs = { hunger: 1, energy: 1, social: 1, happiness: 1 };
   recomputeHappiness(needs);
   return needs;
+}
+
+function stateByte(v: DemoVillager): number {
+  switch (v.state) {
+    case 'idle': return 0;
+    case 'moving': return 1;
+    case 'working': return 2;
+    case 'eating': return 3;
+    case 'sleeping': return 4;
+    case 'socializing': return 5;
+  }
+}
+
+function stateLabel(v: DemoVillager): string {
+  switch (v.state) {
+    case 'idle': return 'Idle';
+    case 'moving':
+      if (v.purpose === 'work') return 'Going to work';
+      if (v.purpose === 'wander') return 'Wandering';
+      return 'Moving';
+    case 'working': return 'Working';
+    case 'eating': return 'Eating';
+    case 'sleeping': return 'Sleeping';
+    case 'socializing': return 'Socializing';
+  }
+}
+
+function pickAction(scored: ScoredAction[], current: ActionKind | null): ScoredAction {
+  let best: ScoredAction = { kind: 'wander', score: 0, jobId: null };
+  for (const action of scored) {
+    if (
+      action.score > best.score
+      || (action.score === best.score && actionRank(action.kind) < actionRank(best.kind))
+    ) {
+      best = action;
+    }
+  }
+  if (current == null) return best;
+  const currentScore = scored.find((a) => a.kind === current)?.score ?? 0;
+  if (best.kind !== current && best.score < currentScore + HYSTERESIS) {
+    return scored.find((a) => a.kind === current) ?? { kind: current, score: currentScore, jobId: null };
+  }
+  return best;
 }
 
 export class DemoWorld {
@@ -185,9 +331,11 @@ export class DemoWorld {
   private nextId = 1;
   private nextCropId = 1;
   private nextJobId = 1;
-  private villager: DemoVillager;
+  private nextVillagerId = 1;
+  private villagers: DemoVillager[] = [];
   private jobs: DemoJob[] = [];
   private events: SimEvent[] = [];
+  private readonly seed = DEMO_SEED;
   private clock: DemoClock = {
     tick: 0,
     minuteAccum: 0,
@@ -201,23 +349,61 @@ export class DemoWorld {
   constructor(terrain: TerrainSnapshot) {
     this.terrain = terrain;
     this.occupancy = new Array(terrain.width * terrain.height).fill(null);
-    const spawn = this.findWalkableNear(Math.floor(terrain.width / 2), Math.floor(terrain.height / 2))
-      ?? [Math.floor(terrain.width / 2), Math.floor(terrain.height / 2)];
-    const [cx, cy] = this.tileCenter(spawn[0], spawn[1]);
-    this.villager = {
-      id: 1,
-      name: 'Ash',
-      x: cx,
-      y: cy,
-      state: 'idle',
-      purpose: null,
-      target: null,
-      path: null,
-      repathCooldown: 0,
-      needs: fullNeeds(),
-      currentJob: null,
-      workTicksRemaining: 0,
-    };
+    this.spawnStartingVillagers();
+  }
+
+  private spawnStartingVillagers(): void {
+    const cx = Math.floor(this.terrain.width / 2);
+    const cy = Math.floor(this.terrain.height / 2);
+    const used: Array<[number, number]> = [];
+    for (let i = 0; i < STARTING_VILLAGER_NAMES.length; i += 1) {
+      const name = STARTING_VILLAGER_NAMES[i];
+      const id = this.nextVillagerId;
+      this.nextVillagerId += 1;
+      const tile = this.findSpawnTile(cx, cy, used) ?? [cx + i, cy];
+      used.push(tile);
+      const [px, py] = this.tileCenter(tile[0], tile[1]);
+      this.villagers.push({
+        id,
+        name,
+        x: px,
+        y: py,
+        state: 'idle',
+        purpose: null,
+        target: null,
+        path: null,
+        repathCooldown: 0,
+        needs: fullNeeds(),
+        currentJob: null,
+        workTicksRemaining: 0,
+        activityTicks: 0,
+        currentAction: null,
+      });
+    }
+  }
+
+  private findSpawnTile(
+    cx: number,
+    cy: number,
+    used: Array<[number, number]>,
+  ): [number, number] | null {
+    const first = this.findWalkableNear(cx, cy);
+    if (first && !used.some((u) => u[0] === first[0] && u[1] === first[1])) {
+      return first;
+    }
+    const maxR = Math.max(this.terrain.width, this.terrain.height);
+    for (let r = 0; r <= maxR; r += 1) {
+      for (let dy = -r; dy <= r; dy += 1) {
+        for (let dx = -r; dx <= r; dx += 1) {
+          if (r > 0 && Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+          const x = cx + dx;
+          const y = cy + dy;
+          if (used.some((u) => u[0] === x && u[1] === y)) continue;
+          if (this.isSpawnCandidate(x, y)) return [x, y];
+        }
+      }
+    }
+    return null;
   }
 
   get catalog(): Catalog {
@@ -264,12 +450,13 @@ export class DemoWorld {
 
     this.tickCrops();
     this.decayNeeds();
-    this.tickVillager();
+    for (let i = 0; i < this.villagers.length; i += 1) {
+      this.tickVillagerAt(i);
+    }
     return this.snapshot();
   }
 
   snapshot(): TickSnapshot {
-    const stateByte = this.villager.state === 'working' ? 2 : this.villager.state === 'moving' ? 1 : 0;
     const clock: ClockView = {
       minute: this.clock.minute,
       day: this.clock.day,
@@ -286,12 +473,12 @@ export class DemoWorld {
     }));
     return {
       tick: this.clock.tick,
-      villagers: [{
-        id: this.villager.id,
-        x: this.villager.x,
-        y: this.villager.y,
-        state: stateByte,
-      }],
+      villagers: this.villagers.map((v) => ({
+        id: v.id,
+        x: v.x,
+        y: v.y,
+        state: stateByte(v),
+      })),
       buildings: this.buildingViews(),
       crops,
       resources: { ...this.resources },
@@ -301,24 +488,20 @@ export class DemoWorld {
   }
 
   getVillagerDetail(id: number): VillagerDetail {
-    if (this.villager.id !== id) throw new Error(`unknown villager ${id}`);
-    const job = this.villager.currentJob != null
-      ? this.jobs.find((entry) => entry.id === this.villager.currentJob) ?? null
+    const villager = this.villagers.find((entry) => entry.id === id);
+    if (!villager) throw new Error(`unknown villager ${id}`);
+    const job = villager.currentJob != null
+      ? this.jobs.find((entry) => entry.id === villager.currentJob) ?? null
       : null;
-    const stateLabel = this.villager.state === 'working'
-      ? 'Working'
-      : this.villager.state === 'moving'
-        ? (this.villager.purpose === 'work' ? 'Going to work' : 'Moving')
-        : 'Idle';
     return {
-      id: this.villager.id,
-      name: this.villager.name,
-      state: this.villager.state === 'working' ? 2 : this.villager.state === 'moving' ? 1 : 0,
-      stateLabel,
-      hunger: this.villager.needs.hunger,
-      energy: this.villager.needs.energy,
-      social: this.villager.needs.social,
-      happiness: this.villager.needs.happiness,
+      id: villager.id,
+      name: villager.name,
+      state: stateByte(villager),
+      stateLabel: stateLabel(villager),
+      hunger: villager.needs.hunger,
+      energy: villager.needs.energy,
+      social: villager.needs.social,
+      happiness: villager.needs.happiness,
       jobKind: job?.kind ?? null,
       jobSite: job?.site ?? null,
     };
@@ -327,15 +510,33 @@ export class DemoWorld {
   moveVillagerTo(x: number, y: number): void {
     if (!this.inBounds(x, y)) throw new Error('out of bounds');
     if (!this.isPassable(x, y)) throw new Error('tile impassable');
-    this.releaseCurrentJob();
-    const start = this.posToTile(this.villager.x, this.villager.y);
+    const index = this.nearestVillagerIndexTo(x, y);
+    if (index < 0) throw new Error('no villagers');
+    this.releaseJobAt(index);
+    const villager = this.villagers[index];
+    const start = this.posToTile(villager.x, villager.y);
     const path = this.computePath(start, [x, y]);
     if (!path) throw new Error('no path');
-    this.villager.state = 'moving';
-    this.villager.purpose = 'player';
-    this.villager.target = [x, y];
-    this.villager.path = path;
-    this.villager.repathCooldown = 0;
+    villager.state = 'moving';
+    villager.purpose = 'player';
+    villager.target = [x, y];
+    villager.path = path;
+    villager.repathCooldown = 0;
+    villager.currentAction = null;
+  }
+
+  private nearestVillagerIndexTo(x: number, y: number): number {
+    let bestIndex = -1;
+    let bestDist = Infinity;
+    for (let i = 0; i < this.villagers.length; i += 1) {
+      const [vx, vy] = this.posToTile(this.villagers[i].x, this.villagers[i].y);
+      const dist = Math.abs(vx - x) + Math.abs(vy - y);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
   }
 
   validatePlacement(kind: string, x: number, y: number, rotation: number): PlacementValidity {
@@ -386,7 +587,7 @@ export class DemoWorld {
       progressTicks: 0,
       complete: false,
     });
-    this.invalidatePathIfNeeded();
+    this.invalidatePathsIfNeeded();
     return { id };
   }
 
@@ -409,13 +610,21 @@ export class DemoWorld {
       this.resources[resourceKey] += amount;
     }
     this.buildings.splice(index, 1);
-    const released = this.jobs.filter((job) => job.site === entityId && job.claimedBy != null)
+    const released = this.jobs
+      .filter((job) => job.site === entityId && job.claimedBy != null)
       .map((job) => job.claimedBy!);
     this.jobs = this.jobs.filter((job) => job.site !== entityId);
-    if (released.includes(this.villager.id)) {
-      this.villager.currentJob = null;
-      if (this.villager.state === 'working' || (this.villager.state === 'moving' && this.villager.purpose === 'work')) {
-        this.clearToIdle();
+    for (const villager of this.villagers) {
+      if (released.includes(villager.id)) {
+        villager.currentJob = null;
+        if (
+          villager.state === 'working'
+          || (villager.state === 'moving' && villager.purpose === 'work')
+        ) {
+          this.clearToIdle(villager);
+        }
+      } else if (villager.currentJob != null && !this.jobs.some((job) => job.id === villager.currentJob)) {
+        villager.currentJob = null;
       }
     }
   }
@@ -456,11 +665,13 @@ export class DemoWorld {
   }
 
   private decayNeeds(): void {
-    const n = this.villager.needs;
-    n.hunger = Math.max(0, Math.min(1, n.hunger - HUNGER_DECAY));
-    n.energy = Math.max(0, Math.min(1, n.energy - ENERGY_DECAY));
-    n.social = Math.max(0, Math.min(1, n.social - SOCIAL_DECAY));
-    recomputeHappiness(n);
+    for (const villager of this.villagers) {
+      const n = villager.needs;
+      n.hunger = Math.max(0, Math.min(1, n.hunger - HUNGER_DECAY));
+      n.energy = Math.max(0, Math.min(1, n.energy - ENERGY_DECAY));
+      n.social = Math.max(0, Math.min(1, n.social - SOCIAL_DECAY));
+      recomputeHappiness(n);
+    }
   }
 
   private advertiseJobsFor(buildingId: number): void {
@@ -515,98 +726,334 @@ export class DemoWorld {
     return unique;
   }
 
-  private tickVillager(): void {
-    if (this.villager.repathCooldown > 0) this.villager.repathCooldown -= 1;
+  private tickVillagerAt(index: number): void {
+    const villager = this.villagers[index];
+    if (villager.repathCooldown > 0) villager.repathCooldown -= 1;
 
-    if (this.villager.currentJob != null && !this.jobs.some((job) => job.id === this.villager.currentJob)) {
-      this.villager.currentJob = null;
-      if (this.villager.state === 'working' || (this.villager.state === 'moving' && this.villager.purpose === 'work')) {
-        this.clearToIdle();
+    if (villager.currentJob != null && !this.jobs.some((job) => job.id === villager.currentJob)) {
+      villager.currentJob = null;
+      if (
+        villager.state === 'working'
+        || (villager.state === 'moving' && villager.purpose === 'work')
+      ) {
+        this.clearToIdle(villager);
       }
     }
 
-    if (this.villager.state === 'idle') {
-      this.tickIdle();
-      return;
-    }
-    if (this.villager.state === 'working') {
-      this.tickWorking();
-      return;
-    }
-    if (this.villager.state === 'moving' && this.villager.target) {
-      this.tickMoving(this.villager.target, this.villager.purpose ?? 'player');
-    }
-  }
-
-  private tickIdle(): void {
-    if (this.villager.repathCooldown > 0) return;
-    if (this.villager.currentJob != null) {
-      const job = this.jobs.find((entry) => entry.id === this.villager.currentJob);
-      if (job) {
-        this.beginMoveToJob(job.tile, job.id);
+    switch (villager.state) {
+      case 'eating':
+        this.tickEating(index);
         return;
-      }
-      this.villager.currentJob = null;
+      case 'sleeping':
+        this.tickSleeping(index);
+        return;
+      case 'socializing':
+        this.tickSocializing(index);
+        return;
+      case 'moving':
+        if (villager.target) {
+          this.tickMoving(index, villager.target, villager.purpose ?? 'player');
+        }
+        return;
+      case 'idle':
+      case 'working':
+        this.maybeDecide(index);
+        if (this.villagers[index].state === 'working') {
+          this.tickWorking(index);
+        }
+        return;
     }
-    const from = this.posToTile(this.villager.x, this.villager.y);
-    const jobId = this.claimBest(from);
-    if (jobId == null) return;
-    const job = this.jobs.find((entry) => entry.id === jobId)!;
-    this.villager.currentJob = jobId;
-    this.beginMoveToJob(job.tile, jobId);
   }
 
-  private claimBest(from: [number, number]): number | null {
-    let best: { id: number; score: number } | null = null;
+  private maybeDecide(index: number): void {
+    const villager = this.villagers[index];
+    if (villager.repathCooldown > 0 && villager.state === 'idle') return;
+    if (villager.state !== 'idle' && villager.state !== 'working') return;
+
+    const from = this.posToTile(villager.x, villager.y);
+    const partnerInRange = this.partnerInRange(index, from);
+    const scored = this.scoreAll(index, from, partnerInRange);
+    const picked = pickAction(scored, villager.currentAction);
+
+    if (
+      picked.kind === 'work'
+      && villager.state === 'working'
+      && villager.currentAction === 'work'
+    ) {
+      return;
+    }
+    if (
+      picked.kind === villager.currentAction
+      && (
+        (picked.kind === 'work' && villager.state === 'working')
+        || (picked.kind === 'work' && villager.state === 'moving' && villager.purpose === 'work')
+      )
+    ) {
+      return;
+    }
+
+    this.beginAction(index, picked.kind, picked.jobId);
+  }
+
+  private scoreAll(index: number, from: [number, number], partnerInRange: boolean): ScoredAction[] {
+    const villager = this.villagers[index];
+    const actions: ScoredAction[] = [
+      { kind: 'eat', score: scoreEat(villager.needs.hunger, this.resources.food), jobId: null },
+      { kind: 'sleep', score: scoreSleep(villager.needs.energy, isNight(this.clock.minute)), jobId: null },
+      { kind: 'socialize', score: scoreSocialize(villager.needs.social, partnerInRange), jobId: null },
+      { kind: 'wander', score: scoreWander(), jobId: null },
+      this.workCandidate(index, from),
+    ];
+    return actions;
+  }
+
+  private workCandidate(index: number, from: [number, number]): ScoredAction {
+    const villager = this.villagers[index];
+    if (villager.currentJob != null) {
+      const job = this.jobs.find((entry) => entry.id === villager.currentJob);
+      if (job) {
+        const dist = Math.abs(job.tile[0] - from[0]) + Math.abs(job.tile[1] - from[1]);
+        return { kind: 'work', score: scoreWork(job.priority, dist), jobId: job.id };
+      }
+    }
+    const best = this.peekBest(from);
+    if (best) {
+      const dist = Math.abs(best.tile[0] - from[0]) + Math.abs(best.tile[1] - from[1]);
+      return { kind: 'work', score: scoreWork(best.priority, dist), jobId: best.id };
+    }
+    return { kind: 'work', score: 0, jobId: null };
+  }
+
+  private peekBest(from: [number, number]): DemoJob | null {
+    let best: { job: DemoJob; score: number } | null = null;
     for (const job of this.jobs) {
       if (job.claimedBy != null) continue;
       const dist = Math.abs(job.tile[0] - from[0]) + Math.abs(job.tile[1] - from[1]);
       const score = job.priority / (1 + dist);
-      if (!best || score > best.score) best = { id: job.id, score };
+      if (!best || score > best.score) best = { job, score };
     }
-    if (!best) return null;
-    const job = this.jobs.find((entry) => entry.id === best!.id)!;
-    job.claimedBy = this.villager.id;
-    return job.id;
+    return best?.job ?? null;
   }
 
-  private beginMoveToJob(tile: [number, number], _jobId: number): void {
-    const start = this.posToTile(this.villager.x, this.villager.y);
+  private partnerInRange(index: number, from: [number, number]): boolean {
+    const id = this.villagers[index].id;
+    return this.villagers.some((other) => {
+      if (other.id === id) return false;
+      const tile = this.posToTile(other.x, other.y);
+      return chebyshev(from, tile) <= SOCIAL_RANGE;
+    });
+  }
+
+  private beginAction(index: number, kind: ActionKind, jobId: number | null): void {
+    switch (kind) {
+      case 'eat':
+        this.beginEat(index);
+        break;
+      case 'sleep':
+        this.beginSleep(index);
+        break;
+      case 'socialize':
+        this.beginSocialize(index);
+        break;
+      case 'work':
+        this.beginWork(index, jobId);
+        break;
+      case 'wander':
+        this.beginWander(index);
+        break;
+    }
+  }
+
+  private beginEat(index: number): void {
+    if (this.resources.food < 1) return;
+    this.resources.food -= 1;
+    const villager = this.villagers[index];
+    villager.path = null;
+    villager.target = null;
+    villager.purpose = null;
+    villager.state = 'eating';
+    villager.activityTicks = EAT_TICKS;
+    villager.currentAction = 'eat';
+  }
+
+  private beginSleep(index: number): void {
+    const villager = this.villagers[index];
+    villager.path = null;
+    villager.target = null;
+    villager.purpose = null;
+    villager.state = 'sleeping';
+    villager.activityTicks = SLEEP_TICKS;
+    villager.currentAction = 'sleep';
+  }
+
+  private beginSocialize(index: number): void {
+    const villager = this.villagers[index];
+    villager.path = null;
+    villager.target = null;
+    villager.purpose = null;
+    villager.state = 'socializing';
+    villager.activityTicks = SOCIALIZE_TICKS;
+    villager.currentAction = 'socialize';
+  }
+
+  private beginWork(index: number, jobId: number | null): void {
+    const villager = this.villagers[index];
+    const from = this.posToTile(villager.x, villager.y);
+
+    let resolved: number | null = null;
+    if (villager.currentJob != null) {
+      if (this.jobs.some((job) => job.id === villager.currentJob)) {
+        resolved = villager.currentJob;
+      } else {
+        villager.currentJob = null;
+      }
+    }
+
+    const preferred = resolved ?? jobId;
+    let claimed: number | null = null;
+    if (preferred != null && this.claimId(preferred, villager.id)) {
+      claimed = preferred;
+    } else {
+      claimed = this.claimBest(villager.id, from);
+    }
+    if (claimed == null) return;
+
+    villager.currentJob = claimed;
+    villager.currentAction = 'work';
+    const job = this.jobs.find((entry) => entry.id === claimed)!;
+    this.beginMoveToJob(index, job.tile, claimed);
+  }
+
+  private claimId(jobId: number, villagerId: number): boolean {
+    const job = this.jobs.find((entry) => entry.id === jobId);
+    if (!job) return false;
+    if (job.claimedBy != null && job.claimedBy !== villagerId) return false;
+    job.claimedBy = villagerId;
+    return true;
+  }
+
+  private claimBest(villagerId: number, from: [number, number]): number | null {
+    const best = this.peekBest(from);
+    if (!best) return null;
+    best.claimedBy = villagerId;
+    return best.id;
+  }
+
+  private beginWander(index: number): void {
+    const villager = this.villagers[index];
+    const from = this.posToTile(villager.x, villager.y);
+    const target = wanderTile(
+      from,
+      this.seed,
+      this.clock.tick,
+      villager.id,
+      this.terrain.width,
+      this.terrain.height,
+      (x, y) => this.isPassable(x, y),
+    );
+    if (!target) {
+      villager.currentAction = 'wander';
+      return;
+    }
+    const path = this.computePath(from, target);
+    if (path) {
+      villager.state = 'moving';
+      villager.purpose = 'wander';
+      villager.target = target;
+      villager.path = path;
+      villager.currentAction = 'wander';
+    } else {
+      villager.currentAction = 'wander';
+      villager.repathCooldown = REPATH_COOLDOWN_TICKS;
+    }
+  }
+
+  private tickEating(index: number): void {
+    const villager = this.villagers[index];
+    if (villager.activityTicks <= 1) {
+      villager.needs.hunger = 1;
+      recomputeHappiness(villager.needs);
+      villager.state = 'idle';
+      villager.path = null;
+      villager.target = null;
+      villager.purpose = null;
+    } else {
+      villager.activityTicks -= 1;
+    }
+  }
+
+  private tickSleeping(index: number): void {
+    const villager = this.villagers[index];
+    if (villager.activityTicks <= 1) {
+      villager.needs.energy = 1;
+      recomputeHappiness(villager.needs);
+      villager.state = 'idle';
+      villager.path = null;
+      villager.target = null;
+      villager.purpose = null;
+    } else {
+      villager.activityTicks -= 1;
+    }
+  }
+
+  private tickSocializing(index: number): void {
+    const villager = this.villagers[index];
+    const from = this.posToTile(villager.x, villager.y);
+    if (!this.partnerInRange(index, from)) {
+      villager.state = 'idle';
+      return;
+    }
+    if (villager.activityTicks <= 1) {
+      villager.needs.social = Math.min(1, villager.needs.social + SOCIAL_RESTORE);
+      recomputeHappiness(villager.needs);
+      villager.state = 'idle';
+      villager.path = null;
+      villager.target = null;
+      villager.purpose = null;
+    } else {
+      villager.activityTicks -= 1;
+    }
+  }
+
+  private beginMoveToJob(index: number, tile: [number, number], jobId: number): void {
+    const villager = this.villagers[index];
+    const start = this.posToTile(villager.x, villager.y);
     if (start[0] === tile[0] && start[1] === tile[1]) {
-      this.villager.path = null;
-      this.villager.target = null;
-      this.villager.purpose = null;
-      this.villager.state = 'working';
-      this.villager.workTicksRemaining = WORK_CYCLE_TICKS;
+      villager.path = null;
+      villager.target = null;
+      villager.purpose = null;
+      villager.state = 'working';
+      villager.workTicksRemaining = WORK_CYCLE_TICKS;
+      villager.currentJob = jobId;
       return;
     }
     const path = this.computePath(start, tile);
     if (!path) {
-      this.releaseCurrentJob();
-      this.villager.repathCooldown = REPATH_COOLDOWN_TICKS;
+      this.releaseJobAt(index);
+      villager.repathCooldown = REPATH_COOLDOWN_TICKS;
       return;
     }
-    this.villager.state = 'moving';
-    this.villager.purpose = 'work';
-    this.villager.target = tile;
-    this.villager.path = path;
+    villager.state = 'moving';
+    villager.purpose = 'work';
+    villager.target = tile;
+    villager.path = path;
   }
 
-  private tickWorking(): void {
-    if (this.villager.currentJob == null
-      || !this.jobs.some((job) => job.id === this.villager.currentJob)) {
-      this.villager.currentJob = null;
-      this.clearToIdle();
+  private tickWorking(index: number): void {
+    const villager = this.villagers[index];
+    if (villager.currentJob == null || !this.jobs.some((job) => job.id === villager.currentJob)) {
+      villager.currentJob = null;
+      this.clearToIdle(villager);
       return;
     }
-    if (this.villager.workTicksRemaining === WORK_CYCLE_TICKS) {
-      this.tendAutoPlant(this.villager.currentJob);
+    if (villager.workTicksRemaining === WORK_CYCLE_TICKS) {
+      this.tendAutoPlant(villager.currentJob);
     }
-    this.tendWaterCrops(this.villager.currentJob);
-    if (this.villager.workTicksRemaining <= 1) {
-      this.villager.workTicksRemaining = WORK_CYCLE_TICKS;
+    this.tendWaterCrops(villager.currentJob);
+    if (villager.workTicksRemaining <= 1) {
+      villager.workTicksRemaining = WORK_CYCLE_TICKS;
     } else {
-      this.villager.workTicksRemaining -= 1;
+      villager.workTicksRemaining -= 1;
     }
   }
 
@@ -707,102 +1154,113 @@ export class DemoWorld {
     });
   }
 
-  private tickMoving(target: [number, number], purpose: 'player' | 'work'): void {
-    if (this.pathIsBlocked(target)) {
-      this.tryRepath(target, purpose);
-      if (this.villager.state !== 'moving') return;
+  private tickMoving(index: number, target: [number, number], purpose: MovePurpose): void {
+    const villager = this.villagers[index];
+    if (this.pathIsBlocked(index, target)) {
+      this.tryRepath(index, target, purpose);
+      if (this.villagers[index].state !== 'moving') return;
     }
 
-    if (!this.villager.path || this.villager.path.length === 0) {
-      const start = this.posToTile(this.villager.x, this.villager.y);
+    if (!villager.path || villager.path.length === 0) {
+      const start = this.posToTile(villager.x, villager.y);
       if (start[0] === target[0] && start[1] === target[1]) {
-        this.onArrived(purpose);
+        this.onArrived(index, purpose);
         return;
       }
-      this.tryRepath(target, purpose);
-      if (!this.villager.path || this.villager.path.length === 0) return;
+      this.tryRepath(index, target, purpose);
+      if (!this.villagers[index].path || this.villagers[index].path!.length === 0) return;
     }
 
-    const next = this.villager.path![0];
+    const next = this.villagers[index].path![0];
     const [cx, cy] = this.tileCenter(next[0], next[1]);
     const speedPx = (MOVE_SPEED_TILES_PER_SEC * this.terrain.tileSize) / TICKS_PER_SECOND;
-    const dx = cx - this.villager.x;
-    const dy = cy - this.villager.y;
+    const dx = cx - this.villagers[index].x;
+    const dy = cy - this.villagers[index].y;
     const dist = Math.hypot(dx, dy);
     if (dist <= speedPx || dist <= ARRIVE_EPSILON_PX) {
-      this.villager.x = cx;
-      this.villager.y = cy;
-      this.villager.path!.shift();
-      if (this.villager.path!.length === 0) this.onArrived(purpose);
+      this.villagers[index].x = cx;
+      this.villagers[index].y = cy;
+      this.villagers[index].path!.shift();
+      if (this.villagers[index].path!.length === 0) this.onArrived(index, purpose);
     } else {
-      this.villager.x += (dx / dist) * speedPx;
-      this.villager.y += (dy / dist) * speedPx;
+      this.villagers[index].x += (dx / dist) * speedPx;
+      this.villagers[index].y += (dy / dist) * speedPx;
     }
   }
 
-  private onArrived(purpose: 'player' | 'work'): void {
-    this.villager.path = null;
-    this.villager.target = null;
-    if (purpose === 'player') {
-      this.villager.purpose = null;
-      this.villager.state = 'idle';
+  private onArrived(index: number, purpose: MovePurpose): void {
+    const villager = this.villagers[index];
+    villager.path = null;
+    villager.target = null;
+    if (purpose === 'player' || purpose === 'wander') {
+      villager.purpose = null;
+      villager.state = 'idle';
       return;
     }
-    if (this.villager.currentJob != null
-      && this.jobs.some((job) => job.id === this.villager.currentJob)) {
-      this.villager.purpose = null;
-      this.villager.state = 'working';
-      this.villager.workTicksRemaining = WORK_CYCLE_TICKS;
+    if (villager.currentJob != null && this.jobs.some((job) => job.id === villager.currentJob)) {
+      villager.purpose = null;
+      villager.state = 'working';
+      villager.workTicksRemaining = WORK_CYCLE_TICKS;
       return;
     }
-    this.villager.currentJob = null;
-    this.villager.purpose = null;
-    this.villager.state = 'idle';
+    villager.currentJob = null;
+    villager.purpose = null;
+    villager.state = 'idle';
   }
 
-  private tryRepath(target: [number, number], purpose: 'player' | 'work'): void {
-    if (this.villager.repathCooldown > 0) {
-      this.clearToIdle();
+  private tryRepath(index: number, target: [number, number], purpose: MovePurpose): void {
+    const villager = this.villagers[index];
+    if (villager.repathCooldown > 0) {
+      this.clearToIdle(villager);
       return;
     }
-    const start = this.posToTile(this.villager.x, this.villager.y);
+    const start = this.posToTile(villager.x, villager.y);
     const path = this.computePath(start, target);
     if (path) {
-      this.villager.path = path;
-      this.villager.state = 'moving';
-      this.villager.purpose = purpose;
-      this.villager.target = target;
+      villager.path = path;
+      villager.state = 'moving';
+      villager.purpose = purpose;
+      villager.target = target;
     } else {
-      this.clearToIdle();
-      this.villager.repathCooldown = REPATH_COOLDOWN_TICKS;
-      if (purpose === 'work') this.releaseCurrentJob();
+      this.clearToIdle(villager);
+      villager.repathCooldown = REPATH_COOLDOWN_TICKS;
+      if (purpose === 'work') this.releaseJobAt(index);
     }
   }
 
-  private invalidatePathIfNeeded(): void {
-    if (this.villager.state !== 'moving' || !this.villager.target) return;
-    if (this.pathIsBlocked(this.villager.target)) {
-      this.tryRepath(this.villager.target, this.villager.purpose ?? 'player');
+  private invalidatePathsIfNeeded(): void {
+    const movers: Array<{ index: number; target: [number, number]; purpose: MovePurpose }> = [];
+    for (let i = 0; i < this.villagers.length; i += 1) {
+      const v = this.villagers[i];
+      if (v.state === 'moving' && v.target) {
+        movers.push({ index: i, target: v.target, purpose: v.purpose ?? 'player' });
+      }
+    }
+    for (const mover of movers) {
+      if (this.pathIsBlocked(mover.index, mover.target)) {
+        this.tryRepath(mover.index, mover.target, mover.purpose);
+      }
     }
   }
 
-  private pathIsBlocked(target: [number, number]): boolean {
+  private pathIsBlocked(index: number, target: [number, number]): boolean {
     if (!this.isPassable(target[0], target[1])) return true;
-    return (this.villager.path ?? []).some(([x, y]) => !this.isPassable(x, y));
+    return (this.villagers[index].path ?? []).some(([x, y]) => !this.isPassable(x, y));
   }
 
-  private clearToIdle(): void {
-    this.villager.state = 'idle';
-    this.villager.purpose = null;
-    this.villager.target = null;
-    this.villager.path = null;
+  private clearToIdle(villager: DemoVillager): void {
+    villager.state = 'idle';
+    villager.purpose = null;
+    villager.target = null;
+    villager.path = null;
   }
 
-  private releaseCurrentJob(): void {
-    if (this.villager.currentJob == null) return;
-    const job = this.jobs.find((entry) => entry.id === this.villager.currentJob);
-    if (job && job.claimedBy === this.villager.id) job.claimedBy = null;
-    this.villager.currentJob = null;
+  private releaseJobAt(index: number): void {
+    const villager = this.villagers[index];
+    if (villager.currentJob == null) return;
+    const job = this.jobs.find((entry) => entry.id === villager.currentJob);
+    if (job && job.claimedBy === villager.id) job.claimedBy = null;
+    villager.currentJob = null;
   }
 
   private computePath(start: [number, number], goal: [number, number]): Array<[number, number]> | null {
