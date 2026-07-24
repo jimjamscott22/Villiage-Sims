@@ -26,7 +26,9 @@ VillageSim is a Tauri 2 desktop app: an authoritative Rust simulation (`src-taur
   the active path forces a repath (or Idle + cooldown).
 - Clock + crops (M6): header speed controls (Pause/1×/2×/3×); Plant menu for wheat on completed
   farm tiles; crops grow by stage when watered in-season and stall in winter. TendCrops auto-plants
-  and waters. Next work is **M7** — see `progress.md`.
+  and waters.
+- Economy (M8): ResourceBar shows wood/stone/grain/flour/food/gold; mill/bakery recipes; hauling;
+  forest/rock gathering. Next work is **M9** — see `progress.md`.
 
 ### Non-obvious gotchas
 

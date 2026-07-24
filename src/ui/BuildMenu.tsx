@@ -1,9 +1,8 @@
-import type { BuildingDef, Catalog, CropDef, ResourceTotals, VillagerDetail } from '../state/types';
+import type { BuildingDef, Catalog, CropDef, VillagerDetail } from '../state/types';
 import { VillagerPanel } from './VillagerPanel';
 
 interface BuildMenuProps {
   catalog: Catalog | null;
-  resources: ResourceTotals | null;
   selectedKind: string | null;
   selectedCrop: string | null;
   selectedBuildingId: number | null;
@@ -19,9 +18,15 @@ function formatCost(cost: Record<string, number>): string {
     .join(', ');
 }
 
+function formatRecipe(building: BuildingDef): string {
+  if (!building.recipe) return '';
+  const inputs = Object.keys(building.recipe.inputs).join('+');
+  const outputs = Object.keys(building.recipe.outputs).join('+');
+  return ` · ${inputs}→${outputs}`;
+}
+
 export function BuildMenu({
   catalog,
-  resources,
   selectedKind,
   selectedCrop,
   selectedBuildingId,
@@ -32,18 +37,6 @@ export function BuildMenu({
 }: BuildMenuProps) {
   return (
     <aside className="flex w-56 shrink-0 flex-col gap-3 border-l border-white/10 bg-[#121c18] p-3 text-sm">
-      <div>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-white/50">Resources</h2>
-        <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-xs text-white/80">
-          <dt>Wood</dt>
-          <dd className="text-right tabular-nums">{resources?.wood ?? '—'}</dd>
-          <dt>Stone</dt>
-          <dd className="text-right tabular-nums">{resources?.stone ?? '—'}</dd>
-          <dt>Grain</dt>
-          <dd className="text-right tabular-nums">{resources?.grain ?? '—'}</dd>
-        </dl>
-      </div>
-
       <VillagerPanel detail={villagerDetail} />
 
       <div>
@@ -86,7 +79,10 @@ export function BuildMenu({
                   }`}
                 >
                   <div className="font-medium">{building.name}</div>
-                  <div className="text-[11px] text-white/55">{formatCost(building.cost)}</div>
+                  <div className="text-[11px] text-white/55">
+                    {formatCost(building.cost)}
+                    {formatRecipe(building)}
+                  </div>
                 </button>
               </li>
             );
