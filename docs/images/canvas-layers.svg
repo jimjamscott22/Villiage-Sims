@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 380" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+  <rect width="880" height="380" rx="16" fill="#17211b"/>
+  <text x="28" y="40" fill="#f7f4e9" font-size="20" font-weight="700">Three stacked canvases, redrawn at different rates</text>
+  <text x="28" y="62" fill="#a8b5aa" font-size="13">Terrain is pre-rendered once to an offscreen buffer and blitted; only what moves is redrawn each frame.</text>
+
+  <!-- isometric-ish stacked layers -->
+  <g transform="translate(120,110)">
+    <!-- skew via matrix for a stacked look -->
+    <g transform="matrix(1,0,-0.5,0.7,0,0)">
+      <!-- Terrain (bottom) -->
+      <g transform="translate(0,300)">
+        <rect width="300" height="200" fill="#3f7fbf"/>
+        <rect x="60" y="0" width="240" height="200" fill="#588a42"/>
+        <rect x="200" y="0" width="100" height="90" fill="#3a6b34"/>
+        <rect x="0" y="150" width="90" height="50" fill="#e2cd8f"/>
+        <g stroke="#0d140f" stroke-opacity="0.25">
+          <line x1="0" y1="50" x2="300" y2="50"/><line x1="0" y1="100" x2="300" y2="100"/><line x1="0" y1="150" x2="300" y2="150"/>
+          <line x1="75" y1="0" x2="75" y2="200"/><line x1="150" y1="0" x2="150" y2="200"/><line x1="225" y1="0" x2="225" y2="200"/>
+        </g>
+      </g>
+      <!-- Entities (middle) -->
+      <g transform="translate(0,150)">
+        <rect width="300" height="200" fill="#f7f4e9" fill-opacity="0.04" stroke="#3a4d36"/>
+        <rect x="90" y="70" width="60" height="60" fill="#a9713f" stroke="#6d431f" stroke-width="2"/>
+        <rect x="180" y="40" width="40" height="40" fill="#b7b0a0" stroke="#6f6a5c" stroke-width="2"/>
+        <circle cx="70" cy="120" r="10" fill="#e8a33d" stroke="#5a3a1e" stroke-width="2"/>
+        <circle cx="210" cy="140" r="10" fill="#d96a3a" stroke="#5a3a1e" stroke-width="2"/>
+      </g>
+      <!-- Overlay (top) -->
+      <g transform="translate(0,0)">
+        <rect width="300" height="200" fill="#5aa0d0" fill-opacity="0.05" stroke="#5aa0d0" stroke-opacity="0.5"/>
+        <rect x="120" y="60" width="90" height="90" fill="#8fce4f" fill-opacity="0.35" stroke="#8fce4f" stroke-width="2"/>
+        <rect x="120" y="60" width="30" height="30" fill="none" stroke="#8fce4f" stroke-width="1.5"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- labels -->
+  <g font-size="13">
+    <g transform="translate(560,120)">
+      <rect width="290" height="52" rx="8" fill="#1e2a2f" stroke="#5aa0d0"/>
+      <text x="14" y="22" fill="#5aa0d0" font-weight="700">Overlay</text>
+      <text x="14" y="40" fill="#a8b5aa" font-size="11">build ghost · selection · hover — every frame in build mode</text>
+    </g>
+    <g transform="translate(560,192)">
+      <rect width="290" height="52" rx="8" fill="#22301f" stroke="#e8a33d"/>
+      <text x="14" y="22" fill="#e8a33d" font-weight="700">Entities</text>
+      <text x="14" y="40" fill="#a8b5aa" font-size="11">buildings · crops · villagers — redrawn every frame</text>
+    </g>
+    <g transform="translate(560,264)">
+      <rect width="290" height="52" rx="8" fill="#22301f" stroke="#588a42"/>
+      <text x="14" y="22" fill="#8fce4f" font-weight="700">Terrain</text>
+      <text x="14" y="40" fill="#a8b5aa" font-size="11">tiles — drawn on load, patched only on dirty tiles</text>
+    </g>
+  </g>
+
+  <g stroke="#3a4d36" stroke-dasharray="3 3">
+    <line x1="470" y1="130" x2="558" y2="146"/>
+    <line x1="470" y1="210" x2="558" y2="218"/>
+    <line x1="470" y1="290" x2="558" y2="290"/>
+  </g>
+</svg>

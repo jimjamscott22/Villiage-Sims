@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 440" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+  <defs>
+    <marker id="arrowR" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#e8a33d"/></marker>
+    <marker id="arrowL" markerWidth="9" markerHeight="9" refX="2" refY="4.5" orient="auto"><path d="M9 0 L0 4.5 L9 9 Z" fill="#5aa0d0"/></marker>
+  </defs>
+
+  <rect width="880" height="440" rx="16" fill="#17211b"/>
+  <text x="28" y="42" fill="#f7f4e9" font-size="20" font-weight="700">Architecture — one authoritative world, one thin renderer</text>
+  <text x="28" y="64" fill="#a8b5aa" font-size="13">The frontend holds no authoritative state. It can be rebuilt from any snapshot.</text>
+
+  <!-- Rust side -->
+  <g transform="translate(28,92)">
+    <rect width="360" height="316" rx="12" fill="#22301f" stroke="#d96a3a" stroke-width="1.5"/>
+    <rect width="360" height="40" rx="12" fill="#d96a3a"/>
+    <rect y="24" width="360" height="16" fill="#d96a3a"/>
+    <text x="18" y="26" fill="#17211b" font-size="15" font-weight="700">RUST · simulation thread</text>
+    <text x="248" y="26" fill="#17211b" font-size="12" font-weight="600">20 Hz · 50 ms</text>
+
+    <g font-size="13" fill="#f7f4e9">
+      <g transform="translate(18,58)"><rect width="150" height="52" rx="8" fill="#2c3d29"/><text x="12" y="22" font-weight="600">World state</text><text x="12" y="40" fill="#a8b5aa" font-size="11">128×128 tiles · entities</text></g>
+      <g transform="translate(192,58)"><rect width="150" height="52" rx="8" fill="#2c3d29"/><text x="12" y="22" font-weight="600">Clock &amp; seasons</text><text x="12" y="40" fill="#a8b5aa" font-size="11">day · season · year</text></g>
+      <g transform="translate(18,120)"><rect width="150" height="52" rx="8" fill="#2c3d29"/><text x="12" y="22" font-weight="600">Utility AI</text><text x="12" y="40" fill="#a8b5aa" font-size="11">needs · jobs · pathfind</text></g>
+      <g transform="translate(192,120)"><rect width="150" height="52" rx="8" fill="#2c3d29"/><text x="12" y="22" font-weight="600">Economy</text><text x="12" y="40" fill="#a8b5aa" font-size="11">resources · buildings</text></g>
+    </g>
+
+    <rect x="18" y="188" width="324" height="46" rx="8" fill="#1a2618" stroke="#3a4d36"/>
+    <text x="30" y="208" fill="#e8a33d" font-size="12" font-weight="700">tick loop</text>
+    <text x="30" y="225" fill="#a8b5aa" font-size="11">drain commands → advance world → publish snapshot</text>
+
+    <rect x="18" y="244" width="324" height="52" rx="8" fill="#1a2618" stroke="#3a4d36"/>
+    <text x="30" y="264" fill="#f7f4e9" font-size="12" font-weight="700">Data-driven content</text>
+    <text x="30" y="282" fill="#a8b5aa" font-size="11">buildings.json · crops.json · traits.json (loaded at startup)</text>
+  </g>
+
+  <!-- Channels -->
+  <g transform="translate(388,150)">
+    <!-- commands in -->
+    <line x1="6" y1="40" x2="98" y2="40" stroke="#e8a33d" stroke-width="2.5" marker-end="url(#arrowR)"/>
+    <rect x="6" y="14" width="98" height="20" rx="10" fill="#22301f" stroke="#e8a33d"/>
+    <text x="55" y="28" fill="#e8a33d" font-size="11" font-weight="700" text-anchor="middle">commands</text>
+    <text x="55" y="58" fill="#a8b5aa" font-size="9" text-anchor="middle">mpsc channel</text>
+
+    <!-- snapshots out -->
+    <line x1="98" y1="128" x2="6" y2="128" stroke="#5aa0d0" stroke-width="2.5" marker-end="url(#arrowL)"/>
+    <rect x="6" y="102" width="98" height="20" rx="10" fill="#22301f" stroke="#5aa0d0"/>
+    <text x="55" y="116" fill="#5aa0d0" font-size="11" font-weight="700" text-anchor="middle">snapshots</text>
+    <text x="55" y="146" fill="#a8b5aa" font-size="9" text-anchor="middle">watch channel · latest only</text>
+  </g>
+
+  <!-- Frontend side -->
+  <g transform="translate(492,92)">
+    <rect width="360" height="316" rx="12" fill="#1e2a2f" stroke="#5aa0d0" stroke-width="1.5"/>
+    <rect width="360" height="40" rx="12" fill="#5aa0d0"/>
+    <rect y="24" width="360" height="16" fill="#5aa0d0"/>
+    <text x="18" y="26" fill="#0f1a20" font-size="15" font-weight="700">REACT · webview renderer</text>
+    <text x="250" y="26" fill="#0f1a20" font-size="12" font-weight="600">60 fps · RAF</text>
+
+    <g font-size="13" fill="#f7f4e9">
+      <g transform="translate(18,58)"><rect width="150" height="52" rx="8" fill="#26343a"/><text x="12" y="22" font-weight="600">Canvas stack</text><text x="12" y="40" fill="#a8b5aa" font-size="11">terrain · entities · overlay</text></g>
+      <g transform="translate(192,58)"><rect width="150" height="52" rx="8" fill="#26343a"/><text x="12" y="22" font-weight="600">Camera</text><text x="12" y="40" fill="#a8b5aa" font-size="11">pan · cursor zoom</text></g>
+      <g transform="translate(18,120)"><rect width="150" height="52" rx="8" fill="#26343a"/><text x="12" y="22" font-weight="600">Interpolation</text><text x="12" y="40" fill="#a8b5aa" font-size="11">smooth 20 → 60</text></g>
+      <g transform="translate(192,120)"><rect width="150" height="52" rx="8" fill="#26343a"/><text x="12" y="22" font-weight="600">UI chrome</text><text x="12" y="40" fill="#a8b5aa" font-size="11">build menu · panels</text></g>
+    </g>
+
+    <rect x="18" y="188" width="324" height="46" rx="8" fill="#16232a" stroke="#33474f"/>
+    <text x="30" y="208" fill="#5aa0d0" font-size="12" font-weight="700">render loop</text>
+    <text x="30" y="225" fill="#a8b5aa" font-size="11">interpolate positions → draw dirty layers each frame</text>
+
+    <rect x="18" y="244" width="324" height="52" rx="8" fill="#16232a" stroke="#33474f"/>
+    <text x="30" y="264" fill="#f7f4e9" font-size="12" font-weight="700">Rebuildable from a snapshot</text>
+    <text x="30" y="282" fill="#a8b5aa" font-size="11">terrain fetched once · deltas patch it · entities culled to viewport</text>
+  </g>
+</svg>

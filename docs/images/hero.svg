@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 400" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c2b20"/>
+      <stop offset="1" stop-color="#17211b"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffe9a8"/>
+      <stop offset="1" stop-color="#f0c419" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M30 0H0V30" fill="none" stroke="#0d140f" stroke-opacity="0.28" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="880" height="400" rx="16" fill="url(#sky)"/>
+
+  <!-- map area -->
+  <g transform="translate(20,20)">
+    <clipPath id="mapclip"><rect width="840" height="300" rx="10"/></clipPath>
+    <g clip-path="url(#mapclip)">
+      <!-- base grass -->
+      <rect width="840" height="300" fill="#588a42"/>
+      <!-- lighter grass patches -->
+      <rect x="120" y="30" width="360" height="180" fill="#63975096" rx="30"/>
+
+      <!-- water bottom-left bay -->
+      <path d="M0 300 L0 150 Q120 175 150 300 Z" fill="#3f7fbf"/>
+      <path d="M0 300 L0 190 Q90 205 110 300 Z" fill="#356fa8"/>
+      <!-- sand shoreline -->
+      <path d="M0 150 Q120 175 150 300 L172 300 Q140 165 0 138 Z" fill="#e2cd8f"/>
+
+      <!-- forest cluster top-right -->
+      <rect x="600" y="0" width="240" height="150" fill="#3a6b34"/>
+      <g fill="#2c5a2b">
+        <circle cx="650" cy="40" r="20"/><circle cx="700" cy="70" r="24"/>
+        <circle cx="760" cy="35" r="22"/><circle cx="800" cy="90" r="26"/>
+        <circle cx="690" cy="120" r="20"/><circle cx="620" cy="95" r="18"/>
+        <circle cx="755" cy="115" r="20"/>
+      </g>
+      <g fill="#3f7d3a">
+        <circle cx="650" cy="40" r="12"/><circle cx="700" cy="70" r="14"/>
+        <circle cx="760" cy="35" r="13"/><circle cx="800" cy="90" r="15"/>
+        <circle cx="690" cy="120" r="12"/><circle cx="620" cy="95" r="11"/>
+        <circle cx="755" cy="115" r="12"/>
+      </g>
+
+      <!-- rocky highland top-left -->
+      <path d="M0 0 H180 Q160 70 60 80 Q20 84 0 60 Z" fill="#8a9489"/>
+      <g fill="#6f7a70">
+        <path d="M40 60 L70 15 L100 60 Z"/>
+        <path d="M95 62 L128 22 L160 62 Z"/>
+      </g>
+      <g fill="#c9d0c6">
+        <path d="M62 32 L70 15 L79 33 Z"/>
+        <path d="M120 40 L128 22 L137 41 Z"/>
+      </g>
+
+      <!-- grid overlay to read as tiles -->
+      <rect width="840" height="300" fill="url(#grid)"/>
+
+      <!-- sun glow -->
+      <circle cx="470" cy="60" r="90" fill="url(#sun)"/>
+      <circle cx="470" cy="60" r="22" fill="#ffe9a8"/>
+
+      <!-- Farm plot 3x3 (grid 30px) at tile (10,5) -->
+      <g transform="translate(300,150)">
+        <rect width="90" height="90" fill="#6b4a2f" stroke="#4d3420" stroke-width="2"/>
+        <g fill="#7a5334"><rect x="0" y="0" width="90" height="30"/><rect x="0" y="60" width="90" height="30"/></g>
+        <!-- crop rows at growth stages -->
+        <g fill="#8fce4f">
+          <circle cx="15" cy="15" r="4"/><circle cx="45" cy="15" r="6"/><circle cx="75" cy="15" r="8"/>
+          <circle cx="15" cy="45" r="5"/><circle cx="45" cy="45" r="7"/><circle cx="75" cy="45" r="9"/>
+          <circle cx="15" cy="75" r="6"/><circle cx="45" cy="75" r="8"/><circle cx="75" cy="75" r="10"/>
+        </g>
+        <g fill="#f0c419">
+          <circle cx="75" cy="15" r="3"/><circle cx="75" cy="45" r="3"/>
+          <circle cx="45" cy="75" r="3"/><circle cx="75" cy="75" r="4"/>
+        </g>
+      </g>
+
+      <!-- Hut 1x1 -->
+      <g transform="translate(240,120)">
+        <rect width="30" height="30" fill="#a9713f" stroke="#6d431f" stroke-width="2"/>
+        <path d="M-4 0 L15 -14 L34 0 Z" fill="#c98a4f" stroke="#6d431f" stroke-width="2"/>
+        <rect x="11" y="14" width="8" height="16" fill="#5a3a1e"/>
+      </g>
+
+      <!-- Granary 2x2 -->
+      <g transform="translate(430,120)">
+        <rect width="60" height="60" fill="#b7b0a0" stroke="#6f6a5c" stroke-width="2"/>
+        <path d="M-4 0 L30 -18 L64 0 Z" fill="#d8cfb8" stroke="#6f6a5c" stroke-width="2"/>
+        <rect x="20" y="26" width="20" height="34" fill="#6f6a5c"/>
+        <rect x="24" y="30" width="12" height="30" fill="#8a8474"/>
+      </g>
+
+      <!-- path (villager route) -->
+      <path d="M255 165 C 300 210, 340 205, 345 195" fill="none" stroke="#f7f4e9" stroke-opacity="0.5" stroke-width="2" stroke-dasharray="4 5"/>
+      <path d="M345 195 C 400 175, 440 165, 460 150" fill="none" stroke="#f7f4e9" stroke-opacity="0.35" stroke-width="2" stroke-dasharray="4 5"/>
+
+      <!-- villagers -->
+      <g>
+        <g transform="translate(345,193)"><circle r="7" fill="#e8a33d" stroke="#5a3a1e" stroke-width="2"/><circle cy="-3" r="3" fill="#f7f4e9"/></g>
+        <g transform="translate(258,165)"><circle r="7" fill="#d96a3a" stroke="#5a3a1e" stroke-width="2"/><circle cy="-3" r="3" fill="#f7f4e9"/></g>
+        <g transform="translate(455,150)"><circle r="7" fill="#5aa0d0" stroke="#1f3a52" stroke-width="2"/><circle cy="-3" r="3" fill="#f7f4e9"/></g>
+        <g transform="translate(520,215)"><circle r="7" fill="#9c6ad0" stroke="#3a2452" stroke-width="2"/><circle cy="-3" r="3" fill="#f7f4e9"/></g>
+      </g>
+    </g>
+    <rect width="840" height="300" rx="10" fill="none" stroke="#0d140f" stroke-opacity="0.5" stroke-width="2"/>
+  </g>
+
+  <!-- wordmark / caption -->
+  <g transform="translate(20,340)">
+    <text x="0" y="20" fill="#f7f4e9" font-size="26" font-weight="700" letter-spacing="0.5">VillageSim</text>
+    <text x="152" y="20" fill="#a8b5aa" font-size="14">an autonomous village, simulated in Rust and drawn on Canvas</text>
+    <g transform="translate(0,32)" font-size="11" fill="#a8b5aa">
+      <circle cx="6" cy="-4" r="5" fill="#588a42"/><text x="16" y="0">Grass</text>
+      <circle cx="66" cy="-4" r="5" fill="#3a6b34"/><text x="76" y="0">Forest</text>
+      <circle cx="132" cy="-4" r="5" fill="#3f7fbf"/><text x="142" y="0">Water</text>
+      <circle cx="196" cy="-4" r="5" fill="#e2cd8f"/><text x="206" y="0">Sand</text>
+      <circle cx="256" cy="-4" r="5" fill="#8a9489"/><text x="266" y="0">Rock</text>
+      <circle cx="316" cy="-4" r="5" fill="#e8a33d"/><text x="326" y="0">Villager</text>
+    </g>
+  </g>
+</svg>
