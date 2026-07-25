@@ -52,9 +52,14 @@ export default function App() {
     };
   }, [selectedVillagerId]);
 
+  const [population, setPopulation] = useState<number>(0);
+  const [housingCapacity, setHousingCapacity] = useState<number>(0);
+
   const onSnapshot = (snapshot: TickSnapshot) => {
     setResources(snapshot.resources);
     setClock(snapshot.clock);
+    setPopulation(snapshot.villagers.length);
+    setHousingCapacity(snapshot.housingCapacity ?? 0);
   };
 
   const onDemolish = async () => {
@@ -84,7 +89,7 @@ export default function App() {
           {transport.mode === 'tauri' ? 'Simulation connected' : 'Browser demo'}
         </span>
       </header>
-      <ResourceBar resources={resources} />
+      <ResourceBar resources={resources} population={population} housingCapacity={housingCapacity} />
       {error && (
         <p role="alert" className="bg-red-950/90 px-4 py-2 text-sm text-red-100">
           {error}
@@ -113,6 +118,7 @@ export default function App() {
           selectedCrop={selectedCrop}
           selectedBuildingId={selectedBuildingId}
           villagerDetail={villagerDetail}
+          population={population}
           onSelectKind={(kind) => {
             setSelectedKind(kind);
             setSelectedCrop(null);

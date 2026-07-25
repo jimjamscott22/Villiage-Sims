@@ -17,6 +17,8 @@ pub struct TerrainSnapshot {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum SimEvent {
     CropReady { id: u32 },
+    VillagerBorn { id: u32, name: String },
+    VillagerDied { id: u32, cause: String },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -27,6 +29,7 @@ pub struct TickSnapshot {
     pub buildings: Vec<BuildingView>,
     pub crops: Vec<CropView>,
     pub resources: ResourceTotals,
+    pub housing_capacity: u32,
     pub clock: ClockView,
     pub events: Vec<SimEvent>,
 }
@@ -66,4 +69,5 @@ pub struct VillagerDetail {
     pub happiness: f32,
     pub job_kind: Option<String>,
     pub job_site: Option<u32>,
+    pub traits: Vec<String>,
 }

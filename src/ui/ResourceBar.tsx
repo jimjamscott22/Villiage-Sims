@@ -2,6 +2,8 @@ import type { ResourceTotals } from '../state/types';
 
 interface ResourceBarProps {
   resources: ResourceTotals | null;
+  population?: number;
+  housingCapacity?: number;
 }
 
 const ENTRIES: Array<{ key: keyof ResourceTotals; label: string }> = [
@@ -13,12 +15,20 @@ const ENTRIES: Array<{ key: keyof ResourceTotals; label: string }> = [
   { key: 'gold', label: 'Gold' },
 ];
 
-export function ResourceBar({ resources }: ResourceBarProps) {
+export function ResourceBar({ resources, population, housingCapacity }: ResourceBarProps) {
   return (
     <div
       className="flex shrink-0 items-center gap-4 border-b border-white/10 bg-[#121c18] px-4 py-1.5 text-xs text-white/80"
       data-testid="resource-bar"
     >
+      {population != null && housingCapacity != null && (
+        <div className="flex items-baseline gap-1.5 border-r border-white/10 pr-3">
+          <span className="text-white/45">Pop</span>
+          <span className="tabular-nums text-emerald-400 font-medium">
+            {population}/{housingCapacity}
+          </span>
+        </div>
+      )}
       {ENTRIES.map(({ key, label }) => (
         <div key={key} className="flex items-baseline gap-1.5">
           <span className="text-white/45">{label}</span>

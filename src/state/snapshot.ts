@@ -34,6 +34,7 @@ export class SnapshotBuffer {
       buildings: this.current.buildings,
       crops: this.current.crops,
       resources: this.current.resources,
+      housingCapacity: this.current.housingCapacity,
       clock: this.current.clock,
       events: this.current.events,
     };

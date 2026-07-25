@@ -1,0 +1,17 @@
+[
+  {
+    "id": "fast_walker",
+    "name": "Fast Walker",
+    "description": "Moves 25% faster than average villagers."
+  },
+  {
+    "id": "green_thumb",
+    "name": "Green Thumb",
+    "description": "Tends crops with extraordinary skill."
+  },
+  {
+    "id": "strong_back",
+    "name": "Strong Back",
+    "description": "Can carry more goods when hauling."
+  }
+]

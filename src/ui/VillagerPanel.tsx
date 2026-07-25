@@ -37,6 +37,15 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
             <NeedBar label="Social" value={detail.social} />
             <NeedBar label="Happiness" value={detail.happiness} />
           </div>
+          {detail.traits && detail.traits.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {detail.traits.map((t) => (
+                <span key={t} className="rounded bg-emerald-950/80 px-1.5 py-0.5 text-[10px] text-emerald-300 border border-emerald-800/40">
+                  {t.replace(/_/g, ' ')}
+                </span>
+              ))}
+            </div>
+          )}
           <p className="text-[11px] text-white/50">
             Job:{' '}
             {detail.jobKind
