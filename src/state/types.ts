@@ -24,6 +24,7 @@ export interface VillagerDetail {
   happiness: number;
   jobKind: string | null;
   jobSite: number | null;
+  traits: string[];
 }
 
 export interface BuildingView {
@@ -52,7 +53,10 @@ export interface ClockView {
   speed: number;
 }
 
-export type SimEvent = { kind: 'cropReady'; id: number };
+export type SimEvent =
+  | { kind: 'cropReady'; id: number }
+  | { kind: 'villagerBorn'; id: number; name: string }
+  | { kind: 'villagerDied'; id: number; cause: string };
 
 export interface ResourceTotals {
   wood: number;
@@ -69,6 +73,7 @@ export interface TickSnapshot {
   buildings: BuildingView[];
   crops: CropView[];
   resources: ResourceTotals;
+  housingCapacity: number;
   clock: ClockView;
   events: SimEvent[];
 }
@@ -77,6 +82,11 @@ export interface RecipeDef {
   inputs: Record<string, number>;
   outputs: Record<string, number>;
   ticks: number;
+}
+
+export interface UnlockCondition {
+  minPopulation?: number;
+  requiresBuilding?: string;
 }
 
 export interface BuildingDef {
@@ -92,6 +102,7 @@ export interface BuildingDef {
   stores?: string[];
   capacity?: number;
   recipe?: RecipeDef;
+  unlockConditions?: UnlockCondition;
 }
 
 export interface CropDef {
@@ -105,9 +116,16 @@ export interface CropDef {
   seedCost?: Record<string, number>;
 }
 
+export interface TraitDef {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface Catalog {
   buildings: BuildingDef[];
   crops: CropDef[];
+  traits?: TraitDef[];
 }
 
 export interface PlacementValidity {

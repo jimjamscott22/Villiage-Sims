@@ -172,6 +172,14 @@ impl JobBoard {
         }
     }
 
+    pub fn release_claimed_by(&mut self, villager_id: u32) {
+        for job in &mut self.jobs {
+            if job.claimed_by == Some(villager_id) {
+                job.claimed_by = None;
+            }
+        }
+    }
+
     pub fn claim_id(&mut self, job_id: u32, villager_id: u32) -> bool {
         let Some(job) = self.jobs.iter_mut().find(|job| job.id == job_id) else {
             return false;

@@ -79,6 +79,10 @@ pub const WORK_CYCLE_TICKS: u32 = 40;
 pub const DEFAULT_JOB_PRIORITY: u8 = 10;
 
 pub const STARTING_VILLAGER_NAMES: [&str; 5] = ["Ash", "Briar", "Cora", "Dale", "Ellis"];
+pub const EXTRA_VILLAGER_NAMES: [&str; 15] = [
+    "Fenn", "Gwen", "Halle", "Ivy", "Jory", "Kael", "Lark", "Milo", "Nia", "Orin",
+    "Pippa", "Quinn", "Rowan", "Silas", "Talia",
+];
 
 #[derive(Clone, Debug)]
 pub struct Villager {
@@ -97,6 +101,10 @@ pub struct Villager {
     pub current_action: Option<ActionKind>,
     /// Goods in transit for a Haul job.
     pub carrying: Option<CarryStack>,
+    /// Villager traits.
+    pub traits: Vec<String>,
+    /// Ticks with hunger == 0.0.
+    pub starvation_ticks: u32,
 }
 
 impl Villager {
@@ -112,7 +120,14 @@ impl Villager {
             repath_cooldown: 0,
             current_action: None,
             carrying: None,
+            traits: Vec::new(),
+            starvation_ticks: 0,
         }
+    }
+
+    pub fn with_traits(mut self, traits: Vec<String>) -> Self {
+        self.traits = traits;
+        self
     }
 
     pub fn target_tile(&self) -> Option<(i32, i32)> {

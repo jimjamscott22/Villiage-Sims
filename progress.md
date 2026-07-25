@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-07-24 (M8 complete).
+Last updated: 2026-07-25 (M9 complete).
 
 ## Status
 
@@ -13,34 +13,30 @@ Last updated: 2026-07-24 (M8 complete).
 | M5 — Needs and a single job | Complete on `main` | #8 |
 | M6 — Clock and crops | Complete on `main` | #9 |
 | M7 — Utility AI | Complete on `main` | [#10](https://github.com/jimjamscott22/Villiage-Sims/pull/10) (+ [#11](https://github.com/jimjamscott22/Villiage-Sims/pull/11) hysteresis fix) |
-| **M8 — Economy and production chains** | **Complete** | [#12](https://github.com/jimjamscott22/Villiage-Sims/pull/12) |
-| M9–M10 | Later | — |
+| M8 — Economy and production chains | Complete on `main` | [#12](https://github.com/jimjamscott22/Villiage-Sims/pull/12) |
+| **M9 — Population and progression** | **Complete** | — |
+| M10 | Later | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
-M8 design: [`docs/superpowers/specs/2026-07-24-milestone-8-design.md`](docs/superpowers/specs/2026-07-24-milestone-8-design.md).
 
-## What works today (M1–M8)
+## What works today (M1–M9)
 
 - Tauri 2 + React Canvas; Rust owns a 20 Hz sim thread; frontend interpolates at RAF.
 - Seeded `128×128` island terrain (`noise`), pan/zoom camera, offscreen terrain blit.
 - `buildings.json` catalog (hut/farm/granary/mill/bakery); BuildMenu; ghost preview; place/demolish with costs/refunds.
 - Five villagers with utility AI (Eat/Sleep/Work/Socialize/Wander) + hysteresis; A* pathfinding.
-- Right-click a tile → nearest villager walks there; place a building on the active path forces a repath (or Idle + cooldown).
-- Needs decay; farms advertise `TendCrops` (harvest ready wheat → farm grain buffer); mill/bakery `Produce`; granary/mill/bakery `Haul`; forest/rock `Gather`.
-- Building inventories + camp stockpile; ResourceBar totals = stockpile + storage inventories.
-- Mill: grain→flour; Bakery: flour→food; haulers move buffers ↔ storage.
-- Completed Eat/Sleep/Socialize clear `current_action` so hysteresis cannot re-enter or starve Wander.
-- `VillagerPanel` via `get_villager_detail` (click a villager to select; needs never in tick payload).
-- Clock (day/season/year) + speed controls; crops grow by stage when watered in-season; TendCrops auto-plants/waters/harvests.
-- Tick snapshots carry villagers (with `state`), buildings, crops, clock, derived resources, events.
-- Browser-demo transport mirrors utility AI, multi-villager, clock, crops, economy, and detail for headless/cloud testing.
+- Needs decay; farms advertise `TendCrops`; mill/bakery `Produce`; granary/mill/bakery `Haul`; forest/rock `Gather`.
+- Population & Housing: base capacity + Hut capacity (+2/hut); automatic birth when under capacity; starvation death on zero hunger.
+- Character Traits: `traits.json` assigned to villagers and rendered in `VillagerPanel`.
+- Tech / Progression Tree: buildings locked in `BuildMenu` until population or building pre-requisites are met.
+- ResourceBar displays live population / housing capacity counter (`Pop X/Y`).
+- Browser-demo transport mirrors population dynamics, traits, unlock conditions, and housing for headless/cloud testing.
 
 ### Key paths
 
 - Spec: `docs/villagesim-spec.md`
-- Designs/plans: `docs/superpowers/specs/`, `docs/superpowers/plans/`
-- Rust sim: `src-tauri/src/sim/` (`economy.rs`, `nodes.rs`, `utility.rs`, `agents.rs`, `clock.rs`, `crops.rs`, `needs.rs`, `jobs.rs`, `world.rs`, …)
-- Frontend: `src/render/`, `src/state/`, `src/ui/` (`ClockBar`, `ResourceBar`, `BuildMenu`, `VillagerPanel`)
+- Rust sim: `src-tauri/src/sim/` (`agents.rs`, `catalog.rs`, `world.rs`, `jobs.rs`, …)
+- Frontend: `src/render/`, `src/state/`, `src/ui/` (`ResourceBar`, `BuildMenu`, `VillagerPanel`)
 - Cloud notes: `AGENTS.md`
 
 ### Verify
@@ -48,9 +44,9 @@ M8 design: [`docs/superpowers/specs/2026-07-24-milestone-8-design.md`](docs/supe
 ```bash
 npm test && npm run build
 cargo test --manifest-path src-tauri/Cargo.toml --lib
-npm run dev   # ResourceBar live; place farm/mill/bakery/granary; gather + haul + produce loop
+npm run dev
 ```
 
 ## Next up
 
-Milestone 9 — Population and progression.
+Milestone 10 — Persistence and polish.

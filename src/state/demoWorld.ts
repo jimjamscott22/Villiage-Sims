@@ -62,6 +62,9 @@ export const DEMO_CATALOG: Catalog = {
       capacity: 500,
       validTerrain: ['grass', 'sand'],
       jobs: [{ kind: 'haul', slots: 1 }],
+      unlockConditions: {
+        minPopulation: 5,
+      },
     },
     {
       id: 'mill',
@@ -80,6 +83,10 @@ export const DEMO_CATALOG: Catalog = {
         { kind: 'produce', slots: 1 },
         { kind: 'haul', slots: 1 },
       ],
+      unlockConditions: {
+        minPopulation: 6,
+        requiresBuilding: 'granary',
+      },
     },
     {
       id: 'bakery',
@@ -98,9 +105,18 @@ export const DEMO_CATALOG: Catalog = {
         { kind: 'produce', slots: 1 },
         { kind: 'haul', slots: 1 },
       ],
+      unlockConditions: {
+        minPopulation: 7,
+        requiresBuilding: 'mill',
+      },
     },
   ],
   crops: DEMO_CROPS,
+  traits: [
+    { id: 'fast_walker', name: 'Fast Walker', description: 'Moves 25% faster than average villagers.' },
+    { id: 'green_thumb', name: 'Green Thumb', description: 'Tends crops with extraordinary skill.' },
+    { id: 'strong_back', name: 'Strong Back', description: 'Can carry more goods when hauling.' },
+  ],
 };
 
 /** Matches Rust Terrain enum byte order. */
@@ -378,6 +394,7 @@ interface DemoVillager {
   activityTicks: number;
   currentAction: ActionKind | null;
   carrying: CarryStack | null;
+  traits: string[];
 }
 
 interface DemoClock {
@@ -508,6 +525,7 @@ export class DemoWorld {
         activityTicks: 0,
         currentAction: null,
         carrying: null,
+        traits: i === 0 ? ['fast_walker'] : i === 1 ? ['green_thumb'] : ['strong_back'],
       });
     }
   }
@@ -588,6 +606,18 @@ export class DemoWorld {
     return this.snapshot();
   }
 
+  housingCapacity(): number {
+    const base = 5;
+    let extra = 0;
+    for (const b of this.buildings) {
+      if (b.complete) {
+        const def = DEMO_CATALOG.buildings[b.kindIndex];
+        if (def?.houses) extra += def.houses;
+      }
+    }
+    return base + extra;
+  }
+
   snapshot(): TickSnapshot {
     const resources = this.deriveTotals();
     const clock: ClockView = {
@@ -615,6 +645,7 @@ export class DemoWorld {
       buildings: this.buildingViews(),
       crops,
       resources,
+      housingCapacity: this.housingCapacity(),
       clock,
       events: [...this.events],
     };
@@ -637,6 +668,7 @@ export class DemoWorld {
       happiness: villager.needs.happiness,
       jobKind: job?.kind ?? null,
       jobSite: job?.site ?? null,
+      traits: villager.traits ?? [],
     };
   }
 

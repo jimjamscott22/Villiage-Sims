@@ -30,7 +30,10 @@
     "stores": ["grain", "flour", "food"],
     "capacity": 500,
     "valid_terrain": ["grass", "sand"],
-    "jobs": [{ "kind": "haul", "slots": 1 }]
+    "jobs": [{ "kind": "haul", "slots": 1 }],
+    "unlock_conditions": {
+      "min_population": 5
+    }
   },
   {
     "id": "mill",
@@ -48,7 +51,11 @@
     "jobs": [
       { "kind": "produce", "slots": 1 },
       { "kind": "haul", "slots": 1 }
-    ]
+    ],
+    "unlock_conditions": {
+      "min_population": 6,
+      "requires_building": "granary"
+    }
   },
   {
     "id": "bakery",
@@ -66,6 +73,10 @@
     "jobs": [
       { "kind": "produce", "slots": 1 },
       { "kind": "haul", "slots": 1 }
-    ]
+    ],
+    "unlock_conditions": {
+      "min_population": 7,
+      "requires_building": "mill"
+    }
   }
 ]

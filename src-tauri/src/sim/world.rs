@@ -5,8 +5,8 @@ use crate::snapshot::{
 };
 
 use super::agents::{
-    AgentState, DEFAULT_JOB_PRIORITY, MOVE_SPEED_TILES_PER_SEC, MovePurpose, REPATH_COOLDOWN_TICKS,
-    STARTING_VILLAGER_NAMES, Villager, WORK_CYCLE_TICKS,
+    AgentState, DEFAULT_JOB_PRIORITY, EXTRA_VILLAGER_NAMES, MOVE_SPEED_TILES_PER_SEC, MovePurpose,
+    REPATH_COOLDOWN_TICKS, STARTING_VILLAGER_NAMES, Villager, WORK_CYCLE_TICKS,
 };
 use super::buildings::{
     BuildState, Building, PlacementResult, PlacementValidity, footprint_tiles, rotated_footprint,
@@ -109,6 +109,7 @@ impl World {
         let cx = self.width as i32 / 2;
         let cy = self.height as i32 / 2;
         let mut used = Vec::new();
+        let traits_pool: Vec<String> = self.catalog.traits.iter().map(|t| t.id.clone()).collect();
         for (i, name) in STARTING_VILLAGER_NAMES.iter().enumerate() {
             let id = (i as u32) + 1;
             let tile = self
@@ -116,7 +117,11 @@ impl World {
                 .unwrap_or((cx + i as i32, cy));
             used.push(tile);
             let pos = self.tile_center(tile.0, tile.1);
-            self.villagers.push(Villager::new(id, *name, pos));
+            let mut v_traits = Vec::new();
+            if !traits_pool.is_empty() {
+                v_traits.push(traits_pool[i % traits_pool.len()].clone());
+            }
+            self.villagers.push(Villager::new(id, *name, pos).with_traits(v_traits));
         }
     }
 
@@ -235,6 +240,68 @@ impl World {
         for index in 0..count {
             self.tick_villager_at(index);
         }
+        self.check_population_dynamics();
+    }
+
+    pub fn housing_capacity(&self) -> u32 {
+        let base = 5;
+        let building_houses: u32 = self
+            .buildings
+            .iter()
+            .filter(|b| b.state == BuildState::Complete)
+            .filter_map(|b| {
+                self.catalog
+                    .get(b.kind_index)
+                    .and_then(|def| def.houses)
+            })
+            .sum();
+        base + building_houses
+    }
+
+    fn check_population_dynamics(&mut self) {
+        // Starvation checks
+        let mut dead_ids = Vec::new();
+        for v in &mut self.villagers {
+            if v.needs.hunger == 0.0 {
+                v.starvation_ticks += 1;
+                if v.starvation_ticks >= 300 {
+                    dead_ids.push((v.id, v.name.clone()));
+                }
+            } else {
+                v.starvation_ticks = 0;
+            }
+        }
+        for (id, _name) in &dead_ids {
+            self.job_board.release_claimed_by(*id);
+            self.villagers.retain(|v| v.id != *id);
+            self.events.push(SimEvent::VillagerDied {
+                id: *id,
+                cause: "starvation".to_string(),
+            });
+        }
+
+        // Birth checks
+        let capacity = self.housing_capacity();
+        if (self.villagers.len() as u32) < capacity && self.clock.tick % 200 == 0 && !self.villagers.is_empty() {
+            let next_id = self.villagers.iter().map(|v| v.id).max().unwrap_or(0) + 1;
+            let name_idx = (next_id as usize) % EXTRA_VILLAGER_NAMES.len();
+            let name = EXTRA_VILLAGER_NAMES[name_idx].to_string();
+            let cx = self.width as i32 / 2;
+            let cy = self.height as i32 / 2;
+            if let Some(tile) = self.find_walkable_near(cx, cy) {
+                let pos = self.tile_center(tile.0, tile.1);
+                let traits_pool: Vec<String> = self.catalog.traits.iter().map(|t| t.id.clone()).collect();
+                let mut v_traits = Vec::new();
+                if !traits_pool.is_empty() {
+                    v_traits.push(traits_pool[(next_id as usize) % traits_pool.len()].clone());
+                }
+                self.villagers.push(Villager::new(next_id, name.clone(), pos).with_traits(v_traits));
+                self.events.push(SimEvent::VillagerBorn {
+                    id: next_id,
+                    name,
+                });
+            }
+        }
     }
 
     #[cfg(test)]
@@ -307,6 +374,7 @@ impl World {
             buildings: self.building_views(),
             crops: self.crops.iter().map(Crop::view).collect(),
             resources: derive_totals(&self.resources, &building_inventories, &self.catalog),
+            housing_capacity: self.housing_capacity(),
             clock: self.clock.view(),
             events: self.events.clone(),
         }
@@ -334,6 +402,7 @@ impl World {
             happiness: villager.needs.happiness,
             job_kind,
             job_site,
+            traits: villager.traits.clone(),
         })
     }
 

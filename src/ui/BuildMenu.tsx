@@ -7,6 +7,7 @@ interface BuildMenuProps {
   selectedCrop: string | null;
   selectedBuildingId: number | null;
   villagerDetail: VillagerDetail | null;
+  population?: number;
   onSelectKind: (kind: string | null) => void;
   onSelectCrop: (kind: string | null) => void;
   onDemolish: () => void;
@@ -31,6 +32,7 @@ export function BuildMenu({
   selectedCrop,
   selectedBuildingId,
   villagerDetail,
+  population = 0,
   onSelectKind,
   onSelectCrop,
   onDemolish,
@@ -69,16 +71,31 @@ export function BuildMenu({
         <ul className="mt-2 flex flex-col gap-1">
           {(catalog?.buildings ?? []).map((building: BuildingDef) => {
             const active = selectedKind === building.id;
+            const minPop = building.unlockConditions?.minPopulation;
+            const locked = minPop != null && population < minPop;
+
             return (
               <li key={building.id}>
                 <button
                   type="button"
+                  disabled={locked}
                   onClick={() => onSelectKind(active ? null : building.id)}
                   className={`w-full rounded px-2 py-2 text-left transition ${
-                    active ? 'bg-emerald-800/70 text-white' : 'bg-white/5 text-white/85 hover:bg-white/10'
+                    locked
+                      ? 'opacity-40 cursor-not-allowed bg-white/5 text-white/40'
+                      : active
+                        ? 'bg-emerald-800/70 text-white'
+                        : 'bg-white/5 text-white/85 hover:bg-white/10'
                   }`}
                 >
-                  <div className="font-medium">{building.name}</div>
+                  <div className="flex justify-between items-center font-medium">
+                    <span>{building.name}</span>
+                    {locked && (
+                      <span className="text-[10px] text-amber-400 font-normal">
+                        🔒 Pop {minPop}+
+                      </span>
+                    )}
+                  </div>
                   <div className="text-[11px] text-white/55">
                     {formatCost(building.cost)}
                     {formatRecipe(building)}
