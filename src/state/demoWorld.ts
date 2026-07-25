@@ -1057,12 +1057,17 @@ export class DemoWorld {
   }
 
   private peekBest(from: [number, number]): DemoJob | null {
-    let best: { job: DemoJob; score: number } | null = null;
+    let best: { job: DemoJob; distance: number } | null = null;
     for (const job of this.jobs) {
       if (job.claimedBy != null) continue;
       const dist = Math.abs(job.tile[0] - from[0]) + Math.abs(job.tile[1] - from[1]);
-      const score = job.priority / (1 + dist);
-      if (!best || score > best.score) best = { job, score };
+      if (
+        !best
+        || job.priority > best.job.priority
+        || (job.priority === best.job.priority && dist < best.distance)
+      ) {
+        best = { job, distance: dist };
+      }
     }
     return best?.job ?? null;
   }
@@ -1131,28 +1136,75 @@ export class DemoWorld {
     const villager = this.villagers[index];
     const from = this.posToTile(villager.x, villager.y);
 
-    let resolved: number | null = null;
-    if (villager.currentJob != null) {
-      if (this.jobs.some((job) => job.id === villager.currentJob)) {
-        resolved = villager.currentJob;
-      } else {
-        villager.currentJob = null;
+    const existing = villager.currentJob;
+    const ranked = this.jobs
+      .filter((job) => job.claimedBy == null || job.claimedBy === villager.id)
+      .map((job) => ({
+        job,
+        distance: Math.abs(job.tile[0] - from[0]) + Math.abs(job.tile[1] - from[1]),
+      }))
+      .sort((a, b) => (b.job.priority - a.job.priority) || (a.distance - b.distance))
+      .map(({ job }) => job.id);
+    const candidates = [existing, jobId, ...ranked]
+      .filter((id): id is number => id != null)
+      .filter((id, candidateIndex, ids) => ids.indexOf(id) === candidateIndex);
+
+    let claimed: number | null = null;
+    for (const candidate of candidates) {
+      const job = this.jobs.find((entry) => entry.id === candidate);
+      if (!job || (job.claimedBy != null && job.claimedBy !== villager.id)) continue;
+      if (!this.jobActionable(job, index)) continue;
+      if (!this.computePath(from, job.tile)) continue;
+      if (this.claimId(candidate, villager.id)) {
+        claimed = candidate;
+        break;
       }
     }
-
-    const preferred = resolved ?? jobId;
-    let claimed: number | null = null;
-    if (preferred != null && this.claimId(preferred, villager.id)) {
-      claimed = preferred;
-    } else {
-      claimed = this.claimBest(villager.id, from);
+    if (claimed == null) {
+      if (existing != null) this.releaseJobAt(index);
+      villager.currentAction = null;
+      return;
     }
-    if (claimed == null) return;
 
     villager.currentJob = claimed;
     villager.currentAction = 'work';
     const job = this.jobs.find((entry) => entry.id === claimed)!;
     this.beginMoveToJob(index, job.tile, claimed);
+  }
+
+  private jobActionable(job: DemoJob, villagerIndex: number): boolean {
+    switch (job.kind) {
+      case 'tend_crops':
+        return this.farmNeedsTending(job.site);
+      case 'gather':
+        return job.gatherTile != null
+          && this.nodes.some((node) => this.sameTile(node.tile, job.gatherTile!) && node.amount > 0);
+      case 'haul':
+        return this.villagers[villagerIndex].carrying != null || this.findHaulTask() != null;
+      case 'produce': {
+        const building = this.buildings.find((entry) => entry.id === job.site);
+        if (!building) return false;
+        if (building.recipeTicks > 0) return true;
+        const recipe = DEMO_CATALOG.buildings[building.kindIndex]?.recipe;
+        return recipe != null && Object.entries(recipe.inputs).every(
+          ([resource, amount]) => inventoryGet(building.inventory, resource) >= amount,
+        );
+      }
+    }
+  }
+
+  private farmNeedsTending(buildingId: number): boolean {
+    const tiles = this.farmFootprintTiles(buildingId);
+    if (tiles.length === 0) return false;
+    const season = SEASON_IDS[this.clock.season];
+    const canPlant = DEMO_CROPS.some((def) => def.id === 'wheat' && def.seasons.includes(season));
+    return tiles.some(([x, y]) => {
+      const crop = this.crops.find((entry) => entry.x === x && entry.y === y);
+      if (!crop) return canPlant;
+      const def = DEMO_CROPS[crop.kindIndex];
+      return crop.stage >= def.stages - 1
+        || (!crop.watered && def.seasons.includes(season));
+    });
   }
 
   private claimId(jobId: number, villagerId: number): boolean {
@@ -1161,13 +1213,6 @@ export class DemoWorld {
     if (job.claimedBy != null && job.claimedBy !== villagerId) return false;
     job.claimedBy = villagerId;
     return true;
-  }
-
-  private claimBest(villagerId: number, from: [number, number]): number | null {
-    const best = this.peekBest(from);
-    if (!best) return null;
-    best.claimedBy = villagerId;
-    return best.id;
   }
 
   private beginWander(index: number): void {
@@ -1308,6 +1353,15 @@ export class DemoWorld {
         break;
     }
     if (villager.state !== 'working' || villager.currentJob !== job.id) return;
+    if (
+      (job.kind === 'tend_crops' || job.kind === 'produce' || job.kind === 'haul')
+      && !this.jobActionable(job, index)
+    ) {
+      this.releaseJobAt(index);
+      this.clearToIdle(villager);
+      villager.currentAction = null;
+      return;
+    }
     if (villager.workTicksRemaining <= 1) {
       villager.workTicksRemaining = WORK_CYCLE_TICKS;
     } else {
@@ -1528,11 +1582,42 @@ export class DemoWorld {
 
     let count = this.jobs.filter((job) => job.kind === 'gather').length;
     if (count >= MAX_GATHER_JOBS) return;
-    for (const node of this.nodes) {
-      if (node.amount === 0 || count >= MAX_GATHER_JOBS) continue;
-      if (this.jobs.some((job) => job.kind === 'gather' && this.sameTile(job.gatherTile, node.tile))) continue;
-      const stand = this.gatherStandTile(node);
-      if (!stand) continue;
+
+    const resourceCounts: Record<ResourceNode['resource'], number> = { wood: 0, stone: 0 };
+    for (const job of this.jobs) {
+      if (job.kind !== 'gather' || !job.gatherTile) continue;
+      const node = this.nodes.find((entry) => this.sameTile(entry.tile, job.gatherTile!));
+      if (node) resourceCounts[node.resource] += 1;
+    }
+    const villagerTiles = this.villagers.map((villager) => this.posToTile(villager.x, villager.y));
+    const rawCandidates = this.nodes
+      .filter((node) =>
+        node.amount > 0
+        && !this.jobs.some((job) => job.kind === 'gather' && this.sameTile(job.gatherTile, node.tile)))
+      .map((node) => ({
+        node,
+        stand: this.gatherStandTile(node),
+        distance: Math.min(...villagerTiles.map(
+          (tile) => Math.abs(tile[0] - node.tile[0]) + Math.abs(tile[1] - node.tile[1]),
+        )),
+      }))
+      .filter((candidate): candidate is { node: ResourceNode; stand: [number, number]; distance: number } =>
+        candidate.stand != null)
+      .sort((a, b) => a.distance - b.distance);
+    const takeReachable = (resource: ResourceNode['resource']) => {
+      const index = rawCandidates.findIndex((candidate) =>
+        candidate.node.resource === resource
+        && villagerTiles.some((tile) => this.computePath(tile, candidate.stand) != null));
+      return index < 0 ? null : rawCandidates.splice(index, 1)[0];
+    };
+
+    while (count < MAX_GATHER_JOBS && rawCandidates.length > 0) {
+      const preferred: ResourceNode['resource'] =
+        resourceCounts.wood <= resourceCounts.stone ? 'wood' : 'stone';
+      const candidate = takeReachable(preferred)
+        ?? takeReachable(preferred === 'wood' ? 'stone' : 'wood');
+      if (!candidate) break;
+      const { node, stand } = candidate;
       const id = this.nextJobId;
       this.nextJobId += 1;
       this.jobs.push({
@@ -1544,6 +1629,7 @@ export class DemoWorld {
         claimedBy: null,
         gatherTile: node.tile,
       });
+      resourceCounts[node.resource] += 1;
       count += 1;
     }
   }

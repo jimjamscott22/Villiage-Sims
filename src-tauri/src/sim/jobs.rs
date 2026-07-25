@@ -186,28 +186,9 @@ impl JobBoard {
         }
     }
 
-    /// Claim the best unclaimed job by priority / (1 + manhattan distance).
-    pub fn claim_best(&mut self, villager_id: u32, from: (i32, i32)) -> Option<u32> {
-        let mut best: Option<(u32, f32)> = None;
-        for job in &self.jobs {
-            if job.claimed_by.is_some() {
-                continue;
-            }
-            let dist = (job.tile.0 - from.0).abs() + (job.tile.1 - from.1).abs();
-            let score = f32::from(job.priority) / (1.0 + dist as f32);
-            match best {
-                None => best = Some((job.id, score)),
-                Some((_, best_score)) if score > best_score => best = Some((job.id, score)),
-                _ => {}
-            }
-        }
-        let job_id = best.map(|(id, _)| id)?;
-        self.claim_id(job_id, villager_id).then_some(job_id)
-    }
-
     /// Peek best unclaimed (or already claimed by this villager) job without claiming.
     pub fn peek_best(&self, villager_id: u32, from: (i32, i32)) -> Option<(u32, u8, i32)> {
-        let mut best: Option<(u32, u8, i32, f32)> = None;
+        let mut best: Option<(u32, u8, i32)> = None;
         for job in &self.jobs {
             if let Some(owner) = job.claimed_by {
                 if owner != villager_id {
@@ -215,16 +196,18 @@ impl JobBoard {
                 }
             }
             let dist = (job.tile.0 - from.0).abs() + (job.tile.1 - from.1).abs();
-            let score = f32::from(job.priority) / (1.0 + dist as f32);
             match best {
-                None => best = Some((job.id, job.priority, dist, score)),
-                Some((_, _, _, best_score)) if score > best_score => {
-                    best = Some((job.id, job.priority, dist, score));
+                None => best = Some((job.id, job.priority, dist)),
+                Some((_, priority, best_dist))
+                    if job.priority > priority
+                        || (job.priority == priority && dist < best_dist) =>
+                {
+                    best = Some((job.id, job.priority, dist));
                 }
                 _ => {}
             }
         }
-        best.map(|(id, priority, dist, _)| (id, priority, dist))
+        best
     }
 
     #[cfg(test)]
@@ -252,7 +235,7 @@ mod tests {
     }
 
     #[test]
-    fn claim_prefers_closer_higher_priority() {
+    fn peek_prefers_closer_job_at_equal_priority() {
         let mut board = JobBoard::new();
         board.jobs.push(Job {
             id: 1,
@@ -272,10 +255,35 @@ mod tests {
             claimed_by: None,
             gather_tile: None,
         });
-        let claimed = board.claim_best(7, (0, 0)).unwrap();
-        assert_eq!(claimed, 2);
-        assert_eq!(board.get(2).unwrap().claimed_by, Some(7));
+        let best = board.peek_best(7, (0, 0)).unwrap();
+        assert_eq!(best.0, 2);
+        assert!(board.get(2).unwrap().claimed_by.is_none());
         assert!(board.get(1).unwrap().claimed_by.is_none());
+    }
+
+    #[test]
+    fn peek_prefers_priority_over_distance() {
+        let mut board = JobBoard::new();
+        board.jobs.push(Job {
+            id: 1,
+            kind: JobKind::Gather,
+            site: 0,
+            tile: (1, 0),
+            priority: 8,
+            claimed_by: None,
+            gather_tile: Some((1, 0)),
+        });
+        board.jobs.push(Job {
+            id: 2,
+            kind: JobKind::TendCrops,
+            site: 2,
+            tile: (10, 0),
+            priority: 10,
+            claimed_by: None,
+            gather_tile: None,
+        });
+
+        assert_eq!(board.peek_best(7, (0, 0)).map(|best| best.0), Some(2));
     }
 
     #[test]

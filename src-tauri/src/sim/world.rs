@@ -872,28 +872,54 @@ impl World {
     }
 
     fn begin_work(&mut self, index: usize, job_id: Option<u32>) {
-        // Resume existing claim.
         let villager_id = self.villagers[index].id;
         let from = self.pos_to_tile(self.villagers[index].pos);
-
-        let resolved = if let Some(existing) = self.villagers[index].current_job {
-            if self.job_board.get(existing).is_some() {
-                Some(existing)
-            } else {
-                self.villagers[index].current_job = None;
-                None
+        let existing = self.villagers[index].current_job;
+        let mut ranked: Vec<(u32, u8, i32)> = self
+            .job_board
+            .jobs()
+            .iter()
+            .filter(|job| job.claimed_by.is_none() || job.claimed_by == Some(villager_id))
+            .map(|job| {
+                let dist = (job.tile.0 - from.0).abs() + (job.tile.1 - from.1).abs();
+                (job.id, job.priority, dist)
+            })
+            .collect();
+        ranked.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
+        let mut candidates = Vec::new();
+        for candidate in existing
+            .into_iter()
+            .chain(job_id)
+            .chain(ranked.into_iter().map(|(id, _, _)| id))
+        {
+            if !candidates.contains(&candidate) {
+                candidates.push(candidate);
             }
-        } else {
-            None
+        }
+        let reachable = candidates.into_iter().find(|candidate| {
+            let Some(job) = self.job_board.get(*candidate) else {
+                return false;
+            };
+            (job.claimed_by.is_none() || job.claimed_by == Some(villager_id))
+                && self.job_actionable(job, index)
+                && self.compute_path(from, job.tile).is_some()
+        });
+        let Some(job_id) = reachable else {
+            if let Some(existing) = existing {
+                self.job_board.release(existing, villager_id);
+                self.villagers[index].current_job = None;
+            }
+            self.villagers[index].current_action = None;
+            return;
         };
-
-        let job_id = match resolved.or(job_id) {
-            Some(id) if self.job_board.claim_id(id, villager_id) => id,
-            _ => match self.job_board.claim_best(villager_id, from) {
-                Some(id) => id,
-                None => return,
-            },
-        };
+        if existing.is_some_and(|id| id != job_id) {
+            self.job_board.release(existing.unwrap(), villager_id);
+            self.villagers[index].current_job = None;
+        }
+        if !self.job_board.claim_id(job_id, villager_id) {
+            self.villagers[index].current_action = None;
+            return;
+        }
 
         self.villagers[index].current_job = Some(job_id);
         self.villagers[index].current_action = Some(ActionKind::Work);
@@ -903,6 +929,42 @@ impl World {
             .map(|job| job.tile)
             .expect("claimed job");
         self.begin_move_to_job(index, tile, job_id);
+    }
+
+    fn job_actionable(&self, job: &crate::sim::jobs::Job, villager_index: usize) -> bool {
+        match job.kind {
+            JobKind::TendCrops => self.farm_needs_tending(job.site),
+            JobKind::Gather => job.gather_tile.is_some_and(|tile| {
+                self.nodes
+                    .iter()
+                    .any(|node| node.tile == tile && node.amount > 0)
+            }),
+            JobKind::Haul => {
+                self.villagers[villager_index].carrying.is_some() || self.find_haul_task().is_some()
+            }
+            JobKind::Produce => {
+                let Some(building) = self
+                    .buildings
+                    .iter()
+                    .find(|building| building.id == job.site)
+                else {
+                    return false;
+                };
+                if building.recipe_ticks > 0 {
+                    return true;
+                }
+                let Some(recipe) = self
+                    .catalog
+                    .get(building.kind_index)
+                    .and_then(|def| def.recipe.as_ref())
+                else {
+                    return false;
+                };
+                recipe.inputs.iter().all(|(resource, amount)| {
+                    inventory_get(&building.inventory, resource) >= *amount
+                })
+            }
+        }
     }
 
     fn begin_wander(&mut self, index: usize) {
@@ -1097,6 +1159,19 @@ impl World {
             JobKind::Gather => self.tick_gather(job, ticks_remaining),
             JobKind::Produce => self.tick_produce(job),
             JobKind::Haul => self.tick_haul(index),
+        }
+        if matches!(
+            job_record.kind,
+            JobKind::TendCrops | JobKind::Produce | JobKind::Haul
+        ) && matches!(
+            self.villagers[index].state,
+            AgentState::Working { job: active, .. } if active == job
+        ) && !self.job_actionable(&job_record, index)
+        {
+            self.release_job_at(index);
+            self.villagers[index].clear_path_to_idle();
+            self.villagers[index].current_action = None;
+            return;
         }
         if !matches!(
             self.villagers[index].state,
@@ -1671,25 +1746,73 @@ impl World {
         if count >= MAX_GATHER_JOBS {
             return;
         }
-        let mut adverts = Vec::new();
-        for node in &self.nodes {
-            if node.amount == 0
-                || self.job_board.has_gather_for_node(node.tile)
-                || count + adverts.len() >= MAX_GATHER_JOBS
-            {
+
+        let mut wood_jobs = 0usize;
+        let mut stone_jobs = 0usize;
+        for job in self.job_board.jobs() {
+            let Some(node_tile) = job.gather_tile else {
                 continue;
-            }
-            if let Some(stand) = self.gather_stand_tile(node) {
-                adverts.push((stand, node.tile));
+            };
+            match self
+                .nodes
+                .iter()
+                .find(|node| node.tile == node_tile)
+                .map(|node| node.resource)
+            {
+                Some("wood") => wood_jobs += 1,
+                Some("stone") => stone_jobs += 1,
+                _ => {}
             }
         }
-        for (stand, node_tile) in adverts {
+        let villager_tiles: Vec<_> = self
+            .villagers
+            .iter()
+            .map(|villager| self.pos_to_tile(villager.pos))
+            .collect();
+        let mut raw_candidates: Vec<_> = self
+            .nodes
+            .iter()
+            .filter(|node| node.amount > 0 && !self.job_board.has_gather_for_node(node.tile))
+            .filter_map(|node| {
+                let stand = self.gather_stand_tile(node)?;
+                let distance = villager_tiles
+                    .iter()
+                    .map(|tile| (tile.0 - stand.0).abs() + (tile.1 - stand.1).abs())
+                    .min()
+                    .unwrap_or(i32::MAX);
+                Some((node.tile, stand, node.resource, distance))
+            })
+            .collect();
+        raw_candidates.sort_by_key(|candidate| candidate.3);
+
+        while count < MAX_GATHER_JOBS && !raw_candidates.is_empty() {
+            let preferred = if wood_jobs <= stone_jobs {
+                "wood"
+            } else {
+                "stone"
+            };
+            let find_reachable = |resource: &str| {
+                raw_candidates.iter().position(|candidate| {
+                    candidate.2 == resource
+                        && villager_tiles
+                            .iter()
+                            .any(|from| self.compute_path(*from, candidate.1).is_some())
+                })
+            };
+            let candidate_index = find_reachable(preferred)
+                .or_else(|| find_reachable(if preferred == "wood" { "stone" } else { "wood" }));
+            let Some(candidate_index) = candidate_index else {
+                break;
+            };
+            let (node_tile, stand, resource, _) = raw_candidates.remove(candidate_index);
             self.job_board
                 .advertise_gather(stand, node_tile, GATHER_PRIORITY);
-            count += 1;
-            if count >= MAX_GATHER_JOBS {
-                break;
+            if resource == "wood" {
+                wood_jobs += 1;
+            } else {
+                stone_jobs += 1;
             }
+            count += 1;
         }
     }
 
@@ -1730,6 +1853,25 @@ impl World {
         };
         let footprint = rotated_footprint(def, building.rotation);
         footprint_tiles(building.origin, footprint)
+    }
+
+    fn farm_needs_tending(&self, building_id: u32) -> bool {
+        let tiles = self.farm_footprint_tiles(building_id);
+        if tiles.is_empty() {
+            return false;
+        }
+        let can_plant = self
+            .catalog
+            .find_crop("wheat")
+            .is_some_and(|(_, def)| def.grows_in(self.clock.season));
+        tiles.into_iter().any(|tile| {
+            let Some(crop) = self.crops.iter().find(|crop| crop.tile == tile) else {
+                return can_plant;
+            };
+            self.catalog.get_crop(crop.kind_index).is_some_and(|def| {
+                crop.stage >= def.max_stage() || (!crop.watered && def.grows_in(self.clock.season))
+            })
+        })
     }
 
     fn tend_water_crops(&mut self, job_id: u32) {
@@ -1902,7 +2044,7 @@ mod tests {
     use super::*;
     use crate::sim::agents::{AgentState, MovePurpose};
     use crate::sim::clock::{Clock, Season};
-    use crate::sim::jobs::JobKind;
+    use crate::sim::jobs::{Job, JobKind};
     use crate::sim::needs::Needs;
     use crate::sim::terrain::Terrain;
     use crate::sim::utility::EAT_TICKS;
@@ -2582,6 +2724,80 @@ mod tests {
     }
 
     #[test]
+    fn gather_jobs_include_reachable_wood_and_stone_nodes() {
+        let mut world = grass_world();
+        world.nodes = (0..6)
+            .map(|i| ResourceNode::forest((i + 1, 1)))
+            .chain((0..6).map(|i| ResourceNode::rock((i + 1, 6))))
+            .collect();
+
+        world.refresh_gather_jobs();
+
+        let resources: Vec<_> = world
+            .job_board()
+            .jobs()
+            .iter()
+            .filter_map(|job| {
+                let tile = job.gather_tile?;
+                world
+                    .nodes
+                    .iter()
+                    .find(|node| node.tile == tile)
+                    .map(|node| node.resource)
+            })
+            .collect();
+        assert_eq!(
+            resources
+                .iter()
+                .filter(|resource| **resource == "wood")
+                .count(),
+            3
+        );
+        assert_eq!(
+            resources
+                .iter()
+                .filter(|resource| **resource == "stone")
+                .count(),
+            3
+        );
+    }
+
+    #[test]
+    fn work_claim_skips_unreachable_preferred_job() {
+        let mut world = grass_world();
+        for y in 0..8 {
+            world.tiles[y * 8 + 3] = Terrain::DeepWater as u8;
+        }
+        world.nodes = vec![ResourceNode::forest((4, 0)), ResourceNode::rock((0, 4))];
+        world.job_board.jobs_mut_for_test().extend([
+            Job {
+                id: 1,
+                kind: JobKind::Gather,
+                site: 0,
+                tile: (4, 0),
+                priority: 10,
+                claimed_by: None,
+                gather_tile: Some((4, 0)),
+            },
+            Job {
+                id: 2,
+                kind: JobKind::Gather,
+                site: 0,
+                tile: (0, 4),
+                priority: 8,
+                claimed_by: None,
+                gather_tile: Some((0, 4)),
+            },
+        ]);
+
+        world.begin_work(0, Some(1));
+
+        assert_eq!(world.villager().current_job, Some(2));
+        assert_eq!(world.job_board().get(1).unwrap().claimed_by, None);
+        assert_eq!(world.job_board().get(2).unwrap().claimed_by, Some(1));
+    }
+
+    #[test]
     fn produced_food_can_be_withdrawn_for_eating() {
         let mut world = grass_world();
         world.resources.stone = 100;
@@ -2631,5 +2847,48 @@ mod tests {
             .unwrap();
         assert!(matches!(world.villager().state, AgentState::Eating { .. }));
         assert_eq!(inventory_get(&granary.inventory, "food"), 1);
+    }
+
+    #[test]
+    fn autonomous_jobs_run_farm_to_bakery_chain() {
+        let mut world = World::generate(24, 24, 32, 1);
+        world.tiles = vec![Terrain::Grass as u8; 24 * 24];
+        world.occupancy = vec![None; 24 * 24];
+        world.nodes.clear();
+        world.job_board = JobBoard::new();
+        world.villagers.truncate(1);
+        world.resources.wood = 500;
+        world.resources.stone = 500;
+        place_complete(&mut world, "farm", 7, 7);
+        place_complete(&mut world, "granary", 12, 7);
+        place_complete(&mut world, "mill", 12, 11);
+        let bakery_id = place_complete(&mut world, "bakery", 8, 12);
+        let mut saw_grain = false;
+        let mut saw_flour = false;
+        let mut saw_bakery_food = false;
+
+        for _ in 0..20_000 {
+            world.advance();
+            saw_grain |= world
+                .buildings
+                .iter()
+                .any(|building| inventory_get(&building.inventory, "grain") > 0);
+            saw_flour |= world
+                .buildings
+                .iter()
+                .any(|building| inventory_get(&building.inventory, "flour") > 0);
+            saw_bakery_food |= world
+                .buildings
+                .iter()
+                .find(|building| building.id == bakery_id)
+                .is_some_and(|building| inventory_get(&building.inventory, "food") > 0);
+            if saw_grain && saw_flour && saw_bakery_food {
+                break;
+            }
+        }
+
+        assert!(saw_grain, "farm should harvest grain");
+        assert!(saw_flour, "mill should produce flour");
+        assert!(saw_bakery_food, "bakery should produce food");
     }
 }
