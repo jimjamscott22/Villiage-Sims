@@ -37,7 +37,8 @@ This is a parallel art track, not a milestone. It touches no sim code and adds o
 | Under construction | One scaffold sprite per footprint size (1×1, 2×2, 3×3), shared across buildings |
 | Villager sprites | 16×24; N/E/S authored at 4 walk frames + 1 idle; W is E mirrored; 1 lying pose |
 | Villager variety | Garment color hashed from villager `id` across six palette dyes |
-| Villager state | 8×8 bubble above head: fork / Zzz / speech / tool (hoe, sack, millstone by job kind) |
+| Villager state | 8×8 bubble above head: fork / Zzz / speech / tool. Generic tool for all workers; the specific tool (hoe, sack, millstone) only for the selected villager |
+| Rotation | No rotated art; sprites face south; `rot` stays data-only |
 | Facing | Derived from interpolation delta in `SnapshotBuffer`. No Rust or IPC change |
 | Animation clock | `frame = floor(tick / n) % frameCount` — deterministic, stateless |
 | Signature element | Animated 3-frame shoreline foam tracing the whole island |
@@ -208,7 +209,7 @@ State (`VillagerView.state`) selects the pose and bubble:
 |---|---|---|
 | 0 Idle | idle | — |
 | 1 Moving | walk cycle | — |
-| 2 Working | idle | tool, by `jobKind` |
+| 2 Working | idle | generic tool (specific tool if selected) |
 | 3 Eating | idle | fork |
 | 4 Sleeping | lying | Zzz |
 | 5 Socializing | idle | speech |
@@ -219,7 +220,11 @@ The tool bubble needs the villager's job kind, which is currently only in `get_v
 
 `state !== 2` draws the scaffold sprite for the building's footprint size instead of the building, with the progress bar restyled to a segmented pixel bar. `state === 2` draws the building sprite.
 
-Rotation (`rot`) swaps footprint width/height as it does today. Building sprites are authored facing south; rotation is conveyed by the footprint change and the ghost, not by four authored orientations — four orientations per building would quadruple the building art for a detail that reads weakly at 16px.
+Building sprites are authored facing **south only**. No rotated art, and the camera stays fixed-orientation.
+
+Note that all five buildings in `buildings.json` currently have square footprints — `[1,1]`, `[3,3]`, `[2,2]`, `[2,2]`, `[2,2]` — and `rot` only swaps footprint width and height. Rotation therefore has no observable effect in the game as it stands. `rot` stays in the data model because a future non-square building (a 2×3 dock or stable) would need it, but no art is spent on it and the redesign does not make it visible.
+
+This leaves the `R` key advertised in the canvas hint doing nothing. Removing that affordance is a one-line HUD change, but it is a gameplay decision rather than an art one, so it is **out of scope here** and flagged for a separate call.
 
 ### HUD
 
