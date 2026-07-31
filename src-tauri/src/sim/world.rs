@@ -2972,7 +2972,7 @@ mod tests {
                     .nodes
                     .iter()
                     .find(|node| node.tile == tile)
-                    .map(|node| node.resource)
+                    .map(|node| node.resource.as_str())
             })
             .collect();
         assert_eq!(

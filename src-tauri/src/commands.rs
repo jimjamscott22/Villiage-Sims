@@ -230,7 +230,6 @@ pub(crate) async fn load_game(
 mod tests {
     use super::*;
     use crate::sim::catalog::Catalog;
-    use crate::snapshot::TerrainSnapshot;
     use std::sync::mpsc;
 
     #[test]
