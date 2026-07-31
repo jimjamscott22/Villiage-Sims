@@ -1,9 +1,9 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::catalog::{BuildingDef, terrain_from_name};
 use super::terrain::Terrain;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BuildState {
     UnderConstruction { progress_ticks: u32 },
     Complete,
@@ -31,7 +31,7 @@ impl BuildState {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Building {
     pub id: u32,
     pub kind_index: u8,

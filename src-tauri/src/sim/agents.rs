@@ -1,10 +1,12 @@
+use serde::{Deserialize, Serialize};
+
 use super::economy::CarryStack;
 use super::needs::Needs;
 
 pub use super::utility::{ActionKind, EAT_TICKS, SLEEP_TICKS, SOCIALIZE_TICKS};
 
 /// Why the villager is walking to a tile.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MovePurpose {
     PlayerOrder,
     Work,
@@ -12,7 +14,7 @@ pub enum MovePurpose {
 }
 
 /// Villager FSM + utility-driven activity states (Milestone 7).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentState {
     Idle,
     MovingTo {
@@ -80,11 +82,11 @@ pub const DEFAULT_JOB_PRIORITY: u8 = 10;
 
 pub const STARTING_VILLAGER_NAMES: [&str; 5] = ["Ash", "Briar", "Cora", "Dale", "Ellis"];
 pub const EXTRA_VILLAGER_NAMES: [&str; 15] = [
-    "Fenn", "Gwen", "Halle", "Ivy", "Jory", "Kael", "Lark", "Milo", "Nia", "Orin",
-    "Pippa", "Quinn", "Rowan", "Silas", "Talia",
+    "Fenn", "Gwen", "Halle", "Ivy", "Jory", "Kael", "Lark", "Milo", "Nia", "Orin", "Pippa",
+    "Quinn", "Rowan", "Silas", "Talia",
 ];
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Villager {
     pub id: u32,
     pub name: String,

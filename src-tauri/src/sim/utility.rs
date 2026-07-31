@@ -1,11 +1,13 @@
 //! Utility AI scoring and action selection (Milestone 7).
 
+use serde::{Deserialize, Serialize};
+
 use super::clock::Clock;
 use super::jobs::JobBoard;
 use super::resources::ResourceTotals;
 
 /// Candidate actions scored each decide tick.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionKind {
     Eat,
     Sleep,

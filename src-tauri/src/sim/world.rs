@@ -1,7 +1,9 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+
+use serde::{Deserialize, Serialize};
 
 use crate::snapshot::{
-    BuildingView, SimEvent, TerrainSnapshot, TickSnapshot, VillagerDetail, VillagerView,
+    BuildingView, SimEvent, TerrainSnapshot, TickSnapshot, VillagerDetail, VillagerView, WorldInit,
 };
 
 use super::agents::{
@@ -40,7 +42,7 @@ pub const DEFAULT_HEIGHT: u32 = 128;
 pub const DEFAULT_TILE_SIZE: u32 = 32;
 pub const DEFAULT_SEED: u64 = 42;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 struct Viewport {
     x: f32,
     y: f32,
@@ -48,6 +50,7 @@ struct Viewport {
     h: f32,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct World {
     width: u32,
     height: u32,
@@ -63,9 +66,12 @@ pub struct World {
     resources: ResourceTotals,
     next_building_id: u32,
     next_crop_id: u32,
+    next_villager_id: u32,
     villagers: Vec<Villager>,
     job_board: JobBoard,
+    #[serde(skip)]
     events: Vec<SimEvent>,
+    #[serde(skip)]
     viewport: Viewport,
 }
 
@@ -91,6 +97,7 @@ impl World {
             resources: ResourceTotals::starting(),
             next_building_id: 1,
             next_crop_id: 1,
+            next_villager_id: 1,
             villagers: Vec::new(),
             job_board: JobBoard::new(),
             events: Vec::new(),
@@ -121,7 +128,9 @@ impl World {
             if !traits_pool.is_empty() {
                 v_traits.push(traits_pool[i % traits_pool.len()].clone());
             }
-            self.villagers.push(Villager::new(id, *name, pos).with_traits(v_traits));
+            self.villagers
+                .push(Villager::new(id, *name, pos).with_traits(v_traits));
+            self.next_villager_id = id.saturating_add(1);
         }
     }
 
@@ -221,6 +230,19 @@ impl World {
                 let result = self.advance_clock(days, season);
                 let _ = reply.send(result);
             }
+            SimCommand::GetTerrain { reply } => {
+                let _ = reply.send(self.terrain_snapshot());
+            }
+            SimCommand::SaveGame { path, reply } => {
+                let _ = reply.send(crate::persist::save_world(self, &path));
+            }
+            SimCommand::LoadGame { path, reply } => {
+                let result = crate::persist::load_world(&path).map(|loaded| {
+                    *self = loaded;
+                    self.world_init(crate::persist::SAVE_VERSION)
+                });
+                let _ = reply.send(result);
+            }
         }
     }
 
@@ -249,11 +271,7 @@ impl World {
             .buildings
             .iter()
             .filter(|b| b.state == BuildState::Complete)
-            .filter_map(|b| {
-                self.catalog
-                    .get(b.kind_index)
-                    .and_then(|def| def.houses)
-            })
+            .filter_map(|b| self.catalog.get(b.kind_index).and_then(|def| def.houses))
             .sum();
         base + building_houses
     }
@@ -282,30 +300,33 @@ impl World {
 
         // Birth checks
         let capacity = self.housing_capacity();
-        if (self.villagers.len() as u32) < capacity && self.clock.tick % 200 == 0 && !self.villagers.is_empty() {
-            let next_id = self.villagers.iter().map(|v| v.id).max().unwrap_or(0) + 1;
+        if (self.villagers.len() as u32) < capacity
+            && self.clock.tick % 200 == 0
+            && !self.villagers.is_empty()
+        {
+            let next_id = self.next_villager_id;
+            self.next_villager_id = self.next_villager_id.saturating_add(1);
             let name_idx = (next_id as usize) % EXTRA_VILLAGER_NAMES.len();
             let name = EXTRA_VILLAGER_NAMES[name_idx].to_string();
             let cx = self.width as i32 / 2;
             let cy = self.height as i32 / 2;
             if let Some(tile) = self.find_walkable_near(cx, cy) {
                 let pos = self.tile_center(tile.0, tile.1);
-                let traits_pool: Vec<String> = self.catalog.traits.iter().map(|t| t.id.clone()).collect();
+                let traits_pool: Vec<String> =
+                    self.catalog.traits.iter().map(|t| t.id.clone()).collect();
                 let mut v_traits = Vec::new();
                 if !traits_pool.is_empty() {
                     v_traits.push(traits_pool[(next_id as usize) % traits_pool.len()].clone());
                 }
-                self.villagers.push(Villager::new(next_id, name.clone(), pos).with_traits(v_traits));
-                self.events.push(SimEvent::VillagerBorn {
-                    id: next_id,
-                    name,
-                });
+                self.villagers
+                    .push(Villager::new(next_id, name.clone(), pos).with_traits(v_traits));
+                self.events
+                    .push(SimEvent::VillagerBorn { id: next_id, name });
             }
         }
     }
 
-    #[cfg(test)]
-    pub fn seed(&self) -> u64 {
+    pub(crate) fn seed(&self) -> u64 {
         self.seed
     }
 
@@ -351,6 +372,145 @@ impl World {
             tile_size: self.tile_size,
             tiles: self.tiles.clone(),
         }
+    }
+
+    pub(crate) fn world_init(&self, save_version: u32) -> WorldInit {
+        WorldInit {
+            seed: self.seed,
+            width: self.width,
+            height: self.height,
+            tile_size: self.tile_size,
+            tick: self.clock.tick,
+            save_version,
+        }
+    }
+
+    pub(crate) fn prepare_after_load(&mut self) -> Result<(), String> {
+        if self.width == 0 || self.height == 0 || self.tile_size == 0 {
+            return Err("save has invalid world dimensions".into());
+        }
+        let expected_len =
+            self.width
+                .checked_mul(self.height)
+                .ok_or_else(|| "save world dimensions overflow".to_string())? as usize;
+        if self.tiles.len() != expected_len || self.occupancy.len() != expected_len {
+            return Err("save world grid length does not match its dimensions".into());
+        }
+        if self
+            .tiles
+            .iter()
+            .any(|terrain| Terrain::from_u8(*terrain).is_none())
+        {
+            return Err("save contains an unknown terrain value".into());
+        }
+        self.catalog.validate()?;
+
+        let mut building_ids = BTreeSet::new();
+        let mut expected_occupancy = vec![None; expected_len];
+        for building in &self.buildings {
+            if building.id == 0 || !building_ids.insert(building.id) {
+                return Err(format!(
+                    "save contains invalid or duplicate building id {}",
+                    building.id
+                ));
+            }
+            let def = self
+                .catalog
+                .get(building.kind_index)
+                .ok_or_else(|| format!("building {} has an unknown kind", building.id))?;
+            for (x, y) in
+                footprint_tiles(building.origin, rotated_footprint(def, building.rotation))
+            {
+                if x < 0 || y < 0 || x >= self.width as i32 || y >= self.height as i32 {
+                    return Err(format!("building {} is outside the world", building.id));
+                }
+                let index = y as usize * self.width as usize + x as usize;
+                if expected_occupancy[index].replace(building.id).is_some() {
+                    return Err("save contains overlapping buildings".into());
+                }
+            }
+        }
+        if self.occupancy != expected_occupancy {
+            return Err("save building occupancy is inconsistent".into());
+        }
+        if self.next_building_id <= building_ids.last().copied().unwrap_or(0) {
+            return Err("save has an invalid next building id".into());
+        }
+
+        let mut crop_ids = BTreeSet::new();
+        for crop in &self.crops {
+            if crop.id == 0 || !crop_ids.insert(crop.id) {
+                return Err(format!(
+                    "save contains invalid or duplicate crop id {}",
+                    crop.id
+                ));
+            }
+            let def = self
+                .catalog
+                .get_crop(crop.kind_index)
+                .ok_or_else(|| format!("crop {} has an unknown kind", crop.id))?;
+            if crop.kind != def.id {
+                return Err(format!(
+                    "crop {} kind does not match its catalog entry",
+                    crop.id
+                ));
+            }
+            if crop.tile.0 < 0
+                || crop.tile.1 < 0
+                || crop.tile.0 >= self.width as i32
+                || crop.tile.1 >= self.height as i32
+            {
+                return Err(format!("crop {} is outside the world", crop.id));
+            }
+        }
+        if self.next_crop_id <= crop_ids.last().copied().unwrap_or(0) {
+            return Err("save has an invalid next crop id".into());
+        }
+
+        let mut villager_ids = BTreeSet::new();
+        let world_width = self.width as f32 * self.tile_size as f32;
+        let world_height = self.height as f32 * self.tile_size as f32;
+        for villager in &self.villagers {
+            if villager.id == 0 || !villager_ids.insert(villager.id) {
+                return Err(format!(
+                    "save contains invalid or duplicate villager id {}",
+                    villager.id
+                ));
+            }
+            if !villager.pos.0.is_finite()
+                || !villager.pos.1.is_finite()
+                || villager.pos.0 < 0.0
+                || villager.pos.1 < 0.0
+                || villager.pos.0 >= world_width
+                || villager.pos.1 >= world_height
+            {
+                return Err(format!("villager {} has an invalid position", villager.id));
+            }
+            for need in [
+                villager.needs.hunger,
+                villager.needs.energy,
+                villager.needs.social,
+                villager.needs.happiness,
+            ] {
+                if !need.is_finite() || !(0.0..=1.0).contains(&need) {
+                    return Err(format!("villager {} has invalid needs", villager.id));
+                }
+            }
+        }
+        if self.next_villager_id <= villager_ids.last().copied().unwrap_or(0) {
+            return Err("save has an invalid next villager id".into());
+        }
+        self.job_board
+            .validate_loaded(&villager_ids, &building_ids)?;
+
+        self.events.clear();
+        self.viewport = Viewport {
+            x: 0.0,
+            y: 0.0,
+            w: world_width,
+            h: world_height,
+        };
+        Ok(())
     }
 
     pub fn tick_snapshot(&self) -> TickSnapshot {
@@ -1289,7 +1449,7 @@ impl World {
         };
         let harvested = self.nodes[node_index].harvest_one();
         if let Some(resource) = harvested {
-            self.deposit_to_stockpile(resource, 1);
+            self.deposit_to_stockpile(&resource, 1);
         }
         if self.nodes[node_index].amount == 0 {
             let released = self.job_board.remove_gather_jobs_for_node(node_tile);
@@ -1826,7 +1986,7 @@ impl World {
                 .nodes
                 .iter()
                 .find(|node| node.tile == node_tile)
-                .map(|node| node.resource)
+                .map(|node| node.resource.as_str())
             {
                 Some("wood") => wood_jobs += 1,
                 Some("stone") => stone_jobs += 1,
@@ -1849,7 +2009,7 @@ impl World {
                     .map(|tile| (tile.0 - stand.0).abs() + (tile.1 - stand.1).abs())
                     .min()
                     .unwrap_or(i32::MAX);
-                Some((node.tile, stand, node.resource, distance))
+                Some((node.tile, stand, node.resource.as_str(), distance))
             })
             .collect();
         raw_candidates.sort_by_key(|candidate| candidate.3);
@@ -2812,7 +2972,7 @@ mod tests {
                     .nodes
                     .iter()
                     .find(|node| node.tile == tile)
-                    .map(|node| node.resource)
+                    .map(|node| node.resource.as_str())
             })
             .collect();
         assert_eq!(

@@ -35,7 +35,7 @@ impl CropDef {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Crop {
     pub id: u32,
     pub kind: String,

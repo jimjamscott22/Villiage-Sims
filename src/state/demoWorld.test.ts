@@ -490,8 +490,6 @@ describe('DemoWorld pathfinding', () => {
     expect(sawFlour).toBe(true);
     expect(sawBakeryFood).toBe(true);
   });
-<<<<<<< HEAD
-
   it('tracks housing capacity, villager traits, and unlock conditions', () => {
     const world = new DemoWorld(grassTerrain(16, 16));
     const snap = world.snapshot();
@@ -503,6 +501,33 @@ describe('DemoWorld pathfinding', () => {
     completeBuilding(world, 'hut', 4, 4);
     expect(world.snapshot().housingCapacity).toBe(7);
   });
-=======
->>>>>>> origin/main
+
+  it('round-trips the complete browser demo state', () => {
+    const world = new DemoWorld(grassTerrain(16, 16));
+    const hut = world.placeBuilding('hut', 4, 4, 0);
+    for (let i = 0; i < 75; i += 1) world.advance();
+    const saved = world.exportState();
+
+    world.demolish(hut.id);
+    world.advance();
+    const loaded = DemoWorld.importState(saved);
+
+    expect(loaded.exportState()).toBe(saved);
+    expect(loaded.snapshot()).toEqual(DemoWorld.importState(saved).snapshot());
+    expect(loaded.worldInit()).toMatchObject({
+      seed: 42,
+      width: 16,
+      height: 16,
+      tick: 75,
+      saveVersion: 1,
+    });
+  });
+
+  it('rejects unsupported browser save versions', () => {
+    const state = JSON.parse(new DemoWorld(grassTerrain()).exportState()) as Record<string, unknown>;
+    state.version = 99;
+    expect(() => DemoWorld.importState(JSON.stringify(state))).toThrow(
+      'unsupported save version 99 (expected 1)',
+    );
+  });
 });

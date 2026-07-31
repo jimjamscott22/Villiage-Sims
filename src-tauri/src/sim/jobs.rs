@@ -1,7 +1,10 @@
 /// Job board: buildings advertise jobs; villagers claim them.
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+
 use super::catalog::BuildingDef;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum JobKind {
     TendCrops,
     Gather,
@@ -30,7 +33,7 @@ impl JobKind {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Job {
     pub id: u32,
     pub kind: JobKind,
@@ -43,7 +46,7 @@ pub struct Job {
     pub gather_tile: Option<(i32, i32)>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct JobBoard {
     jobs: Vec<Job>,
     next_id: u32,
@@ -63,6 +66,43 @@ impl JobBoard {
 
     pub fn get(&self, id: u32) -> Option<&Job> {
         self.jobs.iter().find(|job| job.id == id)
+    }
+
+    pub(crate) fn validate_loaded(
+        &self,
+        villager_ids: &BTreeSet<u32>,
+        building_ids: &BTreeSet<u32>,
+    ) -> Result<(), String> {
+        let mut ids = BTreeSet::new();
+        for job in &self.jobs {
+            if job.id == 0 || !ids.insert(job.id) {
+                return Err(format!(
+                    "save contains invalid or duplicate job id {}",
+                    job.id
+                ));
+            }
+            if job.kind == JobKind::Gather {
+                if job.site != 0 || job.gather_tile.is_none() {
+                    return Err(format!("gather job {} has invalid site data", job.id));
+                }
+            } else if !building_ids.contains(&job.site) {
+                return Err(format!(
+                    "job {} references missing building {}",
+                    job.id, job.site
+                ));
+            }
+            if job
+                .claimed_by
+                .is_some_and(|villager| !villager_ids.contains(&villager))
+            {
+                return Err(format!("job {} references a missing villager", job.id));
+            }
+        }
+        let max_id = ids.last().copied().unwrap_or(0);
+        if self.next_id <= max_id {
+            return Err("save has an invalid next job id".into());
+        }
+        Ok(())
     }
 
     /// Advertise jobs for a completed building. `stand_tiles` are candidate

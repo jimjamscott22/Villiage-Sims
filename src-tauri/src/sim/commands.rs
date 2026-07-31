@@ -1,7 +1,9 @@
+use std::path::PathBuf;
+
 use tokio::sync::oneshot;
 
 use super::buildings::{PlacementResult, PlacementValidity};
-use crate::snapshot::VillagerDetail;
+use crate::snapshot::{TerrainSnapshot, VillagerDetail, WorldInit};
 
 pub enum SimCommand {
     SetViewport {
@@ -50,5 +52,16 @@ pub enum SimCommand {
         days: u32,
         season: Option<u8>,
         reply: oneshot::Sender<Result<(), String>>,
+    },
+    GetTerrain {
+        reply: oneshot::Sender<TerrainSnapshot>,
+    },
+    SaveGame {
+        path: PathBuf,
+        reply: oneshot::Sender<Result<(), String>>,
+    },
+    LoadGame {
+        path: PathBuf,
+        reply: oneshot::Sender<Result<WorldInit, String>>,
     },
 }

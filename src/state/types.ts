@@ -5,6 +5,15 @@ export interface TerrainSnapshot {
   tiles: number[];
 }
 
+export interface WorldInit {
+  seed: number;
+  width: number;
+  height: number;
+  tileSize: number;
+  tick: number;
+  saveVersion: number;
+}
+
 export interface VillagerView {
   id: number;
   x: number;

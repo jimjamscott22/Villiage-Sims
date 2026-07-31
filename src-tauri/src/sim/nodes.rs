@@ -1,5 +1,7 @@
 //! Resource nodes on forest/rock tiles (Milestone 8).
 
+use serde::{Deserialize, Serialize};
+
 use super::terrain::Terrain;
 
 pub const NODE_REGEN_TICKS: u32 = 200;
@@ -8,10 +10,10 @@ pub const ROCK_NODE_MAX: u32 = 4;
 pub const MAX_GATHER_JOBS: usize = 6;
 pub const GATHER_PRIORITY: u8 = 8;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceNode {
     pub tile: (i32, i32),
-    pub resource: &'static str,
+    pub resource: String,
     pub amount: u32,
     pub max: u32,
     pub regen_acc: u32,
@@ -21,7 +23,7 @@ impl ResourceNode {
     pub fn forest(tile: (i32, i32)) -> Self {
         Self {
             tile,
-            resource: "wood",
+            resource: "wood".into(),
             amount: FOREST_NODE_MAX,
             max: FOREST_NODE_MAX,
             regen_acc: 0,
@@ -31,7 +33,7 @@ impl ResourceNode {
     pub fn rock(tile: (i32, i32)) -> Self {
         Self {
             tile,
-            resource: "stone",
+            resource: "stone".into(),
             amount: ROCK_NODE_MAX,
             max: ROCK_NODE_MAX,
             regen_acc: 0,
@@ -50,12 +52,12 @@ impl ResourceNode {
         }
     }
 
-    pub fn harvest_one(&mut self) -> Option<&'static str> {
+    pub fn harvest_one(&mut self) -> Option<String> {
         if self.amount == 0 {
             return None;
         }
         self.amount -= 1;
-        Some(self.resource)
+        Some(self.resource.clone())
     }
 }
 
@@ -84,7 +86,7 @@ mod tests {
     #[test]
     fn harvest_and_regen() {
         let mut node = ResourceNode::forest((1, 1));
-        assert_eq!(node.harvest_one(), Some("wood"));
+        assert_eq!(node.harvest_one().as_deref(), Some("wood"));
         assert_eq!(node.amount, FOREST_NODE_MAX - 1);
         for _ in 0..NODE_REGEN_TICKS {
             node.tick_regen();

@@ -10,6 +10,7 @@ import type {
   TickSnapshot,
   Unlisten,
   VillagerDetail,
+  WorldInit,
 } from './types';
 import { generateDemoTerrain } from './demoTerrain';
 
@@ -37,6 +38,8 @@ interface Transport {
   getVillagerDetail(id: number): Promise<VillagerDetail>;
   plantCrop(kind: string, x: number, y: number): Promise<void>;
   advanceClock(days: number, season: number | null): Promise<void>;
+  saveGame(slot: number): Promise<void>;
+  loadGame(slot: number): Promise<WorldInit>;
 }
 
 class BrowserTransport implements Transport {
@@ -44,7 +47,8 @@ class BrowserTransport implements Transport {
   private elapsed = 0;
   private listeners = new Set<TickListener>();
   private timer: number | null = null;
-  private readonly world = new DemoWorld(generateDemoTerrain());
+  private world = new DemoWorld(generateDemoTerrain());
+  private readonly saves = new Map<number, string>();
 
   async getTerrain(): Promise<TerrainSnapshot> {
     return this.world.terrain;
@@ -112,6 +116,21 @@ class BrowserTransport implements Transport {
     this.emit(this.world.snapshot());
   }
 
+  async saveGame(slot: number): Promise<void> {
+    validateSlot(slot);
+    this.saves.set(slot, this.world.exportState());
+  }
+
+  async loadGame(slot: number): Promise<WorldInit> {
+    validateSlot(slot);
+    const saved = this.saves.get(slot);
+    if (saved == null) throw new Error(`save slot ${slot} is empty`);
+    this.world = DemoWorld.importState(saved);
+    this.elapsed = 0;
+    this.emit(this.world.snapshot());
+    return this.world.worldInit();
+  }
+
   advance(ms: number): void {
     this.elapsed += Math.max(0, ms);
     const speed = Math.max(1, this.world.speed || 0);
@@ -125,6 +144,12 @@ class BrowserTransport implements Transport {
 
   private emit(snapshot: TickSnapshot): void {
     this.listeners.forEach((listener) => listener(snapshot));
+  }
+}
+
+function validateSlot(slot: number): void {
+  if (!Number.isInteger(slot) || slot < 1 || slot > 3) {
+    throw new Error(`invalid save slot ${slot}; expected 1, 2, or 3`);
   }
 }
 
@@ -146,6 +171,8 @@ const tauriTransport: Transport = {
   getVillagerDetail: (id) => invoke<VillagerDetail>('get_villager_detail', { id }),
   plantCrop: (kind, x, y) => invoke('plant_crop', { kind, x, y }),
   advanceClock: (days, season) => invoke('advance_clock', { days, season }),
+  saveGame: (slot) => invoke('save_game', { slot }),
+  loadGame: (slot) => invoke<WorldInit>('load_game', { slot }),
 };
 
 export const transport: Transport = isTauri() ? tauriTransport : browserTransport;

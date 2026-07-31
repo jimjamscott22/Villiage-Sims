@@ -1,6 +1,6 @@
 //! In-game calendar and simulation speed (Milestone 6).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// In-game minutes added per logic tick at any speed.
 /// 1440 minutes / (20 real min × 60 s × 20 Hz) = 0.06.
@@ -8,7 +8,7 @@ pub const MINUTES_PER_TICK: f32 = 0.06;
 pub const MINUTES_PER_DAY: f32 = 1440.0;
 pub const DAYS_PER_SEASON: u32 = 28;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[repr(u8)]
 pub enum Season {
@@ -63,7 +63,7 @@ impl Season {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[repr(u8)]
 pub enum Speed {
@@ -112,7 +112,7 @@ pub struct ClockView {
     pub speed: u8,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Clock {
     pub tick: u64,
     /// Fractional in-game minutes accumulated within the current day.
