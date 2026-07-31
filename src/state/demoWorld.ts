@@ -13,6 +13,7 @@ import type {
   TerrainSnapshot,
   TickSnapshot,
   VillagerDetail,
+  WorldInit,
 } from './types';
 
 const DEMO_CROPS: CropDef[] = [
@@ -157,6 +158,7 @@ const SOCIALIZE_TICKS = 40;
 const SOCIAL_RESTORE = 0.5;
 const WANDER_RADIUS = 6;
 const DEMO_SEED = 42;
+export const DEMO_SAVE_VERSION = 1;
 
 type ActionKind = 'eat' | 'sleep' | 'work' | 'socialize' | 'wander';
 type MovePurpose = 'player' | 'work' | 'wander';
@@ -407,6 +409,24 @@ interface DemoClock {
   speed: number;
 }
 
+interface DemoSaveState {
+  version: number;
+  seed: number;
+  terrain: TerrainSnapshot;
+  resources: ResourceTotals;
+  buildings: DemoBuilding[];
+  crops: DemoCrop[];
+  nodes: ResourceNode[];
+  occupancy: Array<number | null>;
+  nextId: number;
+  nextCropId: number;
+  nextJobId: number;
+  nextVillagerId: number;
+  villagers: DemoVillager[];
+  jobs: DemoJob[];
+  clock: DemoClock;
+}
+
 interface ScoredAction {
   kind: ActionKind;
   score: number;
@@ -560,6 +580,80 @@ export class DemoWorld {
 
   get speed(): number {
     return this.clock.speed;
+  }
+
+  worldInit(saveVersion = DEMO_SAVE_VERSION): WorldInit {
+    return {
+      seed: this.seed,
+      width: this.terrain.width,
+      height: this.terrain.height,
+      tileSize: this.terrain.tileSize,
+      tick: this.clock.tick,
+      saveVersion,
+    };
+  }
+
+  exportState(): string {
+    const state: DemoSaveState = {
+      version: DEMO_SAVE_VERSION,
+      seed: this.seed,
+      terrain: this.terrain,
+      resources: this.resources,
+      buildings: this.buildings,
+      crops: this.crops,
+      nodes: this.nodes,
+      occupancy: this.occupancy,
+      nextId: this.nextId,
+      nextCropId: this.nextCropId,
+      nextJobId: this.nextJobId,
+      nextVillagerId: this.nextVillagerId,
+      villagers: this.villagers,
+      jobs: this.jobs,
+      clock: this.clock,
+    };
+    return JSON.stringify(state);
+  }
+
+  static importState(serialized: string): DemoWorld {
+    let state: DemoSaveState;
+    try {
+      state = JSON.parse(serialized) as DemoSaveState;
+    } catch (cause) {
+      throw new Error(`could not decode save: ${cause instanceof Error ? cause.message : String(cause)}`);
+    }
+    if (state == null || typeof state !== 'object') throw new Error('could not decode save: invalid data');
+    if (state.version !== DEMO_SAVE_VERSION) {
+      throw new Error(`unsupported save version ${String(state.version)} (expected ${DEMO_SAVE_VERSION})`);
+    }
+    if (state.seed !== DEMO_SEED) throw new Error('save header seed does not match the demo world');
+    if (
+      !state.terrain
+      || state.terrain.width <= 0
+      || state.terrain.height <= 0
+      || state.terrain.tileSize <= 0
+      || state.terrain.tiles.length !== state.terrain.width * state.terrain.height
+    ) {
+      throw new Error('save has invalid terrain');
+    }
+    if (state.occupancy?.length !== state.terrain.tiles.length) {
+      throw new Error('save has invalid occupancy');
+    }
+
+    const world = new DemoWorld(state.terrain);
+    world.resources = state.resources;
+    world.buildings = state.buildings;
+    world.crops = state.crops;
+    world.nodes = state.nodes;
+    world.occupancy = state.occupancy;
+    world.nextId = state.nextId;
+    world.nextCropId = state.nextCropId;
+    world.nextJobId = state.nextJobId;
+    world.nextVillagerId = state.nextVillagerId;
+    world.villagers = state.villagers;
+    world.jobs = state.jobs;
+    world.clock = state.clock;
+    world.events = [];
+    return world;
   }
 
   setViewport(_x: number, _y: number, _w: number, _h: number): void {

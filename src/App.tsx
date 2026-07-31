@@ -19,6 +19,9 @@ export default function App() {
   const [selectedVillagerId, setSelectedVillagerId] = useState<number | null>(1);
   const [villagerDetail, setVillagerDetail] = useState<VillagerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [worldKey, setWorldKey] = useState(0);
+  const [persistenceBusy, setPersistenceBusy] = useState(false);
+  const [persistenceStatus, setPersistenceStatus] = useState('Slot 1 · Not saved this session');
 
   useEffect(() => {
     void transport
@@ -80,6 +83,38 @@ export default function App() {
     }
   };
 
+  const onSave = async () => {
+    setPersistenceBusy(true);
+    try {
+      await transport.saveGame(1);
+      setPersistenceStatus('Slot 1 · Saved');
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setPersistenceBusy(false);
+    }
+  };
+
+  const onLoad = async () => {
+    if (!window.confirm('Load Slot 1? Unsaved progress will be lost.')) return;
+    setPersistenceBusy(true);
+    try {
+      await transport.loadGame(1);
+      setSelectedKind(null);
+      setSelectedCrop(null);
+      setSelectedBuildingId(null);
+      setRotation(0);
+      setWorldKey((key) => key + 1);
+      setPersistenceStatus('Slot 1 · Loaded');
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setPersistenceBusy(false);
+    }
+  };
+
   return (
     <main className="flex h-full flex-col bg-[#17211b] text-[#f7f4e9]">
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
@@ -97,6 +132,7 @@ export default function App() {
       )}
       <div className="flex min-h-0 flex-1">
         <Canvas
+          key={worldKey}
           catalog={catalog}
           selectedKind={selectedKind}
           selectedCrop={selectedCrop}
@@ -119,6 +155,8 @@ export default function App() {
           selectedBuildingId={selectedBuildingId}
           villagerDetail={villagerDetail}
           population={population}
+          persistenceStatus={persistenceStatus}
+          persistenceBusy={persistenceBusy}
           onSelectKind={(kind) => {
             setSelectedKind(kind);
             setSelectedCrop(null);
@@ -132,6 +170,12 @@ export default function App() {
           }}
           onDemolish={() => {
             void onDemolish();
+          }}
+          onSave={() => {
+            void onSave();
+          }}
+          onLoad={() => {
+            void onLoad();
           }}
         />
       </div>

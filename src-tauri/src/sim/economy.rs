@@ -2,6 +2,8 @@
 
 use std::collections::BTreeMap;
 
+use serde::{Deserialize, Serialize};
+
 use super::catalog::{BuildingDef, Catalog, RecipeDef};
 use super::resources::ResourceTotals;
 
@@ -10,7 +12,7 @@ pub const PRODUCTION_BUFFER_CAP: u32 = 30;
 /// Max units a villager carries per haul trip.
 pub const CARRY_STACK_MAX: u32 = 5;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HaulEndpoint {
     Stockpile,
     Building(u32),
@@ -24,7 +26,7 @@ pub struct HaulTask {
     pub to: HaulEndpoint,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CarryStack {
     pub resource: String,
     pub amount: u32,

@@ -14,6 +14,17 @@ pub struct TerrainSnapshot {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorldInit {
+    pub seed: u64,
+    pub width: u32,
+    pub height: u32,
+    pub tile_size: u32,
+    pub tick: u64,
+    pub save_version: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum SimEvent {
     CropReady { id: u32 },

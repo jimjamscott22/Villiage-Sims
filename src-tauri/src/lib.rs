@@ -1,4 +1,5 @@
 mod commands;
+mod persist;
 mod sim;
 mod snapshot;
 
@@ -26,12 +27,11 @@ pub fn run() {
     let app = tauri::Builder::default()
         .setup(|app| {
             let world = World::default_world();
-            let terrain = world.terrain_snapshot();
             let catalog = world.catalog().clone();
             let (snapshot_tx, snapshot_rx) = watch::channel(world.tick_snapshot());
             let (command_tx, command_rx) = mpsc::channel();
 
-            app.manage(AppState::new(terrain, catalog, command_tx));
+            app.manage(AppState::new(catalog, command_tx));
             app.manage(start_simulation(world, snapshot_tx, command_rx));
             forward_snapshots(app.handle().clone(), snapshot_rx);
             Ok(())
@@ -47,7 +47,9 @@ pub fn run() {
             commands::move_villager_to,
             commands::get_villager_detail,
             commands::plant_crop,
-            commands::advance_clock
+            commands::advance_clock,
+            commands::save_game,
+            commands::load_game
         ])
         .build(tauri::generate_context!())
         .expect("failed to build VillageSim");

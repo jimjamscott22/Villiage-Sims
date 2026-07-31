@@ -12,6 +12,15 @@ declare global {
         y: number,
         rotation: number,
       ): Promise<{ id: number }>;
+      saveGame(slot: number): Promise<void>;
+      loadGame(slot: number): Promise<{
+        seed: number;
+        width: number;
+        height: number;
+        tileSize: number;
+        tick: number;
+        saveVersion: number;
+      }>;
     };
   }
 }

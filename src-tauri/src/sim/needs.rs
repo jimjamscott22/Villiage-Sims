@@ -1,11 +1,12 @@
 /// Villager needs with per-tick decay (Milestone 5).
+use serde::{Deserialize, Serialize};
 
 /// Decay rates per 20 Hz tick (from villagesim-spec).
 pub const HUNGER_DECAY: f32 = 0.00008;
 pub const ENERGY_DECAY: f32 = 0.00005;
 pub const SOCIAL_DECAY: f32 = 0.00003;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Needs {
     /// 0.0 = starving, 1.0 = full
     pub hunger: f32,

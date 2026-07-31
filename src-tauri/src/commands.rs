@@ -1,36 +1,35 @@
+use std::path::PathBuf;
 use std::sync::mpsc;
 
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 use tokio::sync::oneshot;
 
 use crate::sim::buildings::{PlacementResult, PlacementValidity};
 use crate::sim::catalog::Catalog;
 use crate::sim::commands::SimCommand;
-use crate::snapshot::{TerrainSnapshot, VillagerDetail};
+use crate::snapshot::{TerrainSnapshot, VillagerDetail, WorldInit};
 
 pub struct AppState {
-    terrain: TerrainSnapshot,
     catalog: Catalog,
     commands: mpsc::Sender<SimCommand>,
 }
 
 impl AppState {
-    pub fn new(
-        terrain: TerrainSnapshot,
-        catalog: Catalog,
-        commands: mpsc::Sender<SimCommand>,
-    ) -> Self {
-        Self {
-            terrain,
-            catalog,
-            commands,
-        }
+    pub fn new(catalog: Catalog, commands: mpsc::Sender<SimCommand>) -> Self {
+        Self { catalog, commands }
     }
 }
 
 #[tauri::command]
-pub(crate) fn get_terrain(state: State<'_, AppState>) -> TerrainSnapshot {
-    state.terrain.clone()
+pub(crate) async fn get_terrain(state: State<'_, AppState>) -> Result<TerrainSnapshot, String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::GetTerrain { reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped get_terrain".to_string())
 }
 
 #[tauri::command]
@@ -176,6 +175,57 @@ pub(crate) async fn advance_clock(
         .map_err(|_| "simulation dropped advance_clock".to_string())?
 }
 
+fn validate_slot(slot: u8) -> Result<(), String> {
+    if (1..=3).contains(&slot) {
+        Ok(())
+    } else {
+        Err(format!("invalid save slot {slot}; expected 1, 2, or 3"))
+    }
+}
+
+fn save_slot_path(app: &AppHandle, slot: u8) -> Result<PathBuf, String> {
+    validate_slot(slot)?;
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("could not locate app data directory: {error}"))?;
+    Ok(app_data.join("saves").join(format!("slot-{slot}.vsav")))
+}
+
+#[tauri::command]
+pub(crate) async fn save_game(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    slot: u8,
+) -> Result<(), String> {
+    let path = save_slot_path(&app, slot)?;
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::SaveGame { path, reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped save_game".to_string())?
+}
+
+#[tauri::command]
+pub(crate) async fn load_game(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    slot: u8,
+) -> Result<WorldInit, String> {
+    let path = save_slot_path(&app, slot)?;
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::LoadGame { path, reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped load_game".to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,17 +236,18 @@ mod tests {
     #[test]
     fn app_state_holds_catalog() {
         let (tx, _rx) = mpsc::channel();
-        let state = AppState::new(
-            TerrainSnapshot {
-                width: 4,
-                height: 4,
-                tile_size: 32,
-                tiles: vec![0; 16],
-            },
-            Catalog::load_builtin().unwrap(),
-            tx,
-        );
+        let state = AppState::new(Catalog::load_builtin().unwrap(), tx);
         assert_eq!(state.catalog.buildings.len(), 5);
         assert_eq!(state.catalog.crops.len(), 1);
+    }
+
+    #[test]
+    fn save_slots_are_limited_to_three() {
+        assert!(validate_slot(1).is_ok());
+        assert!(validate_slot(3).is_ok());
+        assert_eq!(
+            validate_slot(4).unwrap_err(),
+            "invalid save slot 4; expected 1, 2, or 3"
+        );
     }
 }

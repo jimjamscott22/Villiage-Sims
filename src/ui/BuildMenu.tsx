@@ -8,9 +8,13 @@ interface BuildMenuProps {
   selectedBuildingId: number | null;
   villagerDetail: VillagerDetail | null;
   population?: number;
+  persistenceStatus: string;
+  persistenceBusy: boolean;
   onSelectKind: (kind: string | null) => void;
   onSelectCrop: (kind: string | null) => void;
   onDemolish: () => void;
+  onSave: () => void;
+  onLoad: () => void;
 }
 
 function formatCost(cost: Record<string, number>): string {
@@ -33,9 +37,13 @@ export function BuildMenu({
   selectedBuildingId,
   villagerDetail,
   population = 0,
+  persistenceStatus,
+  persistenceBusy,
   onSelectKind,
   onSelectCrop,
   onDemolish,
+  onSave,
+  onLoad,
 }: BuildMenuProps) {
   return (
     <aside className="flex w-56 shrink-0 flex-col gap-3 border-l border-white/10 bg-[#121c18] p-3 text-sm">
@@ -109,6 +117,29 @@ export function BuildMenu({
           Select a building or crop, then click the map. <kbd className="text-white/70">R</kbd> rotates,{' '}
           <kbd className="text-white/70">Esc</kbd> cancels. Middle-drag pans. Right-click to move.
         </p>
+      </div>
+
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-white/50">Game</h2>
+        <div className="mt-2 grid grid-cols-2 gap-1">
+          <button
+            type="button"
+            disabled={persistenceBusy}
+            onClick={onSave}
+            className="rounded bg-emerald-900/70 px-2 py-2 text-xs text-emerald-50 transition hover:bg-emerald-800/80 disabled:cursor-wait disabled:opacity-40"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            disabled={persistenceBusy}
+            onClick={onLoad}
+            className="rounded bg-white/5 px-2 py-2 text-xs text-white/85 transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-40"
+          >
+            Load
+          </button>
+        </div>
+        <p className="mt-1 text-[11px] text-white/45">{persistenceStatus}</p>
       </div>
 
       <div>
