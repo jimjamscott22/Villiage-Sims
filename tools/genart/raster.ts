@@ -26,6 +26,7 @@ export class Raster {
   }
 
   get(x: number, y: number): Rgba {
+    if (!this.inBounds(x, y)) return [0, 0, 0, 0];
     const index = (y * this.width + x) * 4;
     return [this.rgba[index], this.rgba[index + 1], this.rgba[index + 2], this.rgba[index + 3]];
   }

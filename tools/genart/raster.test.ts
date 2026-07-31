@@ -25,6 +25,14 @@ describe('Raster', () => {
     expect(Array.from(raster.rgba)).toEqual(new Array(16).fill(0));
   });
 
+  it('returns fully transparent for out-of-bounds reads', () => {
+    const raster = new Raster(2, 2);
+    raster.set(0, 0, RED);
+    expect(raster.get(-1, 0)).toEqual([0, 0, 0, 0]);
+    expect(raster.get(2, 0)).toEqual([0, 0, 0, 0]);
+    expect(raster.get(0, 5)).toEqual([0, 0, 0, 0]);
+  });
+
   it('blits a source raster at an offset', () => {
     const source = new Raster(1, 1);
     source.set(0, 0, BLUE);
