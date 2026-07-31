@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-07-25 (M9 complete).
+Last updated: 2026-07-31 (M10 persistence in progress).
 
 ## Status
 
@@ -15,7 +15,7 @@ Last updated: 2026-07-25 (M9 complete).
 | M7 — Utility AI | Complete on `main` | [#10](https://github.com/jimjamscott22/Villiage-Sims/pull/10) (+ [#11](https://github.com/jimjamscott22/Villiage-Sims/pull/11) hysteresis fix) |
 | M8 — Economy and production chains | Complete on `main` | [#12](https://github.com/jimjamscott22/Villiage-Sims/pull/12) |
 | **M9 — Population and progression** | **Complete** | — |
-| M10 | Later | — |
+| **M10 — Persistence and polish** | **In progress: manual save/load** | [#17](https://github.com/jimjamscott22/Villiage-Sims/pull/17) |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 
@@ -49,4 +49,4 @@ npm run dev
 
 ## Next up
 
-Milestone 10 — Persistence and polish.
+Finish Milestone 10: autosave rotation, weather, event log, and camera/interaction polish.
