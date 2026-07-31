@@ -4,7 +4,8 @@
 
 VillageSim is a Tauri 2 desktop app: an authoritative Rust simulation (`src-tauri/`) streams
 20 Hz snapshots to a React + Canvas renderer (`src/`). Standard dev/test/build commands are in
-`README.md`; the milestone roadmap is in `docs/villagesim-spec.md`.
+`README.md`; the milestone roadmap is in `docs/villagesim-spec.md`, and current milestone
+status/handoff notes are in `progress.md` (check this first — it's updated every milestone).
 
 ### Running / visual testing in the cloud VM
 
@@ -28,7 +29,15 @@ VillageSim is a Tauri 2 desktop app: an authoritative Rust simulation (`src-taur
   farm tiles; crops grow by stage when watered in-season and stall in winter. TendCrops auto-plants
   and waters.
 - Economy (M8): ResourceBar shows wood/stone/grain/flour/food/gold; mill/bakery recipes; hauling;
-  forest/rock gathering. Next work is **M9** — see `progress.md`.
+  forest/rock gathering.
+- Population & progression (M9): population grows automatically under housing capacity
+  (base + houses); traits (`traits.json`) render in `VillagerPanel`; a tech/unlock tree gates
+  buildings in `BuildMenu` until population/building prerequisites are met. Browser-demo mirrors
+  all of this, so it's fully testable headless.
+- Persistence (M10, in progress): Save/Load buttons in the build menu read/write a single fixed
+  slot (slot 1) via `saveGame`/`loadGame`. Desktop writes a versioned binary file
+  (`src-tauri/src/persist.rs`, `SAVE_VERSION`); browser-demo keeps saves in-memory only. Next up:
+  autosaves, weather, event log — see `progress.md`.
 
 ### Non-obvious gotchas
 
