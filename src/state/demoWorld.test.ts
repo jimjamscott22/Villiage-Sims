@@ -490,8 +490,6 @@ describe('DemoWorld pathfinding', () => {
     expect(sawFlour).toBe(true);
     expect(sawBakeryFood).toBe(true);
   });
-<<<<<<< HEAD
-
   it('tracks housing capacity, villager traits, and unlock conditions', () => {
     const world = new DemoWorld(grassTerrain(16, 16));
     const snap = world.snapshot();
@@ -503,6 +501,4 @@ describe('DemoWorld pathfinding', () => {
     completeBuilding(world, 'hut', 4, 4);
     expect(world.snapshot().housingCapacity).toBe(7);
   });
-=======
->>>>>>> origin/main
 });
