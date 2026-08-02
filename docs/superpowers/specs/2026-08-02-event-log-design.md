@@ -76,9 +76,9 @@ pub struct ChronicleEntry {
 pub enum ChronicleBody {
     VillagerBorn { id: u32, name: String },
     VillagerDied { id: u32, name: String, cause: String },
-    BuildingComplete { id: u32, kind: String },
-    BuildingUnlocked { kind: String },
-    HarvestReady { site: u32, kind: Option<String>, count: u32 },
+    BuildingComplete { id: u32, building: String },
+    BuildingUnlocked { building: String },
+    HarvestReady { site: u32, building: Option<String>, count: u32 },
     SeasonTurned { season: u8, year: u32 },
 }
 
@@ -92,9 +92,14 @@ pub struct Chronicle {
 `focus` is hoisted out of the variants so the drawer tests one field rather than matching six body
 types to decide clickability.
 
+The payload field is named `building`, **not** `kind`: the enum is tagged `#[serde(tag = "kind")]`,
+so a variant field of the same name would collide with the discriminant in the serialized form.
+`building` holds a `BuildingDef` id such as `"mill"`, resolved to a display name through the
+catalog.
+
 `VillagerDied` carries the villager's **name**, not just an id: the villager is removed from the
 store before the drawer renders, so the frontend cannot resolve it. `BuildingComplete` and
-`HarvestReady` carry `kind` for the same reason, plus a stronger one — buildings are
+`HarvestReady` carry `building` for the same reason, plus a stronger one — buildings are
 **viewport-culled** out of the tick snapshot, so an id alone is unresolvable whenever the subject is
 off-screen, which for an old log entry is most of the time. Every entry must be renderable from its
 own contents plus the catalog.
@@ -102,13 +107,15 @@ own contents plus the catalog.
 ### `Chronicle::push`
 
 ```rust
-pub fn push(&mut self, clock: &Clock, tick: u64, focus: Option<(i32, i32)>, body: ChronicleBody)
+pub fn push(&mut self, clock: &Clock, focus: Option<(i32, i32)>, body: ChronicleBody)
 ```
 
 `day`, `season`, and `year` are read off the `Clock` and stored on the entry; `season` is flattened
 to `u8` via the existing `Season::as_u8`.
 
 Behaviour:
+
+`tick` is read from `Clock::tick` rather than passed separately.
 
 1. **Coalesce.** If `body` is `HarvestReady { site, count, .. }` and the back entry is also
    `HarvestReady` for the same `site` with the same `day`/`season`/`year`, add `count` to the
@@ -139,9 +146,9 @@ value is what the snapshot exposes.
 `Crop` has no owning-building field (`crops.rs:39-48`), so `HarvestReady` resolves its farm from
 `tiles[idx].occupant` at the crop's tile:
 
-- **Occupied** — `site` is the building's id, `kind` is its building id string, focus is the
-  building origin. Renders as `"3 crops ready at Farm Plot"`.
-- **Unoccupied** — `site` is the crop's id, `kind` is `None`, focus is the crop tile. Renders as
+- **Occupied** — `site` is the building's id, `building` is its def id, focus is the building
+  origin. Renders as `"3 crops ready at Farm Plot"`.
+- **Unoccupied** — `site` is the crop's id, `building` is `None`, focus is the crop tile. Renders as
   `"3 crops ready"`. Coalescing then groups per crop rather than per farm, which is correct: there
   is no farm to group under.
 
@@ -169,6 +176,16 @@ Add to `World`:
 At the end of `advance()`, diff `satisfied_unlocks()` against `unlocked`; push one
 `BuildingUnlocked` per newly-present id, then store the new set. `BTreeSet` rather than `HashSet`
 for deterministic iteration order, per the determinism warning in `docs/villagesim-spec.md` §14.
+
+**`unlocked` must be seeded at world construction**, not left empty. `hut` and `farm` have no
+`unlock_conditions` and are therefore satisfied from tick zero; starting from an empty set would
+make the first tick emit "Hut unlocked" and "Farm Plot unlocked" into a brand-new village's
+chronicle. `World::generate` sets `unlocked = satisfied_unlocks()` once the world is fully built,
+so the opening state is silent.
+
+Note this also fixes a live bug: `BuildMenu.tsx:82-83` evaluates **only** `minPopulation` and
+ignores `requiresBuilding` entirely, so the mill currently unlocks on population alone without its
+granary. Moving the check into `satisfied_unlocks`, which evaluates both, corrects it.
 
 `TickSnapshot` gains `unlocked: Vec<String>` so `BuildMenu` reads the authoritative set instead of
 recomputing it. This is a small payload (at most five short ids today) and removes the duplicated
