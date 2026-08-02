@@ -15,6 +15,7 @@ use super::buildings::{
     terrain_allowed,
 };
 use super::catalog::Catalog;
+use super::chronicle::{Chronicle, ChronicleBody};
 use super::clock::Clock;
 use super::commands::SimCommand;
 use super::crops::{Crop, tick_crop};
@@ -69,6 +70,7 @@ pub struct World {
     next_villager_id: u32,
     villagers: Vec<Villager>,
     job_board: JobBoard,
+    chronicle: Chronicle,
     #[serde(skip)]
     events: Vec<SimEvent>,
     #[serde(skip)]
@@ -100,6 +102,7 @@ impl World {
             next_villager_id: 1,
             villagers: Vec::new(),
             job_board: JobBoard::new(),
+            chronicle: Chronicle::new(),
             events: Vec::new(),
             viewport: Viewport {
                 x: 0.0,
@@ -178,6 +181,10 @@ impl World {
         &self.clock
     }
 
+    pub fn chronicle(&self) -> &Chronicle {
+        &self.chronicle
+    }
+
     pub fn handle_command(&mut self, command: SimCommand) {
         match command {
             SimCommand::SetViewport { x, y, w, h } => {
@@ -252,6 +259,13 @@ impl World {
         if rollover.day {
             self.clear_all_crop_water();
         }
+        if rollover.season {
+            let body = ChronicleBody::SeasonTurned {
+                season: self.clock.season.as_u8(),
+                year: self.clock.year,
+            };
+            self.chronicle.push(&self.clock, None, body);
+        }
         self.complete_buildings();
         self.tick_crops();
         self.tick_nodes();
@@ -290,9 +304,20 @@ impl World {
                 v.starvation_ticks = 0;
             }
         }
-        for (id, _name) in &dead_ids {
+        for (id, name) in &dead_ids {
             self.job_board.release_claimed_by(*id);
+            let focus = self
+                .villagers
+                .iter()
+                .find(|v| v.id == *id)
+                .map(|v| self.world_to_tile(v.pos));
             self.villagers.retain(|v| v.id != *id);
+            let body = ChronicleBody::VillagerDied {
+                id: *id,
+                name: name.clone(),
+                cause: "starvation".to_string(),
+            };
+            self.chronicle.push(&self.clock, focus, body);
             self.events.push(SimEvent::VillagerDied {
                 id: *id,
                 cause: "starvation".to_string(),
@@ -321,6 +346,11 @@ impl World {
                 }
                 self.villagers
                     .push(Villager::new(next_id, name.clone(), pos).with_traits(v_traits));
+                let body = ChronicleBody::VillagerBorn {
+                    id: next_id,
+                    name: name.clone(),
+                };
+                self.chronicle.push(&self.clock, Some(tile), body);
                 self.events
                     .push(SimEvent::VillagerBorn { id: next_id, name });
             }
@@ -349,6 +379,11 @@ impl World {
     #[cfg(test)]
     pub fn villager_mut(&mut self) -> &mut Villager {
         &mut self.villagers[0]
+    }
+
+    #[cfg(test)]
+    pub fn villagers_mut_for_test(&mut self) -> &mut [Villager] {
+        &mut self.villagers
     }
 
     #[cfg(test)]
@@ -621,6 +656,22 @@ impl World {
             }
         }
         for building_id in newly_complete {
+            let entry = self
+                .buildings
+                .iter()
+                .find(|b| b.id == building_id)
+                .and_then(|b| {
+                    self.catalog
+                        .get(b.kind_index)
+                        .map(|def| (b.origin, def.id.clone()))
+                });
+            if let Some((origin, building)) = entry {
+                let body = ChronicleBody::BuildingComplete {
+                    id: building_id,
+                    building,
+                };
+                self.chronicle.push(&self.clock, Some(origin), body);
+            }
             self.advertise_jobs_for(building_id);
         }
     }
@@ -1656,6 +1707,13 @@ impl World {
         ((x as f32 + 0.5) * tile, (y as f32 + 0.5) * tile)
     }
 
+    fn world_to_tile(&self, pos: (f32, f32)) -> (i32, i32) {
+        (
+            (pos.0 / self.tile_size as f32).floor() as i32,
+            (pos.1 / self.tile_size as f32).floor() as i32,
+        )
+    }
+
     fn pos_to_tile(&self, pos: (f32, f32)) -> (i32, i32) {
         let tile = self.tile_size as f32;
         let x = (pos.0 / tile).floor() as i32;
@@ -1885,8 +1943,15 @@ impl World {
 
     pub fn advance_clock(&mut self, days: u32, season: Option<u8>) -> Result<(), String> {
         for _ in 0..days {
-            self.clock.force_day_rollover();
+            let rollover = self.clock.force_day_rollover();
             self.clear_all_crop_water();
+            if rollover.season {
+                let body = ChronicleBody::SeasonTurned {
+                    season: self.clock.season.as_u8(),
+                    year: self.clock.year,
+                };
+                self.chronicle.push(&self.clock, None, body);
+            }
         }
         if let Some(value) = season {
             self.clock.set_season(value)?;
@@ -1911,6 +1976,28 @@ impl World {
             }
         }
         for id in ready_ids {
+            let Some(crop_tile) = self.crops.iter().find(|c| c.id == id).map(|c| c.tile) else {
+                continue;
+            };
+            let index = (crop_tile.1 as u32 * self.width + crop_tile.0 as u32) as usize;
+            let occupant = self.occupancy.get(index).copied().flatten();
+            let (site, building, focus) = match occupant {
+                Some(building_id) => {
+                    let found = self.buildings.iter().find(|b| b.id == building_id);
+                    let def_id = found
+                        .and_then(|b| self.catalog.get(b.kind_index))
+                        .map(|def| def.id.clone());
+                    let origin = found.map(|b| b.origin).unwrap_or(crop_tile);
+                    (building_id, def_id, origin)
+                }
+                None => (id, None, crop_tile),
+            };
+            let body = ChronicleBody::HarvestReady {
+                site,
+                building,
+                count: 1,
+            };
+            self.chronicle.push(&self.clock, Some(focus), body);
             self.events.push(SimEvent::CropReady { id });
         }
     }
@@ -3120,5 +3207,70 @@ mod tests {
         assert!(saw_grain, "farm should harvest grain");
         assert!(saw_flour, "mill should produce flour");
         assert!(saw_bakery_food, "bakery should produce food");
+    }
+
+    #[test]
+    fn chronicle_records_building_completion() {
+        let mut world = World::generate(24, 24, 32, 7);
+        let before = world.chronicle().len();
+        // (5,5) sits in open water for this seed/size; (10,8) is solid grass
+        // near the generated island's centre and free of the villager spawn cluster.
+        world.place_building("hut", 10, 8, 0).expect("place hut");
+        for _ in 0..500 {
+            world.advance();
+        }
+        let entries = world.chronicle().to_vec();
+        assert!(
+            entries.len() > before,
+            "completing a building should record an entry"
+        );
+        assert!(
+            entries.iter().any(|e| matches!(
+                &e.body,
+                ChronicleBody::BuildingComplete { building, .. } if building == "hut"
+            )),
+            "expected a BuildingComplete entry for the hut, got {entries:?}"
+        );
+    }
+
+    #[test]
+    fn chronicle_records_season_turn() {
+        let mut world = World::generate(16, 16, 32, 3);
+        world.advance_clock(28, None).expect("advance a season");
+        assert!(
+            world
+                .chronicle()
+                .to_vec()
+                .iter()
+                .any(|e| matches!(e.body, ChronicleBody::SeasonTurned { .. })),
+            "crossing into a new season should record an entry"
+        );
+    }
+
+    #[test]
+    fn chronicle_death_entry_carries_the_name() {
+        let mut world = World::generate(16, 16, 32, 5);
+        // Deplete the food stockpile so the Eat action can never succeed and
+        // reset starvation_ticks via tick_eating's hunger=1.0 completion.
+        world.resources.food = 0;
+        // Starve the first villager: hunger 0 for 300 consecutive ticks.
+        let name = world.villagers()[0].name.clone();
+        world.villager_mut().needs.hunger = 0.0;
+        for _ in 0..320 {
+            world.villagers_mut_for_test()[0].needs.hunger = 0.0;
+            world.advance();
+        }
+        let died = world
+            .chronicle()
+            .to_vec()
+            .into_iter()
+            .find(|e| matches!(e.body, ChronicleBody::VillagerDied { .. }));
+        let Some(entry) = died else {
+            panic!("expected a death entry");
+        };
+        let ChronicleBody::VillagerDied { name: dead_name, .. } = entry.body else {
+            unreachable!();
+        };
+        assert_eq!(dead_name, name, "the entry must carry the name, not just an id");
     }
 }
