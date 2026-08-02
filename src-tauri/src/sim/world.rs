@@ -248,7 +248,8 @@ impl World {
 
     pub fn advance(&mut self) {
         self.events.clear();
-        if self.clock.advance_tick() {
+        let rollover = self.clock.advance_tick();
+        if rollover.day {
             self.clear_all_crop_water();
         }
         self.complete_buildings();

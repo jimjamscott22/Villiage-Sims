@@ -8,6 +8,13 @@ pub const MINUTES_PER_TICK: f32 = 0.06;
 pub const MINUTES_PER_DAY: f32 = 1440.0;
 pub const DAYS_PER_SEASON: u32 = 28;
 
+/// Which calendar boundaries a tick crossed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Rollover {
+    pub day: bool,
+    pub season: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[repr(u8)]
@@ -157,28 +164,34 @@ impl Clock {
         Ok(())
     }
 
-    /// Advance one logic tick. Returns `true` when a day boundary is crossed.
-    pub fn advance_tick(&mut self) -> bool {
+    /// Advance one logic tick, reporting any calendar boundaries crossed.
+    pub fn advance_tick(&mut self) -> Rollover {
         self.tick = self.tick.saturating_add(1);
         self.minute_accum += MINUTES_PER_TICK;
         self.minute = self.minute_accum.floor() as u32;
         if self.minute_accum < MINUTES_PER_DAY {
-            return false;
+            return Rollover::default();
         }
         self.minute_accum -= MINUTES_PER_DAY;
         self.minute = self.minute_accum.floor() as u32;
-        self.roll_day();
-        true
+        Rollover {
+            day: true,
+            season: self.roll_day(),
+        }
     }
 
     /// Jump forward one calendar day (debug / tests), resetting the minute clock.
-    pub fn force_day_rollover(&mut self) {
+    pub fn force_day_rollover(&mut self) -> Rollover {
         self.minute_accum = 0.0;
         self.minute = 0;
-        self.roll_day();
+        Rollover {
+            day: true,
+            season: self.roll_day(),
+        }
     }
 
-    fn roll_day(&mut self) {
+    /// Advance the calendar by one day. Returns `true` when the season changed.
+    fn roll_day(&mut self) -> bool {
         self.day += 1;
         if self.day > DAYS_PER_SEASON {
             self.day = 1;
@@ -187,7 +200,9 @@ impl Clock {
             if new_year {
                 self.year = self.year.saturating_add(1);
             }
+            return true;
         }
+        false
     }
 }
 
@@ -219,7 +234,8 @@ mod tests {
         let ticks_per_day = (MINUTES_PER_DAY / MINUTES_PER_TICK).round() as u32;
         let mut rolled = false;
         for _ in 0..ticks_per_day {
-            if clock.advance_tick() {
+            let rollover = clock.advance_tick();
+            if rollover.day {
                 rolled = true;
             }
         }
@@ -235,5 +251,19 @@ mod tests {
         assert_eq!(Speed::X2.tick_interval(base), base / 2);
         assert_eq!(Speed::X3.tick_interval(base), base / 3);
         assert_eq!(Speed::Paused.tick_interval(base), base);
+    }
+
+    #[test]
+    fn rollover_reports_season_change() {
+        let mut clock = Clock::new();
+        clock.day = DAYS_PER_SEASON;
+        let rollover = clock.force_day_rollover();
+        assert!(rollover.day);
+        assert!(rollover.season, "crossing the last day of a season is a season change");
+        assert_eq!(clock.season, Season::Summer);
+
+        let rollover = clock.force_day_rollover();
+        assert!(rollover.day);
+        assert!(!rollover.season, "an ordinary day is not a season change");
     }
 }
