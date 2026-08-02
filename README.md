@@ -74,6 +74,21 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib # Rust simulation tests
 cargo check --manifest-path src-tauri/Cargo.toml      # Rust typecheck
 ```
 
+### Art
+
+World and UI art is generated, not hand-drawn as binary assets. Sprite sources live in
+`tools/genart/` as declarative pixel data and material recipes; the generator rasterizes
+them into sprite sheets:
+
+```bash
+npm run art     # regenerate public/art/ from tools/genart/
+```
+
+`public/art/tiles.png` and `public/art/atlas.json` are **committed**, so `npm run dev`
+works without ever running the generator. A test regenerates the atlas and compares it
+to the committed output, so art and source cannot drift apart. If the atlas fails to
+load at runtime, the renderer falls back to flat-color drawing and the game stays playable.
+
 ---
 
 ## Project layout

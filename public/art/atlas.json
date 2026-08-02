@@ -1,0 +1,631 @@
+{
+  "sheets": {
+    "tiles": "tiles.png"
+  },
+  "cells": {
+    "foam.e": {
+      "sheet": "tiles",
+      "x": 0,
+      "y": 0,
+      "w": 16,
+      "h": 16,
+      "frames": 3
+    },
+    "foam.n": {
+      "sheet": "tiles",
+      "x": 48,
+      "y": 0,
+      "w": 16,
+      "h": 16,
+      "frames": 3
+    },
+    "foam.neOut": {
+      "sheet": "tiles",
+      "x": 96,
+      "y": 0,
+      "w": 16,
+      "h": 16,
+      "frames": 3
+    },
+    "foam.nwOut": {
+      "sheet": "tiles",
+      "x": 144,
+      "y": 0,
+      "w": 16,
+      "h": 16,
+      "frames": 3
+    },
+    "foam.s": {
+      "sheet": "tiles",
+      "x": 192,
+      "y": 0,
+      "w": 16,
+      "h": 16,
+      "frames": 3
+    },
+    "foam.seOut": {
+      "sheet": "tiles",
+      "x": 0,
+      "y": 16,
+      "w": 16,
+      "h": 16,
+      "frames": 3
+    },
+    "foam.swOut": {
+      "sheet": "tiles",
+      "x": 48,
+      "y": 16,
+      "w": 16,
+      "h": 16,
+      "frames": 3
+    },
+    "foam.w": {
+      "sheet": "tiles",
+      "x": 96,
+      "y": 16,
+      "w": 16,
+      "h": 16,
+      "frames": 3
+    },
+    "fringe.deepWater.e": {
+      "sheet": "tiles",
+      "x": 144,
+      "y": 16,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.deepWater.n": {
+      "sheet": "tiles",
+      "x": 160,
+      "y": 16,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.deepWater.neIn": {
+      "sheet": "tiles",
+      "x": 176,
+      "y": 16,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.deepWater.neOut": {
+      "sheet": "tiles",
+      "x": 192,
+      "y": 16,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.deepWater.nwIn": {
+      "sheet": "tiles",
+      "x": 208,
+      "y": 16,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.deepWater.nwOut": {
+      "sheet": "tiles",
+      "x": 224,
+      "y": 16,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.deepWater.s": {
+      "sheet": "tiles",
+      "x": 240,
+      "y": 16,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.deepWater.seIn": {
+      "sheet": "tiles",
+      "x": 0,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.deepWater.seOut": {
+      "sheet": "tiles",
+      "x": 16,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.deepWater.swIn": {
+      "sheet": "tiles",
+      "x": 32,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.deepWater.swOut": {
+      "sheet": "tiles",
+      "x": 48,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.deepWater.w": {
+      "sheet": "tiles",
+      "x": 64,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.e": {
+      "sheet": "tiles",
+      "x": 80,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.n": {
+      "sheet": "tiles",
+      "x": 96,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.neIn": {
+      "sheet": "tiles",
+      "x": 112,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.neOut": {
+      "sheet": "tiles",
+      "x": 128,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.nwIn": {
+      "sheet": "tiles",
+      "x": 144,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.nwOut": {
+      "sheet": "tiles",
+      "x": 160,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.s": {
+      "sheet": "tiles",
+      "x": 176,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.seIn": {
+      "sheet": "tiles",
+      "x": 192,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.seOut": {
+      "sheet": "tiles",
+      "x": 208,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.swIn": {
+      "sheet": "tiles",
+      "x": 224,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.swOut": {
+      "sheet": "tiles",
+      "x": 240,
+      "y": 32,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.grass.w": {
+      "sheet": "tiles",
+      "x": 0,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.e": {
+      "sheet": "tiles",
+      "x": 16,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.n": {
+      "sheet": "tiles",
+      "x": 32,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.neIn": {
+      "sheet": "tiles",
+      "x": 48,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.neOut": {
+      "sheet": "tiles",
+      "x": 64,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.nwIn": {
+      "sheet": "tiles",
+      "x": 80,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.nwOut": {
+      "sheet": "tiles",
+      "x": 96,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.s": {
+      "sheet": "tiles",
+      "x": 112,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.seIn": {
+      "sheet": "tiles",
+      "x": 128,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.seOut": {
+      "sheet": "tiles",
+      "x": 144,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.swIn": {
+      "sheet": "tiles",
+      "x": 160,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.swOut": {
+      "sheet": "tiles",
+      "x": 176,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.rock.w": {
+      "sheet": "tiles",
+      "x": 192,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.e": {
+      "sheet": "tiles",
+      "x": 208,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.n": {
+      "sheet": "tiles",
+      "x": 224,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.neIn": {
+      "sheet": "tiles",
+      "x": 240,
+      "y": 48,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.neOut": {
+      "sheet": "tiles",
+      "x": 0,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.nwIn": {
+      "sheet": "tiles",
+      "x": 16,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.nwOut": {
+      "sheet": "tiles",
+      "x": 32,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.s": {
+      "sheet": "tiles",
+      "x": 48,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.seIn": {
+      "sheet": "tiles",
+      "x": 64,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.seOut": {
+      "sheet": "tiles",
+      "x": 80,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.swIn": {
+      "sheet": "tiles",
+      "x": 96,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.swOut": {
+      "sheet": "tiles",
+      "x": 112,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.sand.w": {
+      "sheet": "tiles",
+      "x": 128,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.e": {
+      "sheet": "tiles",
+      "x": 144,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.n": {
+      "sheet": "tiles",
+      "x": 160,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.neIn": {
+      "sheet": "tiles",
+      "x": 176,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.neOut": {
+      "sheet": "tiles",
+      "x": 192,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.nwIn": {
+      "sheet": "tiles",
+      "x": 208,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.nwOut": {
+      "sheet": "tiles",
+      "x": 224,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.s": {
+      "sheet": "tiles",
+      "x": 240,
+      "y": 64,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.seIn": {
+      "sheet": "tiles",
+      "x": 0,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.seOut": {
+      "sheet": "tiles",
+      "x": 16,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.swIn": {
+      "sheet": "tiles",
+      "x": 32,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.swOut": {
+      "sheet": "tiles",
+      "x": 48,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "fringe.shallowWater.w": {
+      "sheet": "tiles",
+      "x": 64,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.deepWater.0": {
+      "sheet": "tiles",
+      "x": 80,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.deepWater.1": {
+      "sheet": "tiles",
+      "x": 96,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.deepWater.2": {
+      "sheet": "tiles",
+      "x": 112,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.deepWater.3": {
+      "sheet": "tiles",
+      "x": 128,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.grass.0": {
+      "sheet": "tiles",
+      "x": 144,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.grass.1": {
+      "sheet": "tiles",
+      "x": 160,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.grass.2": {
+      "sheet": "tiles",
+      "x": 176,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.grass.3": {
+      "sheet": "tiles",
+      "x": 192,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.rock.0": {
+      "sheet": "tiles",
+      "x": 208,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.rock.1": {
+      "sheet": "tiles",
+      "x": 224,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.rock.2": {
+      "sheet": "tiles",
+      "x": 240,
+      "y": 80,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.rock.3": {
+      "sheet": "tiles",
+      "x": 0,
+      "y": 96,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.sand.0": {
+      "sheet": "tiles",
+      "x": 16,
+      "y": 96,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.sand.1": {
+      "sheet": "tiles",
+      "x": 32,
+      "y": 96,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.sand.2": {
+      "sheet": "tiles",
+      "x": 48,
+      "y": 96,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.sand.3": {
+      "sheet": "tiles",
+      "x": 64,
+      "y": 96,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.shallowWater.0": {
+      "sheet": "tiles",
+      "x": 80,
+      "y": 96,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.shallowWater.1": {
+      "sheet": "tiles",
+      "x": 96,
+      "y": 96,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.shallowWater.2": {
+      "sheet": "tiles",
+      "x": 112,
+      "y": 96,
+      "w": 16,
+      "h": 16
+    },
+    "terrain.shallowWater.3": {
+      "sheet": "tiles",
+      "x": 128,
+      "y": 96,
+      "w": 16,
+      "h": 16
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-07-31 (M10 persistence in progress).
+Last updated: 2026-08-02 (Art Phase 1 complete; M10 persistence in progress).
 
 ## Status
 
@@ -16,6 +16,7 @@ Last updated: 2026-07-31 (M10 persistence in progress).
 | M8 — Economy and production chains | Complete on `main` | [#12](https://github.com/jimjamscott22/Villiage-Sims/pull/12) |
 | **M9 — Population and progression** | **Complete** | — |
 | **M10 — Persistence and polish** | **In progress: manual save/load** | [#17](https://github.com/jimjamscott22/Villiage-Sims/pull/17) |
+| Art — Phase 1 (pipeline + terrain) | Complete | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 
@@ -50,3 +51,5 @@ npm run dev
 ## Next up
 
 Finish Milestone 10: autosave rotation, weather, event log, and camera/interaction polish.
+Art Phase 2 (entities: buildings, crops, villagers, y-sorting) and Phase 3 (pixel HUD) are
+specced in `docs/superpowers/specs/2026-07-31-pixel-art-ui-redesign-design.md`.
