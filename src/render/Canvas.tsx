@@ -3,11 +3,17 @@ import { SnapshotBuffer } from '../state/snapshot';
 import { advanceDemoTime, transport } from '../state/transport';
 import type { BuildingDef, Catalog, TerrainSnapshot, TickSnapshot } from '../state/types';
 import { Camera } from './camera';
+import type { Atlas } from './atlas';
+import { ART_SCALE, drawCell, loadAtlas } from './atlas';
 import { drawBuildings, drawCrops, drawVillagers } from './drawEntities';
 import { drawGhost } from './drawGhost';
 import { drawTerrain } from './drawTerrain';
+import type { ShorelineTile } from './tilemap';
+import { bakeTerrain, shorelineTiles } from './tilemap';
 
 const TICK_MS = 50;
+const FOAM_TICKS_PER_FRAME = 8;
+const FOAM_FRAMES = 3;
 const VIEWPORT_DEBOUNCE_MS = 100;
 const EDGE_SCROLL_MARGIN = 24;
 const EDGE_SCROLL_SPEED = 6;
@@ -124,6 +130,9 @@ export function Canvas({
     const camera = new Camera();
     let terrain: TerrainSnapshot | null = null;
     let terrainLayer: HTMLCanvasElement | null = null;
+    let atlas: Atlas | null = null;
+    let shoreline: ShorelineTile[] = [];
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let worldWidth = 0;
     let worldHeight = 0;
     let rendered: TickSnapshot | null = null;
@@ -235,6 +244,22 @@ export function Canvas({
       camera.applyTransform(ctx, dpr);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(terrainLayer, 0, 0);
+      if (atlas && shoreline.length > 0) {
+        const frame = reduceMotion
+          ? 0
+          : Math.floor(tickRef.current / FOAM_TICKS_PER_FRAME) % FOAM_FRAMES;
+        const view = camera.visibleWorldRect(viewWidth, viewHeight);
+        const minX = Math.floor(view.x / terrain.tileSize) - 1;
+        const minY = Math.floor(view.y / terrain.tileSize) - 1;
+        const maxX = Math.ceil((view.x + view.w) / terrain.tileSize) + 1;
+        const maxY = Math.ceil((view.y + view.h) / terrain.tileSize) + 1;
+        for (const tile of shoreline) {
+          if (tile.x < minX || tile.x > maxX || tile.y < minY || tile.y > maxY) continue;
+          const dx = tile.x * terrain.tileSize;
+          const dy = tile.y * terrain.tileSize;
+          for (const edge of tile.edges) drawCell(ctx, atlas, edge, dx, dy, frame, ART_SCALE);
+        }
+      }
       rendered = buffer.interpolate(now, TICK_MS);
       if (rendered) {
         const footprints = (catalogRef.current?.buildings ?? []).map(
@@ -294,7 +319,14 @@ export function Canvas({
         terrainLayer.height = worldHeight;
         const terrainContext = terrainLayer.getContext('2d');
         if (!terrainContext) throw new Error('Offscreen Canvas 2D is unavailable');
-        drawTerrain(terrainContext, terrain);
+        atlas = await loadAtlas();
+        if (cancelled) return;
+        if (atlas) {
+          bakeTerrain(terrainContext, atlas, terrain);
+          shoreline = shorelineTiles(terrain);
+        } else {
+          drawTerrain(terrainContext, terrain);
+        }
         resize();
         const stopListening = await transport.listenToTicks((snapshot) => {
           buffer.push(snapshot, performance.now());
@@ -327,6 +359,10 @@ export function Canvas({
         terrain: terrain
           ? { width: terrain.width, height: terrain.height, tileSize: terrain.tileSize }
           : null,
+        art: {
+          loaded: atlas != null,
+          cells: atlas ? Object.keys(atlas.manifest.cells).length : 0,
+        },
         camera: {
           x: camera.x,
           y: camera.y,
