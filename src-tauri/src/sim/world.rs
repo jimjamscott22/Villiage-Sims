@@ -253,6 +253,17 @@ impl World {
         }
     }
 
+    /// Record a `SeasonTurned` chronicle entry using the clock's current season/year.
+    /// Shared by `advance()` and `advance_clock()`'s day-rollover loop — both call
+    /// this instead of duplicating the `ChronicleBody::SeasonTurned` construction.
+    fn record_season_turn(&mut self) {
+        let body = ChronicleBody::SeasonTurned {
+            season: self.clock.season.as_u8(),
+            year: self.clock.year,
+        };
+        self.chronicle.push(&self.clock, None, body);
+    }
+
     pub fn advance(&mut self) {
         self.events.clear();
         let rollover = self.clock.advance_tick();
@@ -260,11 +271,7 @@ impl World {
             self.clear_all_crop_water();
         }
         if rollover.season {
-            let body = ChronicleBody::SeasonTurned {
-                season: self.clock.season.as_u8(),
-                year: self.clock.year,
-            };
-            self.chronicle.push(&self.clock, None, body);
+            self.record_season_turn();
         }
         self.complete_buildings();
         self.tick_crops();
@@ -1946,11 +1953,7 @@ impl World {
             let rollover = self.clock.force_day_rollover();
             self.clear_all_crop_water();
             if rollover.season {
-                let body = ChronicleBody::SeasonTurned {
-                    season: self.clock.season.as_u8(),
-                    year: self.clock.year,
-                };
-                self.chronicle.push(&self.clock, None, body);
+                self.record_season_turn();
             }
         }
         if let Some(value) = season {
