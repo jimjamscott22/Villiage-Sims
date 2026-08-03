@@ -9,9 +9,9 @@ use super::clock::Clock;
 /// Maximum entries retained. Oldest are evicted first.
 pub const CHRONICLE_CAP: usize = 200;
 
-/// What happened. Tagged `kind` on the wire, so no variant may carry a `kind` field.
+/// What happened. Bincode-serialized with variant indices.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub enum ChronicleBody {
     VillagerBorn {
         id: u32,

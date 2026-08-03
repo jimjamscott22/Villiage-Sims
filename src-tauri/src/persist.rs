@@ -7,7 +7,7 @@ use crate::sim::world::World;
 const SAVE_MAGIC: [u8; 8] = *b"VILSAVE\0";
 const HEADER_LEN: usize = SAVE_MAGIC.len() + size_of::<u32>() + size_of::<u64>();
 const MAX_SAVE_BYTES: u64 = 64 * 1024 * 1024;
-pub const SAVE_VERSION: u32 = 1;
+pub const SAVE_VERSION: u32 = 2;
 
 fn config() -> impl bincode::config::Config {
     bincode::config::standard().with_limit::<{ MAX_SAVE_BYTES as usize }>()
@@ -185,7 +185,7 @@ mod tests {
         bytes[SAVE_MAGIC.len()..SAVE_MAGIC.len() + size_of::<u32>()]
             .copy_from_slice(&99u32.to_le_bytes());
         let error = decode_world(&bytes).expect_err("version must be rejected");
-        assert_eq!(error, "unsupported save version 99 (expected 1)");
+        assert_eq!(error, "unsupported save version 99 (expected 2)");
     }
 
     #[test]
@@ -203,4 +203,32 @@ mod tests {
         );
         let _ = fs::remove_file(path);
     }
+
+    #[test]
+    fn chronicle_survives_a_round_trip() {
+        let mut world = World::generate(16, 16, 32, 21);
+        world.advance_clock(28, None).expect("advance a season");
+
+        // Capture the chronicle state before encoding
+        let expected_entries = world.chronicle().to_vec();
+        assert!(!expected_entries.is_empty(), "test needs at least one chronicle entry");
+        let expected_seq = world.chronicle().seq();
+
+        // Round-trip through encode/decode
+        let bytes = encode_world(&world).expect("encode");
+        let restored = decode_world(&bytes).expect("decode");
+
+        // Verify chronicle survived
+        assert_eq!(restored.chronicle().to_vec(), expected_entries, "chronicle entries should match");
+        assert_eq!(restored.chronicle().seq(), expected_seq, "chronicle seq should match");
+    }
+
+    #[test]
+    fn unlocked_set_survives_a_round_trip() {
+        let world = World::generate(16, 16, 32, 23);
+        let bytes = encode_world(&world).expect("encode");
+        let restored = decode_world(&bytes).expect("decode");
+        assert_eq!(restored.unlocked(), world.unlocked());
+    }
+
 }
