@@ -31,7 +31,11 @@ interface CanvasProps {
   onSelectBuilding: (id: number | null) => void;
   onSelectVillager: (id: number | null) => void;
   onSnapshot: (snapshot: TickSnapshot) => void;
-  focusTile: [number, number] | null;
+  /** `nonce` increments on every focus request so clicking the same tile twice
+   * in a row still produces a new object identity and re-runs the focus effect
+   * below — React bails out of re-renders on `Object.is(prev, next)`, and a
+   * plain `[number, number]` tuple would compare equal by reference reuse. */
+  focusTile: { tile: [number, number]; nonce: number } | null;
 }
 
 function rotatedFootprint(def: BuildingDef, rotation: number): [number, number] {
@@ -87,6 +91,7 @@ export function Canvas({
   const onRotationChangeRef = useRef(onRotationChange);
   const onCancelBuildRef = useRef(onCancelBuild);
   const scheduleViewportSyncRef = useRef<(() => void) | null>(null);
+  const syncViewportNowRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     selectedKindRef.current = selectedKind;
@@ -127,17 +132,20 @@ export function Canvas({
     const canvas = canvasRef.current;
     const terrain = terrainRef.current;
     if (!canvas || !terrain) return;
+    const [tileX, tileY] = focusTile.tile;
     cameraRef.current.centerOnTile(
-      focusTile[0],
-      focusTile[1],
+      tileX,
+      tileY,
       terrain.tileSize,
       canvas.clientWidth,
       canvas.clientHeight,
     );
     // Buildings are viewport-culled server-side; without this the sim doesn't
     // know the camera jumped, and the focused building drops out of the next
-    // snapshot and renders as empty ground.
-    scheduleViewportSyncRef.current?.();
+    // snapshot and renders as empty ground. An explicit focus jump bypasses the
+    // pan/zoom debounce so the building doesn't appear only after the debounce
+    // interval elapses.
+    syncViewportNowRef.current?.();
   }, [focusTile]);
 
   useEffect(() => {
@@ -193,6 +201,20 @@ export function Canvas({
       }, VIEWPORT_DEBOUNCE_MS);
     };
     scheduleViewportSyncRef.current = scheduleViewportSync;
+
+    // Bypasses the debounce for explicit focus jumps (chronicle entry clicks)
+    // so the camera doesn't sit on empty ground for VIEWPORT_DEBOUNCE_MS before
+    // the sim starts including the focused building. Pan/zoom keep using the
+    // debounced path above.
+    const syncViewportNow = () => {
+      if (viewportTimer !== null) {
+        window.clearTimeout(viewportTimer);
+        viewportTimer = null;
+      }
+      const rect = camera.visibleWorldRect(viewWidth, viewHeight);
+      void transport.setViewport(rect.x, rect.y, rect.w, rect.h);
+    };
+    syncViewportNowRef.current = syncViewportNow;
 
     const resize = () => {
       const parent = canvas.parentElement;
@@ -590,6 +612,7 @@ export function Canvas({
       cancelAnimationFrame(frame);
       unlisten?.();
       scheduleViewportSyncRef.current = null;
+      syncViewportNowRef.current = null;
       if (viewportTimer !== null) window.clearTimeout(viewportTimer);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('resize', resize);
