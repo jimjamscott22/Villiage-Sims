@@ -49,6 +49,18 @@ export class Camera {
     this.y = (worldHeight - viewHeight / this.zoom) / 2;
   }
 
+  /** Center the camera on a specific tile given the viewport size in CSS pixels. */
+  centerOnTile(
+    tileX: number,
+    tileY: number,
+    tileSize: number,
+    viewWidth: number,
+    viewHeight: number,
+  ): void {
+    this.x = (tileX + 0.5) * tileSize - viewWidth / (2 * this.zoom);
+    this.y = (tileY + 0.5) * tileSize - viewHeight / (2 * this.zoom);
+  }
+
   applyTransform(ctx: CanvasRenderingContext2D, dpr: number): void {
     // Round the translation to whole device pixels so bitmap blits (the
     // pre-rendered terrain layer) land on the physical pixel grid instead of

@@ -18,6 +18,7 @@ use world::World;
 pub mod agents;
 pub mod buildings;
 pub mod catalog;
+pub mod chronicle;
 pub mod clock;
 pub mod commands;
 pub mod crops;

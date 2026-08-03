@@ -31,6 +31,11 @@ interface CanvasProps {
   onSelectBuilding: (id: number | null) => void;
   onSelectVillager: (id: number | null) => void;
   onSnapshot: (snapshot: TickSnapshot) => void;
+  /** `nonce` increments on every focus request so clicking the same tile twice
+   * in a row still produces a new object identity and re-runs the focus effect
+   * below — React bails out of re-renders on `Object.is(prev, next)`, and a
+   * plain `[number, number]` tuple would compare equal by reference reuse. */
+  focusTile: { tile: [number, number]; nonce: number } | null;
 }
 
 function rotatedFootprint(def: BuildingDef, rotation: number): [number, number] {
@@ -65,8 +70,11 @@ export function Canvas({
   onSelectBuilding,
   onSelectVillager,
   onSnapshot,
+  focusTile,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cameraRef = useRef(new Camera());
+  const terrainRef = useRef<TerrainSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const errorRef = useRef<string | null>(null);
@@ -82,6 +90,8 @@ export function Canvas({
   const onSelectVillagerRef = useRef(onSelectVillager);
   const onRotationChangeRef = useRef(onRotationChange);
   const onCancelBuildRef = useRef(onCancelBuild);
+  const scheduleViewportSyncRef = useRef<(() => void) | null>(null);
+  const syncViewportNowRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     selectedKindRef.current = selectedKind;
@@ -118,6 +128,27 @@ export function Canvas({
   }, [onCancelBuild]);
 
   useEffect(() => {
+    if (!focusTile) return;
+    const canvas = canvasRef.current;
+    const terrain = terrainRef.current;
+    if (!canvas || !terrain) return;
+    const [tileX, tileY] = focusTile.tile;
+    cameraRef.current.centerOnTile(
+      tileX,
+      tileY,
+      terrain.tileSize,
+      canvas.clientWidth,
+      canvas.clientHeight,
+    );
+    // Buildings are viewport-culled server-side; without this the sim doesn't
+    // know the camera jumped, and the focused building drops out of the next
+    // snapshot and renders as empty ground. An explicit focus jump bypasses the
+    // pan/zoom debounce so the building doesn't appear only after the debounce
+    // interval elapses.
+    syncViewportNowRef.current?.();
+  }, [focusTile]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -127,7 +158,7 @@ export function Canvas({
     }
 
     const buffer = new SnapshotBuffer();
-    const camera = new Camera();
+    const camera = cameraRef.current;
     let terrain: TerrainSnapshot | null = null;
     let terrainLayer: HTMLCanvasElement | null = null;
     let atlas: Atlas | null = null;
@@ -169,6 +200,21 @@ export function Canvas({
         void transport.setViewport(rect.x, rect.y, rect.w, rect.h);
       }, VIEWPORT_DEBOUNCE_MS);
     };
+    scheduleViewportSyncRef.current = scheduleViewportSync;
+
+    // Bypasses the debounce for explicit focus jumps (chronicle entry clicks)
+    // so the camera doesn't sit on empty ground for VIEWPORT_DEBOUNCE_MS before
+    // the sim starts including the focused building. Pan/zoom keep using the
+    // debounced path above.
+    const syncViewportNow = () => {
+      if (viewportTimer !== null) {
+        window.clearTimeout(viewportTimer);
+        viewportTimer = null;
+      }
+      const rect = camera.visibleWorldRect(viewWidth, viewHeight);
+      void transport.setViewport(rect.x, rect.y, rect.w, rect.h);
+    };
+    syncViewportNowRef.current = syncViewportNow;
 
     const resize = () => {
       const parent = canvas.parentElement;
@@ -312,6 +358,7 @@ export function Canvas({
         const loadedTerrain = await transport.getTerrain();
         if (cancelled) return;
         terrain = loadedTerrain;
+        terrainRef.current = terrain;
         worldWidth = terrain.width * terrain.tileSize;
         worldHeight = terrain.height * terrain.tileSize;
         terrainLayer = document.createElement('canvas');
@@ -564,6 +611,8 @@ export function Canvas({
       cancelled = true;
       cancelAnimationFrame(frame);
       unlisten?.();
+      scheduleViewportSyncRef.current = null;
+      syncViewportNowRef.current = null;
       if (viewportTimer !== null) window.clearTimeout(viewportTimer);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('resize', resize);

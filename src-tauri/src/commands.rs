@@ -6,6 +6,7 @@ use tokio::sync::oneshot;
 
 use crate::sim::buildings::{PlacementResult, PlacementValidity};
 use crate::sim::catalog::Catalog;
+use crate::sim::chronicle::ChronicleEntryView;
 use crate::sim::commands::SimCommand;
 use crate::snapshot::{TerrainSnapshot, VillagerDetail, WorldInit};
 
@@ -136,6 +137,20 @@ pub(crate) async fn get_villager_detail(
     receiver
         .await
         .map_err(|_| "simulation dropped get_villager_detail".to_string())?
+}
+
+#[tauri::command]
+pub(crate) async fn get_chronicle(
+    state: State<'_, AppState>,
+) -> Result<Vec<ChronicleEntryView>, String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::GetChronicle { reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped get_chronicle".to_string())
 }
 
 #[tauri::command]

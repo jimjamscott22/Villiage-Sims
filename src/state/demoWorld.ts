@@ -3,13 +3,14 @@ import type {
   BuildingDef,
   BuildingView,
   Catalog,
+  ChronicleBody,
+  ChronicleEntry,
   ClockView,
   CropDef,
   CropView,
   PlacementResult,
   PlacementValidity,
   ResourceTotals,
-  SimEvent,
   TerrainSnapshot,
   TickSnapshot,
   VillagerDetail,
@@ -499,7 +500,10 @@ export class DemoWorld {
   private nextVillagerId = 1;
   private villagers: DemoVillager[] = [];
   private jobs: DemoJob[] = [];
-  private events: SimEvent[] = [];
+  private chronicleEntries: ChronicleEntry[] = [];
+  private chronicleNextSeq = 0;
+  private unlocked: string[] = [];
+  private readonly CHRONICLE_CAP = 200;
   private readonly seed = DEMO_SEED;
   private clock: DemoClock = {
     tick: 0,
@@ -516,6 +520,74 @@ export class DemoWorld {
     this.occupancy = new Array(terrain.width * terrain.height).fill(null);
     this.nodes = this.generateNodes();
     this.spawnStartingVillagers();
+    this.unlocked = this.satisfiedUnlocks();
+  }
+
+  private pushChronicle(focus: [number, number] | null, body: ChronicleBody): void {
+    // Mirrors Chronicle::push in src-tauri/src/sim/chronicle.rs.
+    const last = this.chronicleEntries[this.chronicleEntries.length - 1];
+    if (
+      body.kind === 'harvestReady' &&
+      last &&
+      last.body.kind === 'harvestReady' &&
+      last.body.site === body.site &&
+      last.day === this.clock.day &&
+      last.season === this.clock.season &&
+      last.year === this.clock.year
+    ) {
+      last.body.count += body.count;
+      last.tick = this.clock.tick;
+      last.seq = this.chronicleNextSeq++;
+      return;
+    }
+
+    this.chronicleEntries.push({
+      seq: this.chronicleNextSeq++,
+      tick: this.clock.tick,
+      day: this.clock.day,
+      season: this.clock.season,
+      year: this.clock.year,
+      focus,
+      body,
+    });
+
+    while (this.chronicleEntries.length > this.CHRONICLE_CAP) {
+      this.chronicleEntries.shift();
+    }
+  }
+
+  getChronicle(): ChronicleEntry[] {
+    return this.chronicleEntries.map((e) => ({ ...e, body: { ...e.body } }));
+  }
+
+  private satisfiedUnlocks(): string[] {
+    const population = this.villagers.length;
+    const completed = new Set(
+      this.buildings
+        .filter((b) => b.complete)
+        .map((b) => DEMO_CATALOG.buildings[b.kindIndex].id),
+    );
+    return DEMO_CATALOG.buildings
+      .filter((def) => {
+        const cond = def.unlockConditions;
+        if (!cond) return true;
+        const popOk = cond.minPopulation == null || population >= cond.minPopulation;
+        const buildingOk =
+          cond.requiresBuilding == null || completed.has(cond.requiresBuilding);
+        return popOk && buildingOk;
+      })
+      .map((def) => def.id)
+      .sort();
+  }
+
+  private checkUnlocks(): void {
+    const satisfied = this.satisfiedUnlocks();
+    for (const id of satisfied) {
+      if (!this.unlocked.includes(id)) {
+        this.pushChronicle(null, { kind: 'buildingUnlocked', building: id });
+      }
+    }
+    this.unlocked = satisfied;
   }
 
   private spawnStartingVillagers(): void {
@@ -652,7 +724,9 @@ export class DemoWorld {
     world.villagers = state.villagers;
     world.jobs = state.jobs;
     world.clock = state.clock;
-    world.events = [];
+    world.chronicleEntries = [];
+    world.chronicleNextSeq = 0;
+    world.unlocked = world.satisfiedUnlocks();
     return world;
   }
 
@@ -667,7 +741,6 @@ export class DemoWorld {
 
   advance(): TickSnapshot {
     if (this.clock.speed === 0) return this.snapshot();
-    this.events = [];
     this.clock.tick += 1;
     this.clock.minuteAccum += MINUTES_PER_TICK;
     this.clock.minute = Math.floor(this.clock.minuteAccum);
@@ -688,7 +761,18 @@ export class DemoWorld {
         newlyComplete.push(building.id);
       }
     }
-    for (const id of newlyComplete) this.advertiseJobsFor(id);
+    for (const id of newlyComplete) {
+      const building = this.buildings.find((b) => b.id === id);
+      if (building) {
+        const def = DEMO_CATALOG.buildings[building.kindIndex];
+        this.pushChronicle([building.x, building.y], {
+          kind: 'buildingComplete',
+          id,
+          building: def.id,
+        });
+      }
+      this.advertiseJobsFor(id);
+    }
 
     this.tickCrops();
     this.tickNodes();
@@ -697,6 +781,7 @@ export class DemoWorld {
     for (let i = 0; i < this.villagers.length; i += 1) {
       this.tickVillagerAt(i);
     }
+    this.checkUnlocks();
     return this.snapshot();
   }
 
@@ -741,7 +826,8 @@ export class DemoWorld {
       resources,
       housingCapacity: this.housingCapacity(),
       clock,
-      events: [...this.events],
+      chronicleSeq: this.chronicleNextSeq,
+      unlocked: [...this.unlocked],
     };
   }
 
@@ -1512,6 +1598,11 @@ export class DemoWorld {
         this.clock.season = 0;
         this.clock.year += 1;
       }
+      this.pushChronicle(null, {
+        kind: 'seasonTurned',
+        season: this.clock.season,
+        year: this.clock.year,
+      });
     }
   }
 
@@ -1534,9 +1625,28 @@ export class DemoWorld {
       crop.stage = Math.min(maxStage, crop.stage + 1);
       if (crop.stage >= maxStage && !crop.readyEmitted) {
         crop.readyEmitted = true;
-        this.events.push({ kind: 'cropReady', id: crop.id });
+        // Shared harvest-site rule (also encoded in world.rs's `tick_crops`):
+        // whatever building occupies the crop's tile is the harvest site,
+        // regardless of its kind or completion state. This is deliberately
+        // looser than "a completed farm" — crops can only be planted on
+        // completed farms today, so the two conditions coincide, but this is
+        // the rule that's actually authoritative on the Rust side.
+        const occupant = this.occupantBuildingAt(crop.x, crop.y);
+        this.pushChronicle(occupant ? [occupant.x, occupant.y] : [crop.x, crop.y], {
+          kind: 'harvestReady',
+          site: occupant ? occupant.id : crop.id,
+          building: occupant ? DEMO_CATALOG.buildings[occupant.kindIndex].id : null,
+          count: 1,
+        });
       }
     }
+  }
+
+  private occupantBuildingAt(x: number, y: number): DemoBuilding | null {
+    const index = y * this.terrain.width + x;
+    const buildingId = this.occupancy[index];
+    if (buildingId == null) return null;
+    return this.buildings.find((b) => b.id === buildingId) ?? null;
   }
 
   private completedFarmAt(x: number, y: number): number | null {

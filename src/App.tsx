@@ -1,8 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Canvas } from './render/Canvas';
 import { transport } from './state/transport';
-import type { Catalog, ClockView, ResourceTotals, TickSnapshot, VillagerDetail } from './state/types';
+import type {
+  Catalog,
+  ChronicleEntry,
+  ClockView,
+  ResourceTotals,
+  TickSnapshot,
+  VillagerDetail,
+} from './state/types';
 import { BuildMenu } from './ui/BuildMenu';
+import { ChronicleDrawer } from './ui/ChronicleDrawer';
 import { ClockBar } from './ui/ClockBar';
 import { ResourceBar } from './ui/ResourceBar';
 
@@ -57,12 +65,41 @@ export default function App() {
 
   const [population, setPopulation] = useState<number>(0);
   const [housingCapacity, setHousingCapacity] = useState<number>(0);
+  const [chronicle, setChronicle] = useState<ChronicleEntry[]>([]);
+  // Sentinel ref, not state: nothing reads the seq itself, it only gates
+  // whether a refetch is needed. A ref keeps the comparison a pure read
+  // inside the snapshot handler instead of a side effect inside a state
+  // updater (React 18 double-invokes updaters under StrictMode).
+  const chronicleSeqRef = useRef(-1);
+  // Guards against an in-flight getChronicle() response overwriting a newer
+  // one if two requests are outstanding at once and resolve out of order.
+  const chronicleRequestRef = useRef(0);
+  const [chronicleCollapsed, setChronicleCollapsed] = useState(true);
+  const [focusTile, setFocusTile] = useState<{ tile: [number, number]; nonce: number } | null>(
+    null,
+  );
+  const [unlocked, setUnlocked] = useState<string[]>([]);
 
   const onSnapshot = (snapshot: TickSnapshot) => {
     setResources(snapshot.resources);
     setClock(snapshot.clock);
     setPopulation(snapshot.villagers.length);
     setHousingCapacity(snapshot.housingCapacity ?? 0);
+    setUnlocked(snapshot.unlocked ?? []);
+    if (snapshot.chronicleSeq !== chronicleSeqRef.current) {
+      const requestId = ++chronicleRequestRef.current;
+      void transport
+        .getChronicle()
+        .then((entries) => {
+          if (chronicleRequestRef.current !== requestId) return; // superseded by a newer fetch
+          chronicleSeqRef.current = snapshot.chronicleSeq;
+          setChronicle(entries);
+        })
+        .catch(() => {
+          // Chronicle is best-effort; leave the ref stale so the next seq
+          // change (or even a retry at the same seq) retries the fetch.
+        });
+    }
   };
 
   const onDemolish = async () => {
@@ -105,6 +142,9 @@ export default function App() {
       setSelectedCrop(null);
       setSelectedBuildingId(null);
       setRotation(0);
+      setChronicle([]);
+      chronicleSeqRef.current = -1;
+      chronicleRequestRef.current += 1; // invalidate any in-flight fetch from the old world
       setWorldKey((key) => key + 1);
       setPersistenceStatus('Slot 1 · Loaded');
       setError(null);
@@ -147,6 +187,7 @@ export default function App() {
           onSelectBuilding={setSelectedBuildingId}
           onSelectVillager={setSelectedVillagerId}
           onSnapshot={onSnapshot}
+          focusTile={focusTile}
         />
         <BuildMenu
           catalog={catalog}
@@ -154,7 +195,7 @@ export default function App() {
           selectedCrop={selectedCrop}
           selectedBuildingId={selectedBuildingId}
           villagerDetail={villagerDetail}
-          population={population}
+          unlocked={unlocked}
           persistenceStatus={persistenceStatus}
           persistenceBusy={persistenceBusy}
           onSelectKind={(kind) => {
@@ -179,6 +220,15 @@ export default function App() {
           }}
         />
       </div>
+      <ChronicleDrawer
+        entries={chronicle}
+        catalog={catalog}
+        collapsed={chronicleCollapsed}
+        onToggle={() => setChronicleCollapsed((value) => !value)}
+        onFocus={(tile) =>
+          setFocusTile((previous) => ({ tile, nonce: (previous?.nonce ?? 0) + 1 }))
+        }
+      />
     </main>
   );
 }

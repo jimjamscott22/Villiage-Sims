@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { DemoWorld, DEMO_CATALOG } from './demoWorld';
 import type {
   Catalog,
+  ChronicleEntry,
   PlacementResult,
   PlacementValidity,
   TerrainSnapshot,
@@ -28,6 +29,7 @@ interface Transport {
   readonly mode: 'tauri' | 'browser-demo';
   getTerrain(): Promise<TerrainSnapshot>;
   getCatalog(): Promise<Catalog>;
+  getChronicle(): Promise<ChronicleEntry[]>;
   listenToTicks(listener: TickListener): Promise<Unlisten>;
   setViewport(x: number, y: number, w: number, h: number): Promise<void>;
   setSpeed(speed: number): Promise<void>;
@@ -56,6 +58,10 @@ class BrowserTransport implements Transport {
 
   async getCatalog(): Promise<Catalog> {
     return DEMO_CATALOG;
+  }
+
+  async getChronicle(): Promise<ChronicleEntry[]> {
+    return this.world.getChronicle();
   }
 
   async listenToTicks(listener: TickListener): Promise<Unlisten> {
@@ -159,6 +165,7 @@ const tauriTransport: Transport = {
   mode: 'tauri',
   getTerrain: () => invoke<TerrainSnapshot>('get_terrain'),
   getCatalog: () => invoke<Catalog>('get_catalog'),
+  getChronicle: () => invoke<ChronicleEntry[]>('get_chronicle'),
   listenToTicks: async (listener) => listen<TickSnapshot>('tick', (event) => listener(event.payload)),
   setViewport: (x, y, w, h) => invoke('set_viewport', { x, y, w, h }),
   setSpeed: (speed) => invoke('set_speed', { speed }),

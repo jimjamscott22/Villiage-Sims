@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::snapshot::{
-    BuildingView, SimEvent, TerrainSnapshot, TickSnapshot, VillagerDetail, VillagerView, WorldInit,
+    BuildingView, TerrainSnapshot, TickSnapshot, VillagerDetail, VillagerView, WorldInit,
 };
 
 use super::agents::{
@@ -15,6 +15,7 @@ use super::buildings::{
     terrain_allowed,
 };
 use super::catalog::Catalog;
+use super::chronicle::{Chronicle, ChronicleBody};
 use super::clock::Clock;
 use super::commands::SimCommand;
 use super::crops::{Crop, tick_crop};
@@ -69,8 +70,8 @@ pub struct World {
     next_villager_id: u32,
     villagers: Vec<Villager>,
     job_board: JobBoard,
-    #[serde(skip)]
-    events: Vec<SimEvent>,
+    chronicle: Chronicle,
+    unlocked: BTreeSet<String>,
     #[serde(skip)]
     viewport: Viewport,
 }
@@ -100,7 +101,8 @@ impl World {
             next_villager_id: 1,
             villagers: Vec::new(),
             job_board: JobBoard::new(),
-            events: Vec::new(),
+            chronicle: Chronicle::new(),
+            unlocked: BTreeSet::new(),
             viewport: Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -109,6 +111,10 @@ impl World {
             },
         };
         world.spawn_starting_villagers();
+        // Seed the unlock baseline after the world is fully built (villagers spawned,
+        // any starting buildings placed) so buildings with no unlock conditions
+        // (hut, farm) don't emit "unlocked" chronicle entries on the first tick.
+        world.unlocked = world.satisfied_unlocks();
         world
     }
 
@@ -178,6 +184,10 @@ impl World {
         &self.clock
     }
 
+    pub fn chronicle(&self) -> &Chronicle {
+        &self.chronicle
+    }
+
     pub fn handle_command(&mut self, command: SimCommand) {
         match command {
             SimCommand::SetViewport { x, y, w, h } => {
@@ -233,6 +243,10 @@ impl World {
             SimCommand::GetTerrain { reply } => {
                 let _ = reply.send(self.terrain_snapshot());
             }
+            SimCommand::GetChronicle { reply } => {
+                let views: Vec<_> = self.chronicle.entries().map(|e| e.view()).collect();
+                let _ = reply.send(views);
+            }
             SimCommand::SaveGame { path, reply } => {
                 let _ = reply.send(crate::persist::save_world(self, &path));
             }
@@ -246,10 +260,24 @@ impl World {
         }
     }
 
+    /// Record a `SeasonTurned` chronicle entry using the clock's current season/year.
+    /// Shared by `advance()` and `advance_clock()`'s day-rollover loop — both call
+    /// this instead of duplicating the `ChronicleBody::SeasonTurned` construction.
+    fn record_season_turn(&mut self) {
+        let body = ChronicleBody::SeasonTurned {
+            season: self.clock.season.as_u8(),
+            year: self.clock.year,
+        };
+        self.chronicle.push(&self.clock, None, body);
+    }
+
     pub fn advance(&mut self) {
-        self.events.clear();
-        if self.clock.advance_tick() {
+        let rollover = self.clock.advance_tick();
+        if rollover.day {
             self.clear_all_crop_water();
+        }
+        if rollover.season {
+            self.record_season_turn();
         }
         self.complete_buildings();
         self.tick_crops();
@@ -263,6 +291,7 @@ impl World {
             self.tick_villager_at(index);
         }
         self.check_population_dynamics();
+        self.check_unlocks();
     }
 
     pub fn housing_capacity(&self) -> u32 {
@@ -274,6 +303,52 @@ impl World {
             .filter_map(|b| self.catalog.get(b.kind_index).and_then(|def| def.houses))
             .sum();
         base + building_houses
+    }
+
+    /// Every building id whose unlock conditions are currently met.
+    /// A building with no conditions is always unlocked.
+    pub fn satisfied_unlocks(&self) -> BTreeSet<String> {
+        let population = self.villagers.len() as u32;
+        let completed: BTreeSet<&str> = self
+            .buildings
+            .iter()
+            .filter(|b| b.state == BuildState::Complete)
+            .filter_map(|b| self.catalog.get(b.kind_index).map(|def| def.id.as_str()))
+            .collect();
+
+        self.catalog
+            .buildings
+            .iter()
+            .filter(|def| match &def.unlock_conditions {
+                None => true,
+                Some(cond) => {
+                    cond.min_population.is_none_or(|min| population >= min)
+                        && cond
+                            .requires_building
+                            .as_deref()
+                            .is_none_or(|req| completed.contains(req))
+                }
+            })
+            .map(|def| def.id.clone())
+            .collect()
+    }
+
+    pub fn unlocked(&self) -> &BTreeSet<String> {
+        &self.unlocked
+    }
+
+    /// Unlocks are monotonic: once a building satisfies its conditions it stays
+    /// unlocked even if the conditions later lapse (e.g. population dipping back
+    /// below a threshold). `satisfied_unlocks()` is a current-conditions snapshot,
+    /// so this only ever grows `self.unlocked`, never shrinks it.
+    fn check_unlocks(&mut self) {
+        let satisfied = self.satisfied_unlocks();
+        let newly: Vec<String> = satisfied.difference(&self.unlocked).cloned().collect();
+        for building in newly {
+            let body = ChronicleBody::BuildingUnlocked { building };
+            self.chronicle.push(&self.clock, None, body);
+        }
+        self.unlocked.extend(satisfied);
     }
 
     fn check_population_dynamics(&mut self) {
@@ -289,13 +364,20 @@ impl World {
                 v.starvation_ticks = 0;
             }
         }
-        for (id, _name) in &dead_ids {
+        for (id, name) in &dead_ids {
             self.job_board.release_claimed_by(*id);
+            let focus = self
+                .villagers
+                .iter()
+                .find(|v| v.id == *id)
+                .map(|v| self.pos_to_tile(v.pos));
             self.villagers.retain(|v| v.id != *id);
-            self.events.push(SimEvent::VillagerDied {
+            let body = ChronicleBody::VillagerDied {
                 id: *id,
+                name: name.clone(),
                 cause: "starvation".to_string(),
-            });
+            };
+            self.chronicle.push(&self.clock, focus, body);
         }
 
         // Birth checks
@@ -320,8 +402,8 @@ impl World {
                 }
                 self.villagers
                     .push(Villager::new(next_id, name.clone(), pos).with_traits(v_traits));
-                self.events
-                    .push(SimEvent::VillagerBorn { id: next_id, name });
+                let body = ChronicleBody::VillagerBorn { id: next_id, name };
+                self.chronicle.push(&self.clock, Some(tile), body);
             }
         }
     }
@@ -348,6 +430,11 @@ impl World {
     #[cfg(test)]
     pub fn villager_mut(&mut self) -> &mut Villager {
         &mut self.villagers[0]
+    }
+
+    #[cfg(test)]
+    pub fn villagers_mut_for_test(&mut self) -> &mut [Villager] {
+        &mut self.villagers
     }
 
     #[cfg(test)]
@@ -503,7 +590,6 @@ impl World {
         self.job_board
             .validate_loaded(&villager_ids, &building_ids)?;
 
-        self.events.clear();
         self.viewport = Viewport {
             x: 0.0,
             y: 0.0,
@@ -536,7 +622,8 @@ impl World {
             resources: derive_totals(&self.resources, &building_inventories, &self.catalog),
             housing_capacity: self.housing_capacity(),
             clock: self.clock.view(),
-            events: self.events.clone(),
+            chronicle_seq: self.chronicle().seq(),
+            unlocked: self.unlocked().iter().cloned().collect(),
         }
     }
 
@@ -620,6 +707,22 @@ impl World {
             }
         }
         for building_id in newly_complete {
+            let entry = self
+                .buildings
+                .iter()
+                .find(|b| b.id == building_id)
+                .and_then(|b| {
+                    self.catalog
+                        .get(b.kind_index)
+                        .map(|def| (b.origin, def.id.clone()))
+                });
+            if let Some((origin, building)) = entry {
+                let body = ChronicleBody::BuildingComplete {
+                    id: building_id,
+                    building,
+                };
+                self.chronicle.push(&self.clock, Some(origin), body);
+            }
             self.advertise_jobs_for(building_id);
         }
     }
@@ -1779,6 +1882,16 @@ impl World {
             };
         };
         let _ = kind_index;
+        // The frontend hides locked buildings, but it holds no authoritative state —
+        // the sim must reject a direct placement attempt too (e.g. a raw `invoke`
+        // bypassing the UI). Gating here also covers `validate_placement`, so the
+        // ghost preview reflects the lock without a second check.
+        if !self.unlocked.contains(&def.id) {
+            return PlacementValidity {
+                valid: false,
+                reason: format!("{} is locked", def.id),
+            };
+        }
         let footprint = rotated_footprint(def, rotation);
         let tiles = footprint_tiles((x, y), footprint);
 
@@ -1884,8 +1997,11 @@ impl World {
 
     pub fn advance_clock(&mut self, days: u32, season: Option<u8>) -> Result<(), String> {
         for _ in 0..days {
-            self.clock.force_day_rollover();
+            let rollover = self.clock.force_day_rollover();
             self.clear_all_crop_water();
+            if rollover.season {
+                self.record_season_turn();
+            }
         }
         if let Some(value) = season {
             self.clock.set_season(value)?;
@@ -1910,7 +2026,34 @@ impl World {
             }
         }
         for id in ready_ids {
-            self.events.push(SimEvent::CropReady { id });
+            let Some(crop_tile) = self.crops.iter().find(|c| c.id == id).map(|c| c.tile) else {
+                continue;
+            };
+            let index = (crop_tile.1 as u32 * self.width + crop_tile.0 as u32) as usize;
+            // Shared harvest-site rule (also encoded in demoWorld.ts's
+            // `occupantBuildingAt`): whatever building occupies the crop's tile is
+            // the harvest site, regardless of its kind or completion state. This is
+            // deliberately looser than "a completed farm" — crops can only be
+            // planted on completed farms today, so the two conditions coincide, but
+            // this is the rule that's actually authoritative.
+            let occupant = self.occupancy.get(index).copied().flatten();
+            let (site, building, focus) = match occupant {
+                Some(building_id) => {
+                    let found = self.buildings.iter().find(|b| b.id == building_id);
+                    let def_id = found
+                        .and_then(|b| self.catalog.get(b.kind_index))
+                        .map(|def| def.id.clone());
+                    let origin = found.map(|b| b.origin).unwrap_or(crop_tile);
+                    (building_id, def_id, origin)
+                }
+                None => (id, None, crop_tile),
+            };
+            let body = ChronicleBody::HarvestReady {
+                site,
+                building,
+                count: 1,
+            };
+            self.chronicle.push(&self.clock, Some(focus), body);
         }
     }
 
@@ -2291,12 +2434,15 @@ mod tests {
         world.job_board = JobBoard::new();
         world.crops.clear();
         world.nodes.clear();
-        world.events.clear();
         world.clock = Clock::new();
         world
     }
 
     fn place_complete(world: &mut World, kind: &str, x: i32, y: i32) -> u32 {
+        // This helper builds fixtures for production/job tests, not unlock-gate
+        // tests, so force the kind unlocked regardless of population/prerequisite
+        // state rather than making every caller satisfy real unlock conditions.
+        world.unlocked.insert(kind.to_string());
         let id = world.place_building(kind, x, y, 0).unwrap().id;
         world
             .buildings
@@ -3119,5 +3265,202 @@ mod tests {
         assert!(saw_grain, "farm should harvest grain");
         assert!(saw_flour, "mill should produce flour");
         assert!(saw_bakery_food, "bakery should produce food");
+    }
+
+    #[test]
+    fn chronicle_records_building_completion() {
+        let mut world = World::generate(24, 24, 32, 7);
+        let before = world.chronicle().len();
+        // (5,5) sits in open water for this seed/size; (10,8) is solid grass
+        // near the generated island's centre and free of the villager spawn cluster.
+        world.place_building("hut", 10, 8, 0).expect("place hut");
+        for _ in 0..500 {
+            world.advance();
+        }
+        let entries = world.chronicle().to_vec();
+        assert!(
+            entries.len() > before,
+            "completing a building should record an entry"
+        );
+        assert!(
+            entries.iter().any(|e| matches!(
+                &e.body,
+                ChronicleBody::BuildingComplete { building, .. } if building == "hut"
+            )),
+            "expected a BuildingComplete entry for the hut, got {entries:?}"
+        );
+    }
+
+    #[test]
+    fn chronicle_records_season_turn() {
+        let mut world = World::generate(16, 16, 32, 3);
+        world.advance_clock(28, None).expect("advance a season");
+        assert!(
+            world
+                .chronicle()
+                .to_vec()
+                .iter()
+                .any(|e| matches!(e.body, ChronicleBody::SeasonTurned { .. })),
+            "crossing into a new season should record an entry"
+        );
+    }
+
+    #[test]
+    fn chronicle_death_entry_carries_the_name() {
+        let mut world = World::generate(16, 16, 32, 5);
+        // Deplete the food stockpile so the Eat action can never succeed and
+        // reset starvation_ticks via tick_eating's hunger=1.0 completion.
+        world.resources.food = 0;
+        // Starve the first villager: hunger 0 for 300 consecutive ticks.
+        let name = world.villagers()[0].name.clone();
+        world.villager_mut().needs.hunger = 0.0;
+        for _ in 0..320 {
+            world.villagers_mut_for_test()[0].needs.hunger = 0.0;
+            world.advance();
+        }
+        let died = world
+            .chronicle()
+            .to_vec()
+            .into_iter()
+            .find(|e| matches!(e.body, ChronicleBody::VillagerDied { .. }));
+        let Some(entry) = died else {
+            panic!("expected a death entry");
+        };
+        let ChronicleBody::VillagerDied { name: dead_name, .. } = entry.body else {
+            unreachable!();
+        };
+        assert_eq!(dead_name, name, "the entry must carry the name, not just an id");
+    }
+
+    #[test]
+    fn unconditional_buildings_start_unlocked_and_silent() {
+        let world = World::generate(16, 16, 32, 11);
+        assert!(world.unlocked().contains("hut"));
+        assert!(world.unlocked().contains("farm"));
+        assert!(
+            !world
+                .chronicle()
+                .to_vec()
+                .iter()
+                .any(|e| matches!(e.body, ChronicleBody::BuildingUnlocked { .. })),
+            "a fresh world must not narrate its starting unlocks"
+        );
+    }
+
+    #[test]
+    fn mill_is_locked_in_a_fresh_world() {
+        let world = World::generate(16, 16, 32, 13);
+        // Mill needs population 6 AND a granary. A fresh world has neither.
+        assert!(
+            !world.satisfied_unlocks().contains("mill"),
+            "mill must stay locked without its granary"
+        );
+    }
+
+    #[test]
+    fn unlock_emits_once_not_every_tick() {
+        let mut world = World::generate(32, 32, 32, 17);
+        // The world starts with 5 villagers, which already satisfies the
+        // granary's min_population:5 condition, so generate()'s seeding step
+        // marks it unlocked silently before the test ever calls advance().
+        // To actually exercise a transition (not just a steady state), drop
+        // below the threshold and re-seed the baseline, then cross it again.
+        world.villagers.truncate(4);
+        world.unlocked = world.satisfied_unlocks();
+        assert!(
+            !world.unlocked.contains("granary"),
+            "precondition: granary must start locked at population 4"
+        );
+        let mut fifth = world.villagers[0].clone();
+        fifth.id = 9999;
+        world.villagers.push(fifth);
+
+        for _ in 0..5 {
+            world.advance();
+        }
+        let count = world
+            .chronicle()
+            .to_vec()
+            .iter()
+            .filter(|e| {
+                matches!(&e.body, ChronicleBody::BuildingUnlocked { building } if building == "granary")
+            })
+            .count();
+        assert_eq!(
+            count, 1,
+            "expected exactly one granary unlock entry after crossing the population threshold, got {count}"
+        );
+    }
+
+    #[test]
+    fn unlock_does_not_repeat_after_the_condition_lapses_and_is_re_met() {
+        let mut world = World::generate(32, 32, 32, 29);
+        // Same setup as `unlock_emits_once_not_every_tick`: seed the baseline at
+        // population 4 (granary locked) so crossing the threshold is a real
+        // transition rather than a steady state.
+        world.villagers.truncate(4);
+        world.unlocked = world.satisfied_unlocks();
+        assert!(
+            !world.unlocked.contains("granary"),
+            "precondition: granary must start locked at population 4"
+        );
+
+        // Cross the threshold: unlock fires once.
+        let mut fifth = world.villagers[0].clone();
+        fifth.id = 9999;
+        world.villagers.push(fifth);
+        world.advance();
+        assert!(world.unlocked.contains("granary"), "granary should unlock at population 5");
+
+        // Drop back below the threshold. `satisfied_unlocks()` would now say
+        // granary is locked again, but unlocks are monotonic — it must stay
+        // unlocked and must not narrate a re-lock.
+        world.villagers.truncate(4);
+        world.advance();
+        assert!(
+            world.unlocked.contains("granary"),
+            "unlocks are monotonic: dropping below the threshold must not re-lock"
+        );
+
+        // Cross the threshold a second time. Since it never re-locked, this must
+        // not push a second chronicle entry.
+        let mut fifth_again = world.villagers[0].clone();
+        fifth_again.id = 10000;
+        world.villagers.push(fifth_again);
+        world.advance();
+
+        let count = world
+            .chronicle()
+            .to_vec()
+            .iter()
+            .filter(|e| {
+                matches!(&e.body, ChronicleBody::BuildingUnlocked { building } if building == "granary")
+            })
+            .count();
+        assert_eq!(
+            count, 1,
+            "expected exactly one granary unlock entry despite crossing the threshold twice, got {count}"
+        );
+    }
+
+    #[test]
+    fn place_building_rejects_a_locked_kind() {
+        let mut world = grass_world();
+        assert!(
+            !world.unlocked().contains("mill"),
+            "precondition: mill must still be locked (needs population 6 and a granary)"
+        );
+
+        let validity = world.validate_placement("mill", 0, 2, 0);
+        assert!(!validity.valid, "ghost preview must also reflect the lock");
+        assert!(validity.reason.contains("locked"), "reason was: {}", validity.reason);
+
+        let result = world.place_building("mill", 0, 2, 0);
+        let error = result.expect_err("placing a locked building must be rejected");
+        assert!(error.contains("locked"), "error was: {error}");
+        assert!(
+            world.buildings.is_empty(),
+            "a rejected placement must not create a building"
+        );
     }
 }

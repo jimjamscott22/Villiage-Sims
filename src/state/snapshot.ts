@@ -36,7 +36,8 @@ export class SnapshotBuffer {
       resources: this.current.resources,
       housingCapacity: this.current.housingCapacity,
       clock: this.current.clock,
-      events: this.current.events,
+      chronicleSeq: this.current.chronicleSeq,
+      unlocked: this.current.unlocked,
     };
   }
 }
