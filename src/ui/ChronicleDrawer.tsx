@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { formatDivider, formatEntry, needsDivider } from '../state/chronicle';
+import { Fragment, useEffect, useRef } from 'react';
+import { CHRONICLE_EMPTY_MESSAGE, formatDivider, formatEntry, needsDivider } from '../state/chronicle';
 import type { Catalog, ChronicleEntry } from '../state/types';
 
 interface ChronicleDrawerProps {
@@ -42,7 +42,7 @@ export function ChronicleDrawer({
         <span className="text-white/45">{collapsed ? '▸' : '▾'}</span>
         <span className="text-white/45">Chronicle</span>
         <span className="truncate text-white/80">
-          {newest ? formatEntry(newest, catalog) : 'Nothing has happened yet.'}
+          {newest ? formatEntry(newest, catalog) : CHRONICLE_EMPTY_MESSAGE}
         </span>
       </button>
 
@@ -56,30 +56,39 @@ export function ChronicleDrawer({
           }}
           className="max-h-48 overflow-y-auto border-t border-white/10 px-4 py-2"
         >
-          {entries.length === 0 && <p className="text-white/45">Nothing has happened yet.</p>}
+          {entries.length === 0 && <p className="text-white/45">{CHRONICLE_EMPTY_MESSAGE}</p>}
           <ul className="flex flex-col gap-0.5">
             {entries.map((entry, index) => {
               const previous = index === 0 ? null : entries[index - 1];
               const text = formatEntry(entry, catalog);
               return (
-                <li key={entry.seq}>
+                <Fragment key={entry.seq}>
                   {needsDivider(previous, entry) && (
-                    <div className="mt-2 border-b border-white/10 pb-1 text-[10px] uppercase tracking-wide text-white/35 first:mt-0">
-                      {formatDivider(entry)}
-                    </div>
-                  )}
-                  {entry.focus ? (
-                    <button
-                      type="button"
-                      onClick={() => onFocus(entry.focus as [number, number])}
-                      className="w-full rounded px-1 py-0.5 text-left hover:bg-white/10"
+                    // A sibling <li> (not nested inside the entry's <li>) so `first:mt-0`
+                    // targets whichever element is actually first in the <ul> — nesting it
+                    // meant the divider was always its <li>'s first child and the spacing
+                    // never applied.
+                    <li
+                      aria-hidden
+                      className="mt-2 border-b border-white/10 pb-1 text-[10px] uppercase tracking-wide text-white/35 first:mt-0"
                     >
-                      {text}
-                    </button>
-                  ) : (
-                    <span className="block px-1 py-0.5 text-white/60">{text}</span>
+                      {formatDivider(entry)}
+                    </li>
                   )}
-                </li>
+                  <li>
+                    {entry.focus ? (
+                      <button
+                        type="button"
+                        onClick={() => onFocus(entry.focus as [number, number])}
+                        className="w-full rounded px-1 py-0.5 text-left hover:bg-white/10"
+                      >
+                        {text}
+                      </button>
+                    ) : (
+                      <span className="block px-1 py-0.5 text-white/60">{text}</span>
+                    )}
+                  </li>
+                </Fragment>
               );
             })}
           </ul>

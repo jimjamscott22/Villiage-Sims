@@ -2,6 +2,8 @@ import type { Catalog, ChronicleEntry } from './types';
 
 const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'];
 
+export const CHRONICLE_EMPTY_MESSAGE = 'Nothing has happened yet.';
+
 export function seasonName(season: number): string {
   return SEASONS[season] ?? 'Unknown';
 }
@@ -30,6 +32,13 @@ export function formatEntry(entry: ChronicleEntry, catalog: Catalog | null): str
     }
     case 'seasonTurned':
       return `${seasonName(body.season)} of year ${body.year} begins`;
+    default: {
+      // Exhaustiveness guard: if Rust adds a chronicle body variant the TS
+      // union doesn't know about yet, this becomes a compile error instead of
+      // formatEntry silently returning undefined (and rendering blank).
+      const _exhaustive: never = body;
+      return `Unknown event (${(_exhaustive as { kind: string }).kind})`;
+    }
   }
 }
 
