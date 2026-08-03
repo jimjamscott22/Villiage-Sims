@@ -53,16 +53,6 @@ impl ResourceTotals {
         cost.iter().all(|(key, amount)| self.get(key) >= *amount)
     }
 
-    pub fn spend(&mut self, cost: &BTreeMap<String, u32>) -> Result<(), String> {
-        if !self.can_afford(cost) {
-            return Err("insufficient resources".into());
-        }
-        for (key, amount) in cost {
-            self.set(key, self.get(key) - amount);
-        }
-        Ok(())
-    }
-
     pub fn refund(&mut self, cost: &BTreeMap<String, u32>) {
         for (key, amount) in cost {
             self.set(key, self.get(key).saturating_add(*amount));
@@ -75,12 +65,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn spend_and_refund_round_trip() {
+    fn can_afford_and_refund_round_trip() {
         let mut resources = ResourceTotals::starting();
-        let cost = BTreeMap::from([("wood".into(), 20u32)]);
-        resources.spend(&cost).unwrap();
+        let affordable = BTreeMap::from([("wood".into(), 20u32)]);
+        let unaffordable = BTreeMap::from([("wood".into(), 1_000u32)]);
+        assert!(resources.can_afford(&affordable));
+        assert!(!resources.can_afford(&unaffordable));
+
+        resources.set("wood", resources.get("wood") - 20);
         assert_eq!(resources.wood, 100);
-        resources.refund(&cost);
+        resources.refund(&affordable);
         assert_eq!(resources.wood, 120);
     }
 }
