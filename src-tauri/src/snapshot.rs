@@ -25,14 +25,6 @@ pub struct WorldInit {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-pub enum SimEvent {
-    CropReady { id: u32 },
-    VillagerBorn { id: u32, name: String },
-    VillagerDied { id: u32, cause: String },
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TickSnapshot {
     pub tick: u64,
@@ -42,7 +34,10 @@ pub struct TickSnapshot {
     pub resources: ResourceTotals,
     pub housing_capacity: u32,
     pub clock: ClockView,
-    pub events: Vec<SimEvent>,
+    /// Monotonic chronicle revision. When this changes, refetch via `get_chronicle`.
+    pub chronicle_seq: u64,
+    /// Building ids whose unlock conditions are met.
+    pub unlocked: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]

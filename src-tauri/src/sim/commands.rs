@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use tokio::sync::oneshot;
 
 use super::buildings::{PlacementResult, PlacementValidity};
+use crate::sim::chronicle::ChronicleEntry;
 use crate::snapshot::{TerrainSnapshot, VillagerDetail, WorldInit};
 
 pub enum SimCommand {
@@ -55,6 +56,9 @@ pub enum SimCommand {
     },
     GetTerrain {
         reply: oneshot::Sender<TerrainSnapshot>,
+    },
+    GetChronicle {
+        reply: oneshot::Sender<Vec<ChronicleEntry>>,
     },
     SaveGame {
         path: PathBuf,

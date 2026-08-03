@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::snapshot::{
-    BuildingView, SimEvent, TerrainSnapshot, TickSnapshot, VillagerDetail, VillagerView, WorldInit,
+    BuildingView, TerrainSnapshot, TickSnapshot, VillagerDetail, VillagerView, WorldInit,
 };
 
 use super::agents::{
@@ -73,8 +73,6 @@ pub struct World {
     chronicle: Chronicle,
     unlocked: BTreeSet<String>,
     #[serde(skip)]
-    events: Vec<SimEvent>,
-    #[serde(skip)]
     viewport: Viewport,
 }
 
@@ -105,7 +103,6 @@ impl World {
             job_board: JobBoard::new(),
             chronicle: Chronicle::new(),
             unlocked: BTreeSet::new(),
-            events: Vec::new(),
             viewport: Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -246,6 +243,9 @@ impl World {
             SimCommand::GetTerrain { reply } => {
                 let _ = reply.send(self.terrain_snapshot());
             }
+            SimCommand::GetChronicle { reply } => {
+                let _ = reply.send(self.chronicle.to_vec());
+            }
             SimCommand::SaveGame { path, reply } => {
                 let _ = reply.send(crate::persist::save_world(self, &path));
             }
@@ -271,7 +271,6 @@ impl World {
     }
 
     pub fn advance(&mut self) {
-        self.events.clear();
         let rollover = self.clock.advance_tick();
         if rollover.day {
             self.clear_all_crop_water();
@@ -374,10 +373,6 @@ impl World {
                 cause: "starvation".to_string(),
             };
             self.chronicle.push(&self.clock, focus, body);
-            self.events.push(SimEvent::VillagerDied {
-                id: *id,
-                cause: "starvation".to_string(),
-            });
         }
 
         // Birth checks
@@ -402,13 +397,8 @@ impl World {
                 }
                 self.villagers
                     .push(Villager::new(next_id, name.clone(), pos).with_traits(v_traits));
-                let body = ChronicleBody::VillagerBorn {
-                    id: next_id,
-                    name: name.clone(),
-                };
+                let body = ChronicleBody::VillagerBorn { id: next_id, name };
                 self.chronicle.push(&self.clock, Some(tile), body);
-                self.events
-                    .push(SimEvent::VillagerBorn { id: next_id, name });
             }
         }
     }
@@ -595,7 +585,6 @@ impl World {
         self.job_board
             .validate_loaded(&villager_ids, &building_ids)?;
 
-        self.events.clear();
         self.viewport = Viewport {
             x: 0.0,
             y: 0.0,
@@ -628,7 +617,8 @@ impl World {
             resources: derive_totals(&self.resources, &building_inventories, &self.catalog),
             housing_capacity: self.housing_capacity(),
             clock: self.clock.view(),
-            events: self.events.clone(),
+            chronicle_seq: self.chronicle().seq(),
+            unlocked: self.unlocked().iter().cloned().collect(),
         }
     }
 
@@ -2050,7 +2040,6 @@ impl World {
                 count: 1,
             };
             self.chronicle.push(&self.clock, Some(focus), body);
-            self.events.push(SimEvent::CropReady { id });
         }
     }
 
@@ -2431,7 +2420,6 @@ mod tests {
         world.job_board = JobBoard::new();
         world.crops.clear();
         world.nodes.clear();
-        world.events.clear();
         world.clock = Clock::new();
         world
     }
