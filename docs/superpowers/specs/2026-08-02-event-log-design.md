@@ -92,10 +92,36 @@ pub struct Chronicle {
 `focus` is hoisted out of the variants so the drawer tests one field rather than matching six body
 types to decide clickability.
 
-The payload field is named `building`, **not** `kind`: the enum is tagged `#[serde(tag = "kind")]`,
-so a variant field of the same name would collide with the discriminant in the serialized form.
-`building` holds a `BuildingDef` id such as `"mill"`, resolved to a display name through the
-catalog.
+The payload field is named `building`, **not** `kind`, because the *wire* form of this enum is
+tagged `#[serde(tag = "kind")]` and a variant field of the same name would collide with the
+discriminant. `building` holds a `BuildingDef` id such as `"mill"`, resolved to a display name
+through the catalog.
+
+### Storage form vs wire form
+
+`ChronicleBody` itself is **not** internally tagged. Serde's `#[serde(tag = "...")]` representation
+requires a self-describing format, and `bincode` is not one — an internally-tagged enum inside the
+whole-`World` bincode dump fails to serialize. The stored enum therefore uses serde's default
+(externally tagged) representation.
+
+The frontend still needs the internally-tagged shape for a clean TypeScript discriminated union, so
+the JSON form is a separate view type, exactly as the codebase already does for
+`Clock`/`ClockView`, `Crop`/`CropView`, `Villager`/`VillagerView` and `Building`/`BuildingView`:
+
+```rust
+/// JSON wire form. Serialize only — never persisted.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChronicleEntryView { /* same fields as ChronicleEntry */ }
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ChronicleBodyView { /* same variants as ChronicleBody */ }
+```
+
+`get_chronicle` returns `Vec<ChronicleEntryView>`. `ChronicleEntry::view()` converts. The storage
+type carries `Serialize + Deserialize`; the view type carries `Serialize` only, which makes the
+one-way direction structural rather than conventional.
 
 `VillagerDied` carries the villager's **name**, not just an id: the villager is removed from the
 store before the drawer renders, so the frontend cannot resolve it. `BuildingComplete` and
