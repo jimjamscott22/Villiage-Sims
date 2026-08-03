@@ -32,12 +32,22 @@ status/handoff notes are in `progress.md` (check this first — it's updated eve
   forest/rock gathering.
 - Population & progression (M9): population grows automatically under housing capacity
   (base + houses); traits (`traits.json`) render in `VillagerPanel`; a tech/unlock tree gates
-  buildings in `BuildMenu` until population/building prerequisites are met. Browser-demo mirrors
-  all of this, so it's fully testable headless.
+  buildings in `BuildMenu` until population/building prerequisites are met. Unlock evaluation
+  (`min_population` and `requires_building`) lives in `World::satisfied_unlocks()`; `BuildMenu`
+  only reads the authoritative `unlocked` list off the snapshot, it does not re-evaluate
+  conditions itself. Browser-demo mirrors all of this except births/deaths, so it's fully
+  testable headless.
 - Persistence (M10, in progress): Save/Load buttons in the build menu read/write a single fixed
   slot (slot 1) via `saveGame`/`loadGame`. Desktop writes a versioned binary file
-  (`src-tauri/src/persist.rs`, `SAVE_VERSION`); browser-demo keeps saves in-memory only. Next up:
-  autosaves, weather, event log — see `progress.md`.
+  (`src-tauri/src/persist.rs`, `SAVE_VERSION` 2). Browser-demo keeps saves in-memory only.
+- Chronicle (M10): a capped 200-entry log in `World.chronicle`, persisted with the save. The tick
+  snapshot carries only `chronicleSeq`; the frontend refetches via `get_chronicle` when it changes.
+  Never accumulate events from tick payloads — the `watch` channel drops intermediate snapshots.
+  Toggle the drawer beneath the map; click an entry to centre the camera. Clicking also syncs the
+  viewport to the sim first, since `building_views()` viewport-culls buildings and a raw camera
+  jump can land on a building that hasn't been rendered yet. Browser-demo has no births or deaths,
+  so `villagerBorn`/`villagerDied` entries are desktop-only. Next up: autosaves, weather — see
+  `progress.md`.
 
 ### Non-obvious gotchas
 
@@ -58,3 +68,10 @@ status/handoff notes are in `progress.md` (check this first — it's updated eve
   `window`, `Image` or canvas contexts. Keep pure logic (`planTile`, `cellRect`) separate from
   painters (`bakeTerrain`, `drawCell`) so it stays testable.
 - Native art is 16px against a 32px world tile, so everything draws at exactly 2x (`ART_SCALE`).
+- The chronicle has two serde forms (`src-tauri/src/sim/chronicle.rs`): `ChronicleBody` (the
+  storage type persisted with the save) uses serde's default externally-tagged representation
+  because bincode is not a self-describing format and can't handle `#[serde(tag = "...")]`.
+  `ChronicleBodyView` (the JSON wire type sent to the frontend) carries `#[serde(tag = "kind")]`.
+  Do not add a tag attribute to `ChronicleBody` — it will break save/load. `World.unlocked` is
+  seeded from `satisfied_unlocks()` in `generate()`, otherwise a new village narrates its own
+  starting unlocks on tick one.
