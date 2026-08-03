@@ -86,8 +86,16 @@ impl Chronicle {
         self.entries.is_empty()
     }
 
+    #[cfg(test)]
     pub fn to_vec(&self) -> Vec<ChronicleEntry> {
         self.entries.iter().cloned().collect()
+    }
+
+    /// Borrowing accessor over the ring buffer, oldest first. Prefer this over
+    /// `to_vec()` when the caller only needs to iterate (e.g. mapping to wire views)
+    /// since it avoids cloning every entry.
+    pub fn entries(&self) -> impl Iterator<Item = &ChronicleEntry> {
+        self.entries.iter()
     }
 
     #[cfg(test)]

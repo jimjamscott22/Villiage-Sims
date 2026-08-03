@@ -72,6 +72,11 @@ pub struct World {
     job_board: JobBoard,
     chronicle: Chronicle,
     unlocked: BTreeSet<String>,
+    /// (population, completed-building-count) as of the last `check_unlocks` scan.
+    /// Lets `check_unlocks` skip its O(B log B) rescan when neither has moved since
+    /// the previous tick. `None` forces a rescan (fresh world, or just loaded).
+    #[serde(skip)]
+    unlock_check_signature: Option<(u32, usize)>,
     #[serde(skip)]
     viewport: Viewport,
 }
@@ -103,6 +108,7 @@ impl World {
             job_board: JobBoard::new(),
             chronicle: Chronicle::new(),
             unlocked: BTreeSet::new(),
+            unlock_check_signature: None,
             viewport: Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -244,7 +250,7 @@ impl World {
                 let _ = reply.send(self.terrain_snapshot());
             }
             SimCommand::GetChronicle { reply } => {
-                let views: Vec<_> = self.chronicle.to_vec().iter().map(|e| e.view()).collect();
+                let views: Vec<_> = self.chronicle.entries().map(|e| e.view()).collect();
                 let _ = reply.send(views);
             }
             SimCommand::SaveGame { path, reply } => {
@@ -337,14 +343,35 @@ impl World {
         &self.unlocked
     }
 
+    /// Unlocks are monotonic: once a building satisfies its conditions it stays
+    /// unlocked even if the conditions later lapse (e.g. population dipping back
+    /// below a threshold). `satisfied_unlocks()` is a current-conditions snapshot,
+    /// so this only ever grows `self.unlocked`, never shrinks it.
+    ///
+    /// The full scan is skipped whenever neither population nor the completed-
+    /// building count has moved since the last check, since those are the only
+    /// two inputs `satisfied_unlocks()` reads. This keeps the 20 Hz tick loop
+    /// cheap while still reacting within a single tick of a real change.
     fn check_unlocks(&mut self) {
+        let population = self.villagers.len() as u32;
+        let completed_count = self
+            .buildings
+            .iter()
+            .filter(|b| b.state == BuildState::Complete)
+            .count();
+        let signature = (population, completed_count);
+        if self.unlock_check_signature == Some(signature) {
+            return;
+        }
+        self.unlock_check_signature = Some(signature);
+
         let satisfied = self.satisfied_unlocks();
         let newly: Vec<String> = satisfied.difference(&self.unlocked).cloned().collect();
         for building in newly {
             let body = ChronicleBody::BuildingUnlocked { building };
             self.chronicle.push(&self.clock, None, body);
         }
-        self.unlocked = satisfied;
+        self.unlocked.extend(satisfied);
     }
 
     fn check_population_dynamics(&mut self) {
@@ -366,7 +393,7 @@ impl World {
                 .villagers
                 .iter()
                 .find(|v| v.id == *id)
-                .map(|v| self.world_to_tile(v.pos));
+                .map(|v| self.pos_to_tile(v.pos));
             self.villagers.retain(|v| v.id != *id);
             let body = ChronicleBody::VillagerDied {
                 id: *id,
@@ -1754,13 +1781,6 @@ impl World {
         ((x as f32 + 0.5) * tile, (y as f32 + 0.5) * tile)
     }
 
-    fn world_to_tile(&self, pos: (f32, f32)) -> (i32, i32) {
-        (
-            (pos.0 / self.tile_size as f32).floor() as i32,
-            (pos.1 / self.tile_size as f32).floor() as i32,
-        )
-    }
-
     fn pos_to_tile(&self, pos: (f32, f32)) -> (i32, i32) {
         let tile = self.tile_size as f32;
         let x = (pos.0 / tile).floor() as i32;
@@ -1885,6 +1905,16 @@ impl World {
             };
         };
         let _ = kind_index;
+        // The frontend hides locked buildings, but it holds no authoritative state —
+        // the sim must reject a direct placement attempt too (e.g. a raw `invoke`
+        // bypassing the UI). Gating here also covers `validate_placement`, so the
+        // ghost preview reflects the lock without a second check.
+        if !self.unlocked.contains(&def.id) {
+            return PlacementValidity {
+                valid: false,
+                reason: format!("{} is locked", def.id),
+            };
+        }
         let footprint = rotated_footprint(def, rotation);
         let tiles = footprint_tiles((x, y), footprint);
 
@@ -2023,6 +2053,12 @@ impl World {
                 continue;
             };
             let index = (crop_tile.1 as u32 * self.width + crop_tile.0 as u32) as usize;
+            // Shared harvest-site rule (also encoded in demoWorld.ts's
+            // `occupantBuildingAt`): whatever building occupies the crop's tile is
+            // the harvest site, regardless of its kind or completion state. This is
+            // deliberately looser than "a completed farm" — crops can only be
+            // planted on completed farms today, so the two conditions coincide, but
+            // this is the rule that's actually authoritative.
             let occupant = self.occupancy.get(index).copied().flatten();
             let (site, building, focus) = match occupant {
                 Some(building_id) => {
@@ -2426,6 +2462,10 @@ mod tests {
     }
 
     fn place_complete(world: &mut World, kind: &str, x: i32, y: i32) -> u32 {
+        // This helper builds fixtures for production/job tests, not unlock-gate
+        // tests, so force the kind unlocked regardless of population/prerequisite
+        // state rather than making every caller satisfy real unlock conditions.
+        world.unlocked.insert(kind.to_string());
         let id = world.place_building(kind, x, y, 0).unwrap().id;
         world
             .buildings
@@ -3331,7 +3371,7 @@ mod tests {
     }
 
     #[test]
-    fn requires_building_is_enforced() {
+    fn mill_is_locked_in_a_fresh_world() {
         let world = World::generate(16, 16, 32, 13);
         // Mill needs population 6 AND a granary. A fresh world has neither.
         assert!(
@@ -3372,6 +3412,78 @@ mod tests {
         assert_eq!(
             count, 1,
             "expected exactly one granary unlock entry after crossing the population threshold, got {count}"
+        );
+    }
+
+    #[test]
+    fn unlock_does_not_repeat_after_the_condition_lapses_and_is_re_met() {
+        let mut world = World::generate(32, 32, 32, 29);
+        // Same setup as `unlock_emits_once_not_every_tick`: seed the baseline at
+        // population 4 (granary locked) so crossing the threshold is a real
+        // transition rather than a steady state.
+        world.villagers.truncate(4);
+        world.unlocked = world.satisfied_unlocks();
+        assert!(
+            !world.unlocked.contains("granary"),
+            "precondition: granary must start locked at population 4"
+        );
+
+        // Cross the threshold: unlock fires once.
+        let mut fifth = world.villagers[0].clone();
+        fifth.id = 9999;
+        world.villagers.push(fifth);
+        world.advance();
+        assert!(world.unlocked.contains("granary"), "granary should unlock at population 5");
+
+        // Drop back below the threshold. `satisfied_unlocks()` would now say
+        // granary is locked again, but unlocks are monotonic — it must stay
+        // unlocked and must not narrate a re-lock.
+        world.villagers.truncate(4);
+        world.advance();
+        assert!(
+            world.unlocked.contains("granary"),
+            "unlocks are monotonic: dropping below the threshold must not re-lock"
+        );
+
+        // Cross the threshold a second time. Since it never re-locked, this must
+        // not push a second chronicle entry.
+        let mut fifth_again = world.villagers[0].clone();
+        fifth_again.id = 10000;
+        world.villagers.push(fifth_again);
+        world.advance();
+
+        let count = world
+            .chronicle()
+            .to_vec()
+            .iter()
+            .filter(|e| {
+                matches!(&e.body, ChronicleBody::BuildingUnlocked { building } if building == "granary")
+            })
+            .count();
+        assert_eq!(
+            count, 1,
+            "expected exactly one granary unlock entry despite crossing the threshold twice, got {count}"
+        );
+    }
+
+    #[test]
+    fn place_building_rejects_a_locked_kind() {
+        let mut world = grass_world();
+        assert!(
+            !world.unlocked().contains("mill"),
+            "precondition: mill must still be locked (needs population 6 and a granary)"
+        );
+
+        let validity = world.validate_placement("mill", 0, 2, 0);
+        assert!(!validity.valid, "ghost preview must also reflect the lock");
+        assert!(validity.reason.contains("locked"), "reason was: {}", validity.reason);
+
+        let result = world.place_building("mill", 0, 2, 0);
+        let error = result.expect_err("placing a locked building must be rejected");
+        assert!(error.contains("locked"), "error was: {error}");
+        assert!(
+            world.buildings.is_empty(),
+            "a rejected placement must not create a building"
         );
     }
 }
