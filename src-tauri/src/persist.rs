@@ -183,9 +183,9 @@ mod tests {
     fn rejects_unknown_version_before_decoding() {
         let mut bytes = encode_world(&World::generate(8, 8, 32, 4)).expect("encode world");
         bytes[SAVE_MAGIC.len()..SAVE_MAGIC.len() + size_of::<u32>()]
-            .copy_from_slice(&99u32.to_le_bytes());
+            .copy_from_slice(&1u32.to_le_bytes());
         let error = decode_world(&bytes).expect_err("version must be rejected");
-        assert_eq!(error, "unsupported save version 99 (expected 2)");
+        assert_eq!(error, "unsupported save version 1 (expected 2)");
     }
 
     #[test]
