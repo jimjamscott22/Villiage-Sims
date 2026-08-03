@@ -71,6 +71,7 @@ pub struct World {
     villagers: Vec<Villager>,
     job_board: JobBoard,
     chronicle: Chronicle,
+    unlocked: BTreeSet<String>,
     #[serde(skip)]
     events: Vec<SimEvent>,
     #[serde(skip)]
@@ -103,6 +104,7 @@ impl World {
             villagers: Vec::new(),
             job_board: JobBoard::new(),
             chronicle: Chronicle::new(),
+            unlocked: BTreeSet::new(),
             events: Vec::new(),
             viewport: Viewport {
                 x: 0.0,
@@ -112,6 +114,10 @@ impl World {
             },
         };
         world.spawn_starting_villagers();
+        // Seed the unlock baseline after the world is fully built (villagers spawned,
+        // any starting buildings placed) so buildings with no unlock conditions
+        // (hut, farm) don't emit "unlocked" chronicle entries on the first tick.
+        world.unlocked = world.satisfied_unlocks();
         world
     }
 
@@ -285,6 +291,7 @@ impl World {
             self.tick_villager_at(index);
         }
         self.check_population_dynamics();
+        self.check_unlocks();
     }
 
     pub fn housing_capacity(&self) -> u32 {
@@ -296,6 +303,48 @@ impl World {
             .filter_map(|b| self.catalog.get(b.kind_index).and_then(|def| def.houses))
             .sum();
         base + building_houses
+    }
+
+    /// Every building id whose unlock conditions are currently met.
+    /// A building with no conditions is always unlocked.
+    pub fn satisfied_unlocks(&self) -> BTreeSet<String> {
+        let population = self.villagers.len() as u32;
+        let completed: BTreeSet<&str> = self
+            .buildings
+            .iter()
+            .filter(|b| b.state == BuildState::Complete)
+            .filter_map(|b| self.catalog.get(b.kind_index).map(|def| def.id.as_str()))
+            .collect();
+
+        self.catalog
+            .buildings
+            .iter()
+            .filter(|def| match &def.unlock_conditions {
+                None => true,
+                Some(cond) => {
+                    cond.min_population.is_none_or(|min| population >= min)
+                        && cond
+                            .requires_building
+                            .as_deref()
+                            .is_none_or(|req| completed.contains(req))
+                }
+            })
+            .map(|def| def.id.clone())
+            .collect()
+    }
+
+    pub fn unlocked(&self) -> &BTreeSet<String> {
+        &self.unlocked
+    }
+
+    fn check_unlocks(&mut self) {
+        let satisfied = self.satisfied_unlocks();
+        let newly: Vec<String> = satisfied.difference(&self.unlocked).cloned().collect();
+        for building in newly {
+            let body = ChronicleBody::BuildingUnlocked { building };
+            self.chronicle.push(&self.clock, None, body);
+        }
+        self.unlocked = satisfied;
     }
 
     fn check_population_dynamics(&mut self) {
@@ -3275,5 +3324,65 @@ mod tests {
             unreachable!();
         };
         assert_eq!(dead_name, name, "the entry must carry the name, not just an id");
+    }
+
+    #[test]
+    fn unconditional_buildings_start_unlocked_and_silent() {
+        let world = World::generate(16, 16, 32, 11);
+        assert!(world.unlocked().contains("hut"));
+        assert!(world.unlocked().contains("farm"));
+        assert!(
+            !world
+                .chronicle()
+                .to_vec()
+                .iter()
+                .any(|e| matches!(e.body, ChronicleBody::BuildingUnlocked { .. })),
+            "a fresh world must not narrate its starting unlocks"
+        );
+    }
+
+    #[test]
+    fn requires_building_is_enforced() {
+        let world = World::generate(16, 16, 32, 13);
+        // Mill needs population 6 AND a granary. A fresh world has neither.
+        assert!(
+            !world.satisfied_unlocks().contains("mill"),
+            "mill must stay locked without its granary"
+        );
+    }
+
+    #[test]
+    fn unlock_emits_once_not_every_tick() {
+        let mut world = World::generate(32, 32, 32, 17);
+        // The world starts with 5 villagers, which already satisfies the
+        // granary's min_population:5 condition, so generate()'s seeding step
+        // marks it unlocked silently before the test ever calls advance().
+        // To actually exercise a transition (not just a steady state), drop
+        // below the threshold and re-seed the baseline, then cross it again.
+        world.villagers.truncate(4);
+        world.unlocked = world.satisfied_unlocks();
+        assert!(
+            !world.unlocked.contains("granary"),
+            "precondition: granary must start locked at population 4"
+        );
+        let mut fifth = world.villagers[0].clone();
+        fifth.id = 9999;
+        world.villagers.push(fifth);
+
+        for _ in 0..5 {
+            world.advance();
+        }
+        let count = world
+            .chronicle()
+            .to_vec()
+            .iter()
+            .filter(|e| {
+                matches!(&e.body, ChronicleBody::BuildingUnlocked { building } if building == "granary")
+            })
+            .count();
+        assert_eq!(
+            count, 1,
+            "expected exactly one granary unlock entry after crossing the population threshold, got {count}"
+        );
     }
 }
