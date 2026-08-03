@@ -72,11 +72,6 @@ pub struct World {
     job_board: JobBoard,
     chronicle: Chronicle,
     unlocked: BTreeSet<String>,
-    /// (population, completed-building-count) as of the last `check_unlocks` scan.
-    /// Lets `check_unlocks` skip its O(B log B) rescan when neither has moved since
-    /// the previous tick. `None` forces a rescan (fresh world, or just loaded).
-    #[serde(skip)]
-    unlock_check_signature: Option<(u32, usize)>,
     #[serde(skip)]
     viewport: Viewport,
 }
@@ -108,7 +103,6 @@ impl World {
             job_board: JobBoard::new(),
             chronicle: Chronicle::new(),
             unlocked: BTreeSet::new(),
-            unlock_check_signature: None,
             viewport: Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -347,24 +341,7 @@ impl World {
     /// unlocked even if the conditions later lapse (e.g. population dipping back
     /// below a threshold). `satisfied_unlocks()` is a current-conditions snapshot,
     /// so this only ever grows `self.unlocked`, never shrinks it.
-    ///
-    /// The full scan is skipped whenever neither population nor the completed-
-    /// building count has moved since the last check, since those are the only
-    /// two inputs `satisfied_unlocks()` reads. This keeps the 20 Hz tick loop
-    /// cheap while still reacting within a single tick of a real change.
     fn check_unlocks(&mut self) {
-        let population = self.villagers.len() as u32;
-        let completed_count = self
-            .buildings
-            .iter()
-            .filter(|b| b.state == BuildState::Complete)
-            .count();
-        let signature = (population, completed_count);
-        if self.unlock_check_signature == Some(signature) {
-            return;
-        }
-        self.unlock_check_signature = Some(signature);
-
         let satisfied = self.satisfied_unlocks();
         let newly: Vec<String> = satisfied.difference(&self.unlocked).cloned().collect();
         for building in newly {
