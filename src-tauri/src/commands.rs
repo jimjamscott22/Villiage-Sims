@@ -6,7 +6,7 @@ use tokio::sync::oneshot;
 
 use crate::sim::buildings::{PlacementResult, PlacementValidity};
 use crate::sim::catalog::Catalog;
-use crate::sim::chronicle::ChronicleEntry;
+use crate::sim::chronicle::ChronicleEntryView;
 use crate::sim::commands::SimCommand;
 use crate::snapshot::{TerrainSnapshot, VillagerDetail, WorldInit};
 
@@ -142,7 +142,7 @@ pub(crate) async fn get_villager_detail(
 #[tauri::command]
 pub(crate) async fn get_chronicle(
     state: State<'_, AppState>,
-) -> Result<Vec<ChronicleEntry>, String> {
+) -> Result<Vec<ChronicleEntryView>, String> {
     let (reply, receiver) = oneshot::channel();
     state
         .commands

@@ -244,7 +244,8 @@ impl World {
                 let _ = reply.send(self.terrain_snapshot());
             }
             SimCommand::GetChronicle { reply } => {
-                let _ = reply.send(self.chronicle.to_vec());
+                let views: Vec<_> = self.chronicle.to_vec().iter().map(|e| e.view()).collect();
+                let _ = reply.send(views);
             }
             SimCommand::SaveGame { path, reply } => {
                 let _ = reply.send(crate::persist::save_world(self, &path));

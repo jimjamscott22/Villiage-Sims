@@ -9,7 +9,9 @@ use super::clock::Clock;
 /// Maximum entries retained. Oldest are evicted first.
 pub const CHRONICLE_CAP: usize = 200;
 
-/// What happened. Bincode-serialized with variant indices.
+/// What happened. Storage type: uses externally-tagged enum (variant indices) because bincode
+/// does not support internally-tagged enums. For JSON APIs, use `ChronicleBodyView` which
+/// provides a discriminated union with the `kind` field — see `ChronicleEntry::view()`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ChronicleBody {
@@ -131,6 +133,106 @@ impl Chronicle {
     }
 }
 
+impl ChronicleEntry {
+    /// Convert storage entry to JSON wire form with internally-tagged body.
+    pub fn view(&self) -> ChronicleEntryView {
+        ChronicleEntryView {
+            seq: self.seq,
+            tick: self.tick,
+            day: self.day,
+            season: self.season,
+            year: self.year,
+            focus: self.focus,
+            body: self.body.view(),
+        }
+    }
+}
+
+impl ChronicleBody {
+    /// Convert storage body to JSON wire form with kind discriminator.
+    pub fn view(&self) -> ChronicleBodyView {
+        match self {
+            ChronicleBody::VillagerBorn { id, name } => ChronicleBodyView::VillagerBorn {
+                id: *id,
+                name: name.clone(),
+            },
+            ChronicleBody::VillagerDied { id, name, cause } => ChronicleBodyView::VillagerDied {
+                id: *id,
+                name: name.clone(),
+                cause: cause.clone(),
+            },
+            ChronicleBody::BuildingComplete { id, building } => {
+                ChronicleBodyView::BuildingComplete {
+                    id: *id,
+                    building: building.clone(),
+                }
+            }
+            ChronicleBody::BuildingUnlocked { building } => ChronicleBodyView::BuildingUnlocked {
+                building: building.clone(),
+            },
+            ChronicleBody::HarvestReady {
+                site,
+                building,
+                count,
+            } => ChronicleBodyView::HarvestReady {
+                site: *site,
+                building: building.clone(),
+                count: *count,
+            },
+            ChronicleBody::SeasonTurned { season, year } => ChronicleBodyView::SeasonTurned {
+                season: *season,
+                year: *year,
+            },
+        }
+    }
+}
+
+/// JSON wire form of a chronicle entry. Serialize only — never persisted.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChronicleEntryView {
+    pub seq: u64,
+    pub tick: u64,
+    pub day: u32,
+    pub season: u8,
+    pub year: u32,
+    pub focus: Option<(i32, i32)>,
+    pub body: ChronicleBodyView,
+}
+
+/// Internally tagged so the frontend gets a clean discriminated union on `kind`.
+/// Serialize only — never persisted. No variant may carry a field named `kind` — it would
+/// collide with the tag. See `ChronicleBody` for the storage type.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ChronicleBodyView {
+    VillagerBorn {
+        id: u32,
+        name: String,
+    },
+    VillagerDied {
+        id: u32,
+        name: String,
+        cause: String,
+    },
+    BuildingComplete {
+        id: u32,
+        building: String,
+    },
+    BuildingUnlocked {
+        building: String,
+    },
+    HarvestReady {
+        site: u32,
+        building: Option<String>,
+        count: u32,
+    },
+    SeasonTurned {
+        season: u8,
+        year: u32,
+    },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246,5 +348,40 @@ mod tests {
         assert_eq!(entry.day, 12);
         assert_eq!(entry.year, 3);
         assert_eq!(entry.focus, Some((4, 5)));
+    }
+
+    #[test]
+    fn view_is_internally_tagged_in_json() {
+        use serde_json;
+        let clock = Clock::new();
+        let mut chronicle = Chronicle::new();
+        chronicle.push(&clock, None, born(42));
+        let entry = chronicle.back().unwrap();
+        let view = entry.view();
+
+        let json = serde_json::to_string(&view).expect("serialize to json");
+        assert!(
+            json.contains("\"kind\":\"villagerBorn\""),
+            "JSON must contain kind discriminator; got: {json}"
+        );
+        assert!(
+            json.contains("\"id\":42"),
+            "JSON must contain id field; got: {json}"
+        );
+    }
+
+    #[test]
+    fn storage_body_round_trips_via_bincode() {
+        // Test that storage body (untagged) survives bincode serialization.
+        // This is the regression guard for the tag removal — if someone re-adds the tag,
+        // this will fail.
+        let body = born(1);
+        let config = bincode::config::standard().with_limit::<{ 64 * 1024 * 1024 }>();
+        let encoded = bincode::serde::encode_to_vec(&body, config)
+            .expect("encode storage body");
+        let (decoded, _): (ChronicleBody, usize) =
+            bincode::serde::decode_from_slice(&encoded, config)
+                .expect("decode storage body");
+        assert_eq!(decoded, body);
     }
 }
