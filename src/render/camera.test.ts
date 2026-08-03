@@ -38,4 +38,22 @@ describe('Camera', () => {
     camera.fitWorld(1024, 768, 1280, 800);
     expect(camera.zoom).toBeCloseTo(Math.min(1280 / 1024, 800 / 768) * 0.92, 5);
   });
+
+  it('centres the viewport on a tile', () => {
+    const camera = new Camera();
+    camera.zoom = 1;
+    camera.centerOnTile(10, 20, 32, 800, 600);
+    // Tile centre is (336, 656); half the viewport is (400, 300).
+    expect(camera.x).toBeCloseTo(336 - 400);
+    expect(camera.y).toBeCloseTo(656 - 300);
+  });
+
+  it('accounts for zoom when centring', () => {
+    const camera = new Camera();
+    camera.zoom = 2;
+    camera.centerOnTile(10, 20, 32, 800, 600);
+    // Same tile centre, but half the viewport shrinks to (200, 150) at 2x zoom.
+    expect(camera.x).toBeCloseTo(336 - 200);
+    expect(camera.y).toBeCloseTo(656 - 150);
+  });
 });

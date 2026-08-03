@@ -31,6 +31,7 @@ interface CanvasProps {
   onSelectBuilding: (id: number | null) => void;
   onSelectVillager: (id: number | null) => void;
   onSnapshot: (snapshot: TickSnapshot) => void;
+  focusTile?: [number, number] | null;
 }
 
 function rotatedFootprint(def: BuildingDef, rotation: number): [number, number] {
@@ -65,8 +66,11 @@ export function Canvas({
   onSelectBuilding,
   onSelectVillager,
   onSnapshot,
+  focusTile = null,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cameraRef = useRef(new Camera());
+  const terrainRef = useRef<TerrainSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const errorRef = useRef<string | null>(null);
@@ -118,6 +122,20 @@ export function Canvas({
   }, [onCancelBuild]);
 
   useEffect(() => {
+    if (!focusTile) return;
+    const canvas = canvasRef.current;
+    const terrain = terrainRef.current;
+    if (!canvas || !terrain) return;
+    cameraRef.current.centerOnTile(
+      focusTile[0],
+      focusTile[1],
+      terrain.tileSize,
+      canvas.clientWidth,
+      canvas.clientHeight,
+    );
+  }, [focusTile]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -127,7 +145,7 @@ export function Canvas({
     }
 
     const buffer = new SnapshotBuffer();
-    const camera = new Camera();
+    const camera = cameraRef.current;
     let terrain: TerrainSnapshot | null = null;
     let terrainLayer: HTMLCanvasElement | null = null;
     let atlas: Atlas | null = null;
@@ -312,6 +330,7 @@ export function Canvas({
         const loadedTerrain = await transport.getTerrain();
         if (cancelled) return;
         terrain = loadedTerrain;
+        terrainRef.current = terrain;
         worldWidth = terrain.width * terrain.tileSize;
         worldHeight = terrain.height * terrain.tileSize;
         terrainLayer = document.createElement('canvas');
