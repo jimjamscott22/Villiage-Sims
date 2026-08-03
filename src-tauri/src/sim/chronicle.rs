@@ -351,22 +351,172 @@ mod tests {
     }
 
     #[test]
-    fn view_is_internally_tagged_in_json() {
+    fn wire_view_has_correct_kind_discriminant_and_fields_for_all_variants() {
         use serde_json;
+
+        let clock = Clock::new();
+
+        // Test data: (body, expected_kind, expected_field_checks)
+        // Each check is a closure that validates JSON content
+        let test_cases: Vec<(
+            ChronicleBody,
+            &str,
+            Vec<Box<dyn Fn(&str) -> bool>>,
+        )> = vec![
+            // VillagerBorn: check kind and name field
+            (
+                ChronicleBody::VillagerBorn {
+                    id: 42,
+                    name: "Anya".to_string(),
+                },
+                "villagerBorn",
+                vec![
+                    Box::new(|json: &str| json.contains("\"id\":42")),
+                    Box::new(|json: &str| json.contains("\"name\":\"Anya\"")),
+                ],
+            ),
+            // VillagerDied: check kind, name, and cause fields
+            (
+                ChronicleBody::VillagerDied {
+                    id: 7,
+                    name: "Bob".to_string(),
+                    cause: "starvation".to_string(),
+                },
+                "villagerDied",
+                vec![
+                    Box::new(|json: &str| json.contains("\"id\":7")),
+                    Box::new(|json: &str| json.contains("\"name\":\"Bob\"")),
+                    Box::new(|json: &str| json.contains("\"cause\":\"starvation\"")),
+                ],
+            ),
+            // BuildingComplete: check kind and building field (not kind field)
+            (
+                ChronicleBody::BuildingComplete {
+                    id: 99,
+                    building: "mill".to_string(),
+                },
+                "buildingComplete",
+                vec![
+                    Box::new(|json: &str| json.contains("\"id\":99")),
+                    Box::new(|json: &str| json.contains("\"building\":\"mill\"")),
+                ],
+            ),
+            // BuildingUnlocked: check kind and building field
+            (
+                ChronicleBody::BuildingUnlocked {
+                    building: "granary".to_string(),
+                },
+                "buildingUnlocked",
+                vec![Box::new(|json: &str| json.contains("\"building\":\"granary\""))],
+            ),
+            // HarvestReady with Some(building): check site, count, building
+            (
+                ChronicleBody::HarvestReady {
+                    site: 15,
+                    building: Some("farm".to_string()),
+                    count: 3,
+                },
+                "harvestReady",
+                vec![
+                    Box::new(|json: &str| json.contains("\"site\":15")),
+                    Box::new(|json: &str| json.contains("\"count\":3")),
+                    Box::new(|json: &str| json.contains("\"building\":\"farm\"")),
+                ],
+            ),
+            // HarvestReady with None(building): check site, count, null building
+            (
+                ChronicleBody::HarvestReady {
+                    site: 20,
+                    building: None,
+                    count: 5,
+                },
+                "harvestReady",
+                vec![
+                    Box::new(|json: &str| json.contains("\"site\":20")),
+                    Box::new(|json: &str| json.contains("\"count\":5")),
+                    Box::new(|json: &str| json.contains("\"building\":null")),
+                ],
+            ),
+            // SeasonTurned: check kind, season, and year fields
+            (
+                ChronicleBody::SeasonTurned {
+                    season: 2,
+                    year: 4,
+                },
+                "seasonTurned",
+                vec![
+                    Box::new(|json: &str| json.contains("\"season\":2")),
+                    Box::new(|json: &str| json.contains("\"year\":4")),
+                ],
+            ),
+        ];
+
+        // Test each variant
+        for (body, expected_kind, field_checks) in test_cases {
+            let mut chronicle = Chronicle::new();
+            chronicle.push(&clock, None, body);
+            let entry = chronicle.back().unwrap();
+            let view = entry.view();
+
+            let json = serde_json::to_string(&view).expect("serialize to json");
+
+            // Check kind discriminator
+            let kind_field = format!("\"kind\":\"{}\"", expected_kind);
+            assert!(
+                json.contains(&kind_field),
+                "JSON for {} must contain kind discriminator '{}'; got: {}",
+                expected_kind,
+                kind_field,
+                json
+            );
+
+            // Check all field assertions for this variant
+            for check in field_checks {
+                assert!(
+                    check(&json),
+                    "Field validation failed for {} variant; JSON: {}",
+                    expected_kind,
+                    json
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn wire_view_encodes_focus_coordinates_correctly() {
+        use serde_json;
+
         let clock = Clock::new();
         let mut chronicle = Chronicle::new();
-        chronicle.push(&clock, None, born(42));
-        let entry = chronicle.back().unwrap();
-        let view = entry.view();
 
-        let json = serde_json::to_string(&view).expect("serialize to json");
+        // Test with Some(focus)
+        chronicle.push(&clock, Some((3, 4)), ChronicleBody::VillagerBorn {
+            id: 1,
+            name: "Test".to_string(),
+        });
+        let entry_with_focus = chronicle.back().unwrap();
+        let view_with_focus = entry_with_focus.view();
+        let json_with_focus =
+            serde_json::to_string(&view_with_focus).expect("serialize with focus");
         assert!(
-            json.contains("\"kind\":\"villagerBorn\""),
-            "JSON must contain kind discriminator; got: {json}"
+            json_with_focus.contains("\"focus\":[3,4]"),
+            "focus should render as JSON array [3,4]; got: {}",
+            json_with_focus
         );
+
+        // Test with None(focus)
+        chronicle.push(&clock, None, ChronicleBody::VillagerBorn {
+            id: 2,
+            name: "Test2".to_string(),
+        });
+        let entry_no_focus = chronicle.back().unwrap();
+        let view_no_focus = entry_no_focus.view();
+        let json_no_focus =
+            serde_json::to_string(&view_no_focus).expect("serialize without focus");
         assert!(
-            json.contains("\"id\":42"),
-            "JSON must contain id field; got: {json}"
+            json_no_focus.contains("\"focus\":null"),
+            "focus should render as null when None; got: {}",
+            json_no_focus
         );
     }
 
