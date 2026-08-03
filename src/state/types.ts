@@ -62,10 +62,23 @@ export interface ClockView {
   speed: number;
 }
 
-export type SimEvent =
-  | { kind: 'cropReady'; id: number }
+export type ChronicleBody =
   | { kind: 'villagerBorn'; id: number; name: string }
-  | { kind: 'villagerDied'; id: number; cause: string };
+  | { kind: 'villagerDied'; id: number; name: string; cause: string }
+  | { kind: 'buildingComplete'; id: number; building: string }
+  | { kind: 'buildingUnlocked'; building: string }
+  | { kind: 'harvestReady'; site: number; building: string | null; count: number }
+  | { kind: 'seasonTurned'; season: number; year: number };
+
+export interface ChronicleEntry {
+  seq: number;
+  tick: number;
+  day: number;
+  season: number;
+  year: number;
+  focus: [number, number] | null;
+  body: ChronicleBody;
+}
 
 export interface ResourceTotals {
   wood: number;
@@ -84,7 +97,8 @@ export interface TickSnapshot {
   resources: ResourceTotals;
   housingCapacity: number;
   clock: ClockView;
-  events: SimEvent[];
+  chronicleSeq: number;
+  unlocked: string[];
 }
 
 export interface RecipeDef {

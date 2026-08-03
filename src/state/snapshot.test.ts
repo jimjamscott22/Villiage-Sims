@@ -12,7 +12,8 @@ const tick = (number: number, x: number): TickSnapshot => ({
   resources,
   housingCapacity: 5,
   clock: { minute: 0, day: 1, season: 0, year: 1, speed: 1 },
-  events: [],
+  chronicleSeq: 0,
+  unlocked: [],
 });
 
 describe('SnapshotBuffer', () => {
