@@ -1625,16 +1625,28 @@ export class DemoWorld {
       crop.stage = Math.min(maxStage, crop.stage + 1);
       if (crop.stage >= maxStage && !crop.readyEmitted) {
         crop.readyEmitted = true;
-        const farmId = this.completedFarmAt(crop.x, crop.y);
-        const farm = farmId == null ? null : this.buildings.find((b) => b.id === farmId);
-        this.pushChronicle(farm ? [farm.x, farm.y] : [crop.x, crop.y], {
+        // Shared harvest-site rule (also encoded in world.rs's `tick_crops`):
+        // whatever building occupies the crop's tile is the harvest site,
+        // regardless of its kind or completion state. This is deliberately
+        // looser than "a completed farm" — crops can only be planted on
+        // completed farms today, so the two conditions coincide, but this is
+        // the rule that's actually authoritative on the Rust side.
+        const occupant = this.occupantBuildingAt(crop.x, crop.y);
+        this.pushChronicle(occupant ? [occupant.x, occupant.y] : [crop.x, crop.y], {
           kind: 'harvestReady',
-          site: farm ? farm.id : crop.id,
-          building: farm ? DEMO_CATALOG.buildings[farm.kindIndex].id : null,
+          site: occupant ? occupant.id : crop.id,
+          building: occupant ? DEMO_CATALOG.buildings[occupant.kindIndex].id : null,
           count: 1,
         });
       }
     }
+  }
+
+  private occupantBuildingAt(x: number, y: number): DemoBuilding | null {
+    const index = y * this.terrain.width + x;
+    const buildingId = this.occupancy[index];
+    if (buildingId == null) return null;
+    return this.buildings.find((b) => b.id === buildingId) ?? null;
   }
 
   private completedFarmAt(x: number, y: number): number | null {
