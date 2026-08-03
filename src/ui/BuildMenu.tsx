@@ -7,7 +7,7 @@ interface BuildMenuProps {
   selectedCrop: string | null;
   selectedBuildingId: number | null;
   villagerDetail: VillagerDetail | null;
-  population?: number;
+  unlocked: string[];
   persistenceStatus: string;
   persistenceBusy: boolean;
   onSelectKind: (kind: string | null) => void;
@@ -36,7 +36,7 @@ export function BuildMenu({
   selectedCrop,
   selectedBuildingId,
   villagerDetail,
-  population = 0,
+  unlocked,
   persistenceStatus,
   persistenceBusy,
   onSelectKind,
@@ -79,8 +79,7 @@ export function BuildMenu({
         <ul className="mt-2 flex flex-col gap-1">
           {(catalog?.buildings ?? []).map((building: BuildingDef) => {
             const active = selectedKind === building.id;
-            const minPop = building.unlockConditions?.minPopulation;
-            const locked = minPop != null && population < minPop;
+            const locked = !unlocked.includes(building.id);
 
             return (
               <li key={building.id}>
@@ -100,7 +99,9 @@ export function BuildMenu({
                     <span>{building.name}</span>
                     {locked && (
                       <span className="text-[10px] text-amber-400 font-normal">
-                        🔒 Pop {minPop}+
+                        🔒 {building.unlockConditions?.minPopulation != null
+                          ? `Pop ${building.unlockConditions.minPopulation}+`
+                          : 'Locked'}
                       </span>
                     )}
                   </div>

@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Canvas } from './render/Canvas';
 import { transport } from './state/transport';
-import type { Catalog, ClockView, ResourceTotals, TickSnapshot, VillagerDetail } from './state/types';
+import type {
+  Catalog,
+  ChronicleEntry,
+  ClockView,
+  ResourceTotals,
+  TickSnapshot,
+  VillagerDetail,
+} from './state/types';
 import { BuildMenu } from './ui/BuildMenu';
+import { ChronicleDrawer } from './ui/ChronicleDrawer';
 import { ClockBar } from './ui/ClockBar';
 import { ResourceBar } from './ui/ResourceBar';
 
@@ -57,12 +65,28 @@ export default function App() {
 
   const [population, setPopulation] = useState<number>(0);
   const [housingCapacity, setHousingCapacity] = useState<number>(0);
+  const [chronicle, setChronicle] = useState<ChronicleEntry[]>([]);
+  const [, setChronicleSeq] = useState(-1);
+  const [chronicleCollapsed, setChronicleCollapsed] = useState(true);
+  const [focusTile, setFocusTile] = useState<[number, number] | null>(null);
+  const [unlocked, setUnlocked] = useState<string[]>([]);
 
   const onSnapshot = (snapshot: TickSnapshot) => {
     setResources(snapshot.resources);
     setClock(snapshot.clock);
     setPopulation(snapshot.villagers.length);
     setHousingCapacity(snapshot.housingCapacity ?? 0);
+    setUnlocked(snapshot.unlocked ?? []);
+    setChronicleSeq((previous) => {
+      if (snapshot.chronicleSeq === previous) return previous;
+      void transport
+        .getChronicle()
+        .then(setChronicle)
+        .catch(() => {
+          /* chronicle is best-effort; the next tick retries */
+        });
+      return snapshot.chronicleSeq;
+    });
   };
 
   const onDemolish = async () => {
@@ -105,6 +129,8 @@ export default function App() {
       setSelectedCrop(null);
       setSelectedBuildingId(null);
       setRotation(0);
+      setChronicle([]);
+      setChronicleSeq(-1);
       setWorldKey((key) => key + 1);
       setPersistenceStatus('Slot 1 · Loaded');
       setError(null);
@@ -147,6 +173,7 @@ export default function App() {
           onSelectBuilding={setSelectedBuildingId}
           onSelectVillager={setSelectedVillagerId}
           onSnapshot={onSnapshot}
+          focusTile={focusTile}
         />
         <BuildMenu
           catalog={catalog}
@@ -154,7 +181,7 @@ export default function App() {
           selectedCrop={selectedCrop}
           selectedBuildingId={selectedBuildingId}
           villagerDetail={villagerDetail}
-          population={population}
+          unlocked={unlocked}
           persistenceStatus={persistenceStatus}
           persistenceBusy={persistenceBusy}
           onSelectKind={(kind) => {
@@ -179,6 +206,13 @@ export default function App() {
           }}
         />
       </div>
+      <ChronicleDrawer
+        entries={chronicle}
+        catalog={catalog}
+        collapsed={chronicleCollapsed}
+        onToggle={() => setChronicleCollapsed((value) => !value)}
+        onFocus={(tile) => setFocusTile(tile)}
+      />
     </main>
   );
 }

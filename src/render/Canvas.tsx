@@ -31,7 +31,7 @@ interface CanvasProps {
   onSelectBuilding: (id: number | null) => void;
   onSelectVillager: (id: number | null) => void;
   onSnapshot: (snapshot: TickSnapshot) => void;
-  focusTile?: [number, number] | null;
+  focusTile: [number, number] | null;
 }
 
 function rotatedFootprint(def: BuildingDef, rotation: number): [number, number] {
@@ -66,7 +66,7 @@ export function Canvas({
   onSelectBuilding,
   onSelectVillager,
   onSnapshot,
-  focusTile = null,
+  focusTile,
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cameraRef = useRef(new Camera());
@@ -86,6 +86,7 @@ export function Canvas({
   const onSelectVillagerRef = useRef(onSelectVillager);
   const onRotationChangeRef = useRef(onRotationChange);
   const onCancelBuildRef = useRef(onCancelBuild);
+  const scheduleViewportSyncRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     selectedKindRef.current = selectedKind;
@@ -133,6 +134,10 @@ export function Canvas({
       canvas.clientWidth,
       canvas.clientHeight,
     );
+    // Buildings are viewport-culled server-side; without this the sim doesn't
+    // know the camera jumped, and the focused building drops out of the next
+    // snapshot and renders as empty ground.
+    scheduleViewportSyncRef.current?.();
   }, [focusTile]);
 
   useEffect(() => {
@@ -187,6 +192,7 @@ export function Canvas({
         void transport.setViewport(rect.x, rect.y, rect.w, rect.h);
       }, VIEWPORT_DEBOUNCE_MS);
     };
+    scheduleViewportSyncRef.current = scheduleViewportSync;
 
     const resize = () => {
       const parent = canvas.parentElement;
@@ -583,6 +589,7 @@ export function Canvas({
       cancelled = true;
       cancelAnimationFrame(frame);
       unlisten?.();
+      scheduleViewportSyncRef.current = null;
       if (viewportTimer !== null) window.clearTimeout(viewportTimer);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('resize', resize);
