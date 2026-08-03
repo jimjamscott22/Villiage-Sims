@@ -132,13 +132,6 @@ impl Villager {
         self
     }
 
-    pub fn target_tile(&self) -> Option<(i32, i32)> {
-        match self.state {
-            AgentState::MovingTo { target, .. } => Some(target),
-            _ => None,
-        }
-    }
-
     pub fn clear_path_to_idle(&mut self) {
         self.state = AgentState::Idle;
         self.path = None;

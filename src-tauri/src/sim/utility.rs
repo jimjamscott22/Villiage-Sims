@@ -52,7 +52,7 @@ pub struct ScoredAction {
 }
 
 pub fn is_night(minute: u32) -> bool {
-    minute >= NIGHT_START_MINUTE || minute < NIGHT_END_MINUTE
+    !(NIGHT_END_MINUTE..NIGHT_START_MINUTE).contains(&minute)
 }
 
 pub fn distance_factor(dist: i32) -> f32 {

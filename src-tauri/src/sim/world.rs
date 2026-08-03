@@ -1098,12 +1098,12 @@ impl World {
             }
             AgentState::Idle | AgentState::Working { .. } => {
                 self.maybe_decide(index);
-                match self.villagers[index].state.clone() {
-                    AgentState::Working {
-                        job,
-                        ticks_remaining,
-                    } => self.tick_working(index, job, ticks_remaining),
-                    _ => {}
+                if let AgentState::Working {
+                    job,
+                    ticks_remaining,
+                } = self.villagers[index].state.clone()
+                {
+                    self.tick_working(index, job, ticks_remaining);
                 }
             }
         }
@@ -1123,11 +1123,10 @@ impl World {
         // retaining them as `current_action` feeds a near-zero live score into
         // hysteresis and traps the villager (re-eat until food is gone, then stuck).
         if matches!(self.villagers[index].state, AgentState::Idle) {
-            match self.villagers[index].current_action {
-                Some(ActionKind::Eat | ActionKind::Sleep | ActionKind::Socialize) => {
-                    self.villagers[index].current_action = None;
-                }
-                _ => {}
+            if let Some(ActionKind::Eat | ActionKind::Sleep | ActionKind::Socialize) =
+                self.villagers[index].current_action
+            {
+                self.villagers[index].current_action = None;
             }
         }
 
@@ -2252,7 +2251,7 @@ impl World {
         };
         let tiles = self.farm_footprint_tiles(job.site);
         for crop in &mut self.crops {
-            if tiles.iter().any(|&tile| tile == crop.tile) {
+            if tiles.contains(&crop.tile) {
                 crop.watered = true;
             }
         }
@@ -2264,7 +2263,7 @@ impl World {
         };
         let tiles = self.farm_footprint_tiles(job.site);
         let Some(crop_index) = self.crops.iter().position(|crop| {
-            tiles.iter().any(|&tile| tile == crop.tile)
+            tiles.contains(&crop.tile)
                 && self
                     .catalog
                     .get_crop(crop.kind_index)
@@ -2355,8 +2354,7 @@ impl World {
     }
 
     fn remove_crops_on_tiles(&mut self, tiles: &[(i32, i32)]) {
-        self.crops
-            .retain(|crop| !tiles.iter().any(|&tile| tile == crop.tile));
+        self.crops.retain(|crop| !tiles.contains(&crop.tile));
     }
 
     pub fn demolish(&mut self, entity_id: u32) -> Result<(), String> {
