@@ -76,10 +76,12 @@ impl Chronicle {
         self.next_seq
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -253,6 +255,15 @@ mod tests {
     }
 
     #[test]
+    fn is_empty_reflects_entry_count() {
+        let clock = Clock::new();
+        let mut chronicle = Chronicle::new();
+        assert!(chronicle.is_empty());
+        chronicle.push(&clock, None, born(1));
+        assert!(!chronicle.is_empty());
+    }
+
+    #[test]
     fn evicts_oldest_past_cap() {
         let clock = Clock::new();
         let mut chronicle = Chronicle::new();
@@ -358,11 +369,9 @@ mod tests {
 
         // Test data: (body, expected_kind, expected_field_checks)
         // Each check is a closure that validates JSON content
-        let test_cases: Vec<(
-            ChronicleBody,
-            &str,
-            Vec<Box<dyn Fn(&str) -> bool>>,
-        )> = vec![
+        type FieldCheck = Box<dyn Fn(&str) -> bool>;
+        type TestCase = (ChronicleBody, &'static str, Vec<FieldCheck>);
+        let test_cases: Vec<TestCase> = vec![
             // VillagerBorn: check kind and name field
             (
                 ChronicleBody::VillagerBorn {
