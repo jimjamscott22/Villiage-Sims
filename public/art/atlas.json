@@ -1,7 +1,8 @@
 {
   "sheets": {
     "tiles": "tiles.png",
-    "entities": "entities.png"
+    "entities": "entities.png",
+    "ui": "ui.png"
   },
   "cells": {
     "bakery": {
@@ -119,6 +120,13 @@
       "w": 16,
       "h": 16,
       "frames": 3
+    },
+    "font.strip": {
+      "sheet": "ui",
+      "x": 0,
+      "y": 18,
+      "w": 144,
+      "h": 14
     },
     "fringe.deepWater.e": {
       "sheet": "tiles",
@@ -744,6 +752,160 @@
       "y": 96,
       "w": 16,
       "h": 16
+    },
+    "ui.bar.notch": {
+      "sheet": "ui",
+      "x": 184,
+      "y": 18,
+      "w": 4,
+      "h": 6
+    },
+    "ui.bar.notch.empty": {
+      "sheet": "ui",
+      "x": 188,
+      "y": 18,
+      "w": 4,
+      "h": 6
+    },
+    "ui.bracket.bl": {
+      "sheet": "ui",
+      "x": 144,
+      "y": 18,
+      "w": 8,
+      "h": 8
+    },
+    "ui.bracket.br": {
+      "sheet": "ui",
+      "x": 152,
+      "y": 18,
+      "w": 8,
+      "h": 8
+    },
+    "ui.bracket.tl": {
+      "sheet": "ui",
+      "x": 160,
+      "y": 18,
+      "w": 8,
+      "h": 8
+    },
+    "ui.bracket.tr": {
+      "sheet": "ui",
+      "x": 168,
+      "y": 18,
+      "w": 8,
+      "h": 8
+    },
+    "ui.icon.autumn": {
+      "sheet": "ui",
+      "x": 18,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.flour": {
+      "sheet": "ui",
+      "x": 34,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.food": {
+      "sheet": "ui",
+      "x": 50,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.gold": {
+      "sheet": "ui",
+      "x": 66,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.grain": {
+      "sheet": "ui",
+      "x": 82,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.lock": {
+      "sheet": "ui",
+      "x": 176,
+      "y": 18,
+      "w": 8,
+      "h": 8
+    },
+    "ui.icon.pause": {
+      "sheet": "ui",
+      "x": 98,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.speed1": {
+      "sheet": "ui",
+      "x": 114,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.speed2": {
+      "sheet": "ui",
+      "x": 130,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.speed3": {
+      "sheet": "ui",
+      "x": 146,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.spring": {
+      "sheet": "ui",
+      "x": 162,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.stone": {
+      "sheet": "ui",
+      "x": 178,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.summer": {
+      "sheet": "ui",
+      "x": 194,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.winter": {
+      "sheet": "ui",
+      "x": 210,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.icon.wood": {
+      "sheet": "ui",
+      "x": 226,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
+    "ui.panel": {
+      "sheet": "ui",
+      "x": 0,
+      "y": 0,
+      "w": 18,
+      "h": 18
     },
     "villager.e.idle.0": {
       "sheet": "entities",

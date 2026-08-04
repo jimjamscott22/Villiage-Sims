@@ -331,9 +331,19 @@ export function buildDrawList(input: SceneInput): DrawEntry[] {
 
 /** Paint a previously built draw list. */
 export function paintScene(ctx: CanvasRenderingContext2D, atlas: Atlas, list: DrawEntry[]): void {
+  const hasUiBrackets = atlas.manifest.cells['ui.bracket.tl'] != null;
+
   for (const entry of list) {
     if (entry.key === '__building_sel__' || entry.key === '__villager_sel__') {
-      drawSelectionBrackets(ctx, entry.x, entry.y, entry.selW ?? 16, entry.selH ?? 16);
+      drawSelectionBrackets(
+        ctx,
+        atlas,
+        entry.x,
+        entry.y,
+        entry.selW ?? 16,
+        entry.selH ?? 16,
+        hasUiBrackets,
+      );
       continue;
     }
     if (entry.key.startsWith('__')) continue;
@@ -354,11 +364,27 @@ export function paintScene(ctx: CanvasRenderingContext2D, atlas: Atlas, list: Dr
 
 function drawSelectionBrackets(
   ctx: CanvasRenderingContext2D,
+  atlas: Atlas,
   x: number,
   y: number,
   w: number,
   h: number,
+  useAtlas: boolean,
 ): void {
+  if (useAtlas) {
+    const size = 8 * ART_SCALE;
+    const corners: Array<{ key: string; dx: number; dy: number }> = [
+      { key: 'ui.bracket.tl', dx: x, dy: y },
+      { key: 'ui.bracket.tr', dx: x + w - size, dy: y },
+      { key: 'ui.bracket.bl', dx: x, dy: y + h - size },
+      { key: 'ui.bracket.br', dx: x + w - size, dy: y + h - size },
+    ];
+    for (const corner of corners) {
+      drawCell(ctx, atlas, corner.key, corner.dx, corner.dy, 0, ART_SCALE);
+    }
+    return;
+  }
+
   const len = Math.min(8, w / 3, h / 3);
   ctx.strokeStyle = '#f4c95d';
   ctx.lineWidth = 2;
