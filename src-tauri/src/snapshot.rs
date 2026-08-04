@@ -38,6 +38,8 @@ pub struct TickSnapshot {
     pub chronicle_seq: u64,
     /// Building ids whose unlock conditions are met.
     pub unlocked: Vec<String>,
+    /// Last rotating autosave slot written this session (`1..=3`), if any.
+    pub last_autosave_slot: Option<u8>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]

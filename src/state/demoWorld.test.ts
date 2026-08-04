@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateDemoTerrain } from './demoTerrain';
-import { DEMO_CATALOG, DemoWorld } from './demoWorld';
+import { DEMO_CATALOG, DemoWorld, demoWeatherFor } from './demoWorld';
 
 function grassTerrain(width = 16, height = 16) {
   return {
@@ -529,5 +529,27 @@ describe('DemoWorld pathfinding', () => {
     expect(() => DemoWorld.importState(JSON.stringify(state))).toThrow(
       'unsupported save version 99 (expected 1)',
     );
+  });
+
+  it('exposes deterministic weather and rotates autosaves on day rollover', () => {
+    const saves = new Map<number, string>();
+    const world = new DemoWorld(grassTerrain(16, 16));
+    world.bindAutosave(saves);
+
+    expect(world.snapshot().clock.weather).toBe(
+      demoWeatherFor(42, 1, 0, 1),
+    );
+
+    world.advanceClock(1, null);
+    expect(world.snapshot().lastAutosaveSlot).toBe(2);
+    expect(saves.has(2)).toBe(true);
+
+    world.advanceClock(1, null);
+    expect(world.snapshot().lastAutosaveSlot).toBe(3);
+    expect(saves.has(3)).toBe(true);
+
+    world.advanceClock(1, null);
+    expect(world.snapshot().lastAutosaveSlot).toBe(1);
+    expect(saves.has(1)).toBe(true);
   });
 });

@@ -40,14 +40,19 @@ status/handoff notes are in `progress.md` (check this first — it's updated eve
 - Persistence (M10, in progress): Save/Load buttons in the build menu read/write a single fixed
   slot (slot 1) via `saveGame`/`loadGame`. Desktop writes a versioned binary file
   (`src-tauri/src/persist.rs`, `SAVE_VERSION` 2). Browser-demo keeps saves in-memory only.
+  Autosave rotates through slots 1–3 every in-game day (desktop writes under the app data
+  `saves/` dir; browser-demo writes the same in-memory map).
 - Chronicle (M10): a capped 200-entry log in `World.chronicle`, persisted with the save. The tick
   snapshot carries only `chronicleSeq`; the frontend refetches via `get_chronicle` when it changes.
   Never accumulate events from tick payloads — the `watch` channel drops intermediate snapshots.
   Toggle the drawer beneath the map; click an entry to centre the camera. Clicking also syncs the
   viewport to the sim first, since `building_views()` viewport-culls buildings and a raw camera
   jump can land on a building that hasn't been rendered yet. Browser-demo has no births or deaths,
-  so `villagerBorn`/`villagerDied` entries are desktop-only. Next up: autosaves, weather — see
-  `progress.md`.
+  so `villagerBorn`/`villagerDied` entries are desktop-only.
+- Weather (M10): deterministic daily Clear/Rain/Storm from `(seed, year, season, day)` — not stored
+  in the save. Rain/Storm re-water outdoor crops after the daily clear; Storm knocks one building
+  back to under-construction at half progress. ClockBar shows the current weather. Next up:
+  camera/interaction polish — see `progress.md`.
 
 ### Non-obvious gotchas
 

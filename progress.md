@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-08-04 (Art Phase 3 pixel HUD complete; M10 persistence in progress).
+Last updated: 2026-08-04 (M10 autosave + weather; camera polish remains).
 
 ## Status
 
@@ -15,14 +15,14 @@ Last updated: 2026-08-04 (Art Phase 3 pixel HUD complete; M10 persistence in pro
 | M7 — Utility AI | Complete on `main` | [#10](https://github.com/jimjamscott22/Villiage-Sims/pull/10) (+ [#11](https://github.com/jimjamscott22/Villiage-Sims/pull/11) hysteresis fix) |
 | M8 — Economy and production chains | Complete on `main` | [#12](https://github.com/jimjamscott22/Villiage-Sims/pull/12) |
 | **M9 — Population and progression** | **Complete** | — |
-| **M10 — Persistence and polish** | **In progress: save/load + event log done; autosave and weather remain** | [#17](https://github.com/jimjamscott22/Villiage-Sims/pull/17) |
+| **M10 — Persistence and polish** | **In progress: save/load + chronicle + autosave + weather done; camera/interaction polish remains** | — |
 | Art — Phase 1 (pipeline + terrain) | Complete | [#21](https://github.com/jimjamscott22/Villiage-Sims/pull/21) |
 | Art — Phase 2 (entities + y-sort) | Complete | — |
 | **Art — Phase 3 (pixel HUD)** | **Complete** | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 
-## What works today (M1–M9)
+## What works today (M1–M10 partial)
 
 - Tauri 2 + React Canvas; Rust owns a 20 Hz sim thread; frontend interpolates at RAF.
 - Seeded `128×128` island terrain (`noise`), pan/zoom camera, offscreen terrain blit.
@@ -33,18 +33,22 @@ Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 - Character Traits: `traits.json` assigned to villagers and rendered in `VillagerPanel`.
 - Tech / Progression Tree: buildings locked in `BuildMenu` until population or building pre-requisites are met.
 - ResourceBar displays live population / housing capacity counter (`Pop X/Y`).
-- Browser-demo transport mirrors traits, unlock conditions, housing capacity, and the chronicle
-  (building completions, harvests, season turns, unlocks) for headless/cloud testing. It does
-  **not** implement births or deaths, so population is static in the demo.
+- Browser-demo transport mirrors traits, unlock conditions, housing capacity, weather, autosave
+  rotation, and the chronicle for headless/cloud testing. It does **not** implement births or
+  deaths, so population is static in the demo.
 - Village Chronicle: a 200-entry capped log of births, deaths, building completions, unlocks,
   harvests and season turns, owned by the sim, saved with the world, shown in a collapsible drawer.
   Clicking an entry centres the camera on its subject.
+- Persistence: versioned bincode save/load (`SAVE_VERSION` 2); manual Slot 1 Save/Load; rotating
+  autosave through slots 1–3 every in-game day.
+- Weather: deterministic daily Clear/Rain/Storm from seed+date. Rain/Storm water outdoor crops;
+  Storm knocks one building back to half-built. Shown in the ClockBar.
 
 ### Key paths
 
 - Spec: `docs/villagesim-spec.md`
-- Rust sim: `src-tauri/src/sim/` (`agents.rs`, `catalog.rs`, `world.rs`, `jobs.rs`, …)
-- Frontend: `src/render/`, `src/state/`, `src/ui/` (`ResourceBar`, `BuildMenu`, `VillagerPanel`)
+- Rust sim: `src-tauri/src/sim/` (`agents.rs`, `catalog.rs`, `world.rs`, `jobs.rs`, `weather.rs`, …)
+- Frontend: `src/render/`, `src/state/`, `src/ui/` (`ResourceBar`, `BuildMenu`, `VillagerPanel`, `ClockBar`)
 - Cloud notes: `AGENTS.md`
 
 ### Verify
@@ -57,7 +61,7 @@ npm run dev
 
 ## Next up
 
-Finish Milestone 10: autosave rotation, weather, and camera/interaction polish.
+Finish Milestone 10: camera/interaction polish (hover tooltips, selection highlight).
 The pixel-art redesign (Phases 1–3) is complete — see
 `docs/superpowers/specs/2026-07-31-pixel-art-ui-redesign-design.md`.
 

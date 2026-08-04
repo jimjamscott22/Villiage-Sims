@@ -87,6 +87,9 @@ export default function App() {
     setPopulation(snapshot.villagers.length);
     setHousingCapacity(snapshot.housingCapacity ?? 0);
     setUnlocked(snapshot.unlocked ?? []);
+    if (snapshot.lastAutosaveSlot != null) {
+      setPersistenceStatus(`Autosaved · Slot ${snapshot.lastAutosaveSlot}`);
+    }
     if (snapshot.chronicleSeq !== chronicleSeqRef.current) {
       const requestId = ++chronicleRequestRef.current;
       void transport

@@ -49,8 +49,13 @@ class BrowserTransport implements Transport {
   private elapsed = 0;
   private listeners = new Set<TickListener>();
   private timer: number | null = null;
-  private world = new DemoWorld(generateDemoTerrain());
   private readonly saves = new Map<number, string>();
+  private world: DemoWorld;
+
+  constructor() {
+    this.world = new DemoWorld(generateDemoTerrain());
+    this.world.bindAutosave(this.saves);
+  }
 
   async getTerrain(): Promise<TerrainSnapshot> {
     return this.world.terrain;
@@ -132,6 +137,7 @@ class BrowserTransport implements Transport {
     const saved = this.saves.get(slot);
     if (saved == null) throw new Error(`save slot ${slot} is empty`);
     this.world = DemoWorld.importState(saved);
+    this.world.bindAutosave(this.saves);
     this.elapsed = 0;
     this.emit(this.world.snapshot());
     return this.world.worldInit();

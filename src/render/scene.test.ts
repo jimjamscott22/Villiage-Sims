@@ -56,7 +56,7 @@ function snapshot(partial: Partial<TickSnapshot> = {}): TickSnapshot {
     crops: [],
     resources: { wood: 0, stone: 0, grain: 0, flour: 0, food: 0, gold: 0 },
     housingCapacity: 5,
-    clock: { minute: 0, day: 1, season: 0, year: 1, speed: 1 },
+    clock: { minute: 0, day: 1, season: 0, year: 1, speed: 1, weather: 0 },
     chronicleSeq: 0,
     unlocked: [],
     ...partial,

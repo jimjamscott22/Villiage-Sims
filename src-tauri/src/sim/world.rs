@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -33,6 +34,7 @@ use super::utility::{
     ActionKind, SOCIAL_RANGE, SOCIAL_RESTORE, ScoreContext, chebyshev, night_from_clock,
     pick_action, score_all, wander_tile,
 };
+use super::weather::{self, Weather, autosave_slot_for, weather_for_clock};
 
 const VIEWPORT_MARGIN_TILES: f32 = 4.0;
 const TICKS_PER_SECOND: f32 = 20.0;
@@ -74,6 +76,12 @@ pub struct World {
     unlocked: BTreeSet<String>,
     #[serde(skip)]
     viewport: Viewport,
+    /// When set, day rollover writes a rotating autosave into this directory.
+    #[serde(skip)]
+    autosave_dir: Option<PathBuf>,
+    /// Last autosave slot written this session (`1..=3`).
+    #[serde(skip)]
+    last_autosave_slot: Option<u8>,
 }
 
 impl World {
@@ -109,6 +117,8 @@ impl World {
                 w: world_w,
                 h: world_h,
             },
+            autosave_dir: None,
+            last_autosave_slot: None,
         };
         world.spawn_starting_villagers();
         // Seed the unlock baseline after the world is fully built (villagers spawned,
@@ -251,13 +261,24 @@ impl World {
                 let _ = reply.send(crate::persist::save_world(self, &path));
             }
             SimCommand::LoadGame { path, reply } => {
+                let autosave_dir = self.autosave_dir.clone();
                 let result = crate::persist::load_world(&path).map(|loaded| {
                     *self = loaded;
+                    self.autosave_dir = autosave_dir;
+                    self.last_autosave_slot = None;
                     self.world_init(crate::persist::SAVE_VERSION)
                 });
                 let _ = reply.send(result);
             }
         }
+    }
+
+    pub fn set_autosave_dir(&mut self, dir: Option<PathBuf>) {
+        self.autosave_dir = dir;
+    }
+
+    pub fn current_weather(&self) -> Weather {
+        weather_for_clock(self.seed, &self.clock)
     }
 
     /// Record a `SeasonTurned` chronicle entry using the clock's current season/year.
@@ -274,7 +295,7 @@ impl World {
     pub fn advance(&mut self) {
         let rollover = self.clock.advance_tick();
         if rollover.day {
-            self.clear_all_crop_water();
+            self.on_day_rollover();
         }
         if rollover.season {
             self.record_season_turn();
@@ -621,9 +642,10 @@ impl World {
             crops: self.crops.iter().map(Crop::view).collect(),
             resources: derive_totals(&self.resources, &building_inventories, &self.catalog),
             housing_capacity: self.housing_capacity(),
-            clock: self.clock.view(),
+            clock: self.clock.view(self.current_weather().as_u8()),
             chronicle_seq: self.chronicle().seq(),
             unlocked: self.unlocked().iter().cloned().collect(),
+            last_autosave_slot: self.last_autosave_slot,
         }
     }
 
@@ -1997,7 +2019,7 @@ impl World {
     pub fn advance_clock(&mut self, days: u32, season: Option<u8>) -> Result<(), String> {
         for _ in 0..days {
             let rollover = self.clock.force_day_rollover();
-            self.clear_all_crop_water();
+            self.on_day_rollover();
             if rollover.season {
                 self.record_season_turn();
             }
@@ -2006,6 +2028,59 @@ impl World {
             self.clock.set_season(value)?;
         }
         Ok(())
+    }
+
+    /// Shared day-boundary effects: reset crop water, apply today's weather, autosave.
+    fn on_day_rollover(&mut self) {
+        self.clear_all_crop_water();
+        self.apply_daily_weather();
+        self.maybe_autosave();
+    }
+
+    fn apply_daily_weather(&mut self) {
+        let weather = self.current_weather();
+        if weather.waters_crops() {
+            for crop in &mut self.crops {
+                crop.watered = true;
+            }
+        }
+        if weather.damages_buildings() {
+            self.apply_storm_damage();
+        }
+    }
+
+    /// Storms knock one building back toward construction (half progress).
+    fn apply_storm_damage(&mut self) {
+        let Some(index) = weather::storm_damage_index(
+            self.seed,
+            self.clock.year,
+            self.clock.season,
+            self.clock.day,
+            self.buildings.len(),
+        ) else {
+            return;
+        };
+        let kind_index = self.buildings[index].kind_index;
+        let Some(def) = self.catalog.get(kind_index) else {
+            return;
+        };
+        let half = def.build_ticks / 2;
+        self.buildings[index].state = BuildState::UnderConstruction {
+            progress_ticks: half,
+        };
+        self.buildings[index].recipe_ticks = 0;
+    }
+
+    fn maybe_autosave(&mut self) {
+        let Some(dir) = self.autosave_dir.clone() else {
+            return;
+        };
+        let slot = autosave_slot_for(&self.clock);
+        let path = dir.join(format!("slot-{slot}.vsav"));
+        match crate::persist::save_world(self, &path) {
+            Ok(()) => self.last_autosave_slot = Some(slot),
+            Err(error) => eprintln!("autosave to slot {slot} failed: {error}"),
+        }
     }
 
     fn tick_crops(&mut self) {
@@ -2770,7 +2845,12 @@ mod tests {
         world.plant_crop("wheat", 2, 2).unwrap();
         world.crops[0].watered = true;
         world.advance_clock(1, None).unwrap();
-        assert!(!world.crops()[0].watered);
+        // Day rollover always clears water first; Rain/Storm then re-soak.
+        if world.current_weather().waters_crops() {
+            assert!(world.crops()[0].watered);
+        } else {
+            assert!(!world.crops()[0].watered);
+        }
         assert_eq!(world.clock().day, 2);
 
         let tick_before = world.clock().tick;
@@ -3460,5 +3540,99 @@ mod tests {
             world.buildings.is_empty(),
             "a rejected placement must not create a building"
         );
+    }
+
+    #[test]
+    fn rain_day_rewaters_crops_after_rollover() {
+        let mut world = grass_world();
+        world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..30 {
+            world.advance();
+        }
+        world.plant_crop("wheat", 2, 2).unwrap();
+        world.crops[0].watered = true;
+        // seed 1 / spring day 2 is Rain (see weather::tests / hash).
+        world.advance_clock(1, None).unwrap();
+        assert_eq!(world.clock().day, 2);
+        assert_eq!(world.current_weather(), Weather::Rain);
+        assert!(world.crops()[0].watered, "rain should soak outdoor crops");
+    }
+
+    #[test]
+    fn clear_day_leaves_crops_dry_after_rollover() {
+        let mut world = grass_world();
+        world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..30 {
+            world.advance();
+        }
+        world.plant_crop("wheat", 2, 2).unwrap();
+        world.crops[0].watered = true;
+        // Advance to spring day 3 (Clear for seed 1).
+        world.advance_clock(2, None).unwrap();
+        assert_eq!(world.clock().day, 3);
+        assert_eq!(world.current_weather(), Weather::Clear);
+        assert!(!world.crops()[0].watered);
+    }
+
+    #[test]
+    fn storm_damages_a_building() {
+        let mut world = grass_world();
+        let id = place_complete(&mut world, "hut", 0, 0);
+        assert!(matches!(
+            world.buildings.iter().find(|b| b.id == id).unwrap().state,
+            BuildState::Complete
+        ));
+        // seed 1 / spring day 15 is Storm.
+        world.advance_clock(14, None).unwrap();
+        assert_eq!(world.clock().day, 15);
+        assert_eq!(world.current_weather(), Weather::Storm);
+        let building = world.buildings.iter().find(|b| b.id == id).unwrap();
+        match building.state {
+            BuildState::UnderConstruction { progress_ticks } => {
+                let half = world.catalog.get(building.kind_index).unwrap().build_ticks / 2;
+                assert_eq!(progress_ticks, half);
+            }
+            other => panic!("expected storm damage, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn autosave_rotates_through_three_slots() {
+        let dir = std::env::temp_dir().join(format!(
+            "villagesim-autosave-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).expect("temp saves dir");
+        let mut world = grass_world();
+        world.set_autosave_dir(Some(dir.clone()));
+
+        world.advance_clock(1, None).unwrap();
+        assert_eq!(world.tick_snapshot().last_autosave_slot, Some(2)); // day 2 → slot 2
+        assert!(dir.join("slot-2.vsav").exists());
+
+        world.advance_clock(1, None).unwrap();
+        assert_eq!(world.tick_snapshot().last_autosave_slot, Some(3)); // day 3 → slot 3
+        assert!(dir.join("slot-3.vsav").exists());
+
+        world.advance_clock(1, None).unwrap();
+        assert_eq!(world.tick_snapshot().last_autosave_slot, Some(1)); // day 4 → slot 1
+        assert!(dir.join("slot-1.vsav").exists());
+
+        let snap = world.tick_snapshot();
+        assert_eq!(snap.last_autosave_slot, Some(1));
+        assert_eq!(snap.clock.weather, world.current_weather().as_u8());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn autosave_disabled_without_directory() {
+        let mut world = grass_world();
+        world.advance_clock(1, None).unwrap();
+        assert_eq!(world.tick_snapshot().last_autosave_slot, None);
     }
 }

@@ -11,7 +11,7 @@ const tick = (number: number, x: number): TickSnapshot => ({
   crops: [],
   resources,
   housingCapacity: 5,
-  clock: { minute: 0, day: 1, season: 0, year: 1, speed: 1 },
+  clock: { minute: 0, day: 1, season: 0, year: 1, speed: 1, weather: 0 },
   chronicleSeq: 0,
   unlocked: [],
 });

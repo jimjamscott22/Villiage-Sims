@@ -161,6 +161,45 @@ const WANDER_RADIUS = 6;
 const DEMO_SEED = 42;
 export const DEMO_SAVE_VERSION = 1;
 
+/** Match Rust `weather::mix` — unsigned 64-bit wrapping. */
+function mixU64(a: bigint | number, b: number, c: number, d: number): bigint {
+  const mask = (1n << 64n) - 1n;
+  let hash = ((typeof a === 'bigint' ? a : BigInt(a)) * 0x9e3779b97f4a7c15n + BigInt(b)) & mask;
+  hash = (hash * 0xbf58476d1ce4e5b9n + BigInt(c)) & mask;
+  hash = (hash * 0x94d049bb133111ebn + BigInt(d)) & mask;
+  hash ^= hash >> 33n;
+  hash = (hash * 0xff51afd7ed558ccdn) & mask;
+  hash ^= hash >> 33n;
+  return hash;
+}
+
+/** 0 Clear, 1 Rain, 2 Storm — mirrors Rust `weather_for`. */
+export function demoWeatherFor(seed: number, year: number, season: number, day: number): number {
+  const mod = Number(mixU64(seed, year, season, day) % 10n);
+  if (mod <= 5) return 0;
+  if (mod <= 8) return 1;
+  return 2;
+}
+
+export function demoAutosaveSlot(year: number, season: number, day: number): number {
+  const abs =
+    (year - 1) * 112 + season * 28 + (day - 1);
+  return (abs % 3) + 1;
+}
+
+function demoStormDamageIndex(
+  seed: number,
+  year: number,
+  season: number,
+  day: number,
+  buildingCount: number,
+): number | null {
+  if (buildingCount === 0) return null;
+  const xorSeed = (BigInt(seed) ^ 0xa5a5a5a5a5a5a5a5n) & ((1n << 64n) - 1n);
+  const hash = mixU64(xorSeed, year, season, day);
+  return Number(hash % BigInt(buildingCount));
+}
+
 type ActionKind = 'eat' | 'sleep' | 'work' | 'socialize' | 'wander';
 type MovePurpose = 'player' | 'work' | 'wander';
 type AgentStateName = 'idle' | 'moving' | 'working' | 'eating' | 'sleeping' | 'socializing';
@@ -505,6 +544,8 @@ export class DemoWorld {
   private unlocked: string[] = [];
   private readonly CHRONICLE_CAP = 200;
   private readonly seed = DEMO_SEED;
+  private lastAutosaveSlot: number | null = null;
+  private autosaves: Map<number, string> | null = null;
   private clock: DemoClock = {
     tick: 0,
     minuteAccum: 0,
@@ -521,6 +562,15 @@ export class DemoWorld {
     this.nodes = this.generateNodes();
     this.spawnStartingVillagers();
     this.unlocked = this.satisfiedUnlocks();
+  }
+
+  /** Wire the transport's in-memory save map for rotating daily autosaves. */
+  bindAutosave(saves: Map<number, string>): void {
+    this.autosaves = saves;
+  }
+
+  currentWeather(): number {
+    return demoWeatherFor(this.seed, this.clock.year, this.clock.season, this.clock.day);
   }
 
   private pushChronicle(focus: [number, number] | null, body: ChronicleBody): void {
@@ -748,7 +798,7 @@ export class DemoWorld {
       this.clock.minuteAccum -= MINUTES_PER_DAY;
       this.clock.minute = Math.floor(this.clock.minuteAccum);
       this.rollDay();
-      this.clearAllCropWater();
+      this.onDayRollover();
     }
 
     const newlyComplete: number[] = [];
@@ -805,6 +855,7 @@ export class DemoWorld {
       season: this.clock.season,
       year: this.clock.year,
       speed: this.clock.speed,
+      weather: this.currentWeather(),
     };
     const crops: CropView[] = this.crops.map((crop) => ({
       id: crop.id,
@@ -828,6 +879,7 @@ export class DemoWorld {
       clock,
       chronicleSeq: this.chronicleNextSeq,
       unlocked: [...this.unlocked],
+      lastAutosaveSlot: this.lastAutosaveSlot,
     };
   }
 
@@ -1095,12 +1147,51 @@ export class DemoWorld {
       this.clock.minuteAccum = 0;
       this.clock.minute = 0;
       this.rollDay();
-      this.clearAllCropWater();
+      this.onDayRollover();
     }
     if (season != null) {
       if (season < 0 || season > 3) throw new Error(`invalid season ${season}`);
       this.clock.season = season;
     }
+  }
+
+  private onDayRollover(): void {
+    this.clearAllCropWater();
+    this.applyDailyWeather();
+    this.maybeAutosave();
+  }
+
+  private applyDailyWeather(): void {
+    const weather = this.currentWeather();
+    if (weather === 1 || weather === 2) {
+      for (const crop of this.crops) crop.watered = true;
+    }
+    if (weather === 2) {
+      this.applyStormDamage();
+    }
+  }
+
+  private applyStormDamage(): void {
+    const index = demoStormDamageIndex(
+      this.seed,
+      this.clock.year,
+      this.clock.season,
+      this.clock.day,
+      this.buildings.length,
+    );
+    if (index == null) return;
+    const building = this.buildings[index];
+    const def = DEMO_CATALOG.buildings[building.kindIndex];
+    building.complete = false;
+    building.progressTicks = Math.floor(def.buildTicks / 2);
+    building.recipeTicks = 0;
+  }
+
+  private maybeAutosave(): void {
+    if (this.autosaves == null) return;
+    const slot = demoAutosaveSlot(this.clock.year, this.clock.season, this.clock.day);
+    this.autosaves.set(slot, this.exportState());
+    this.lastAutosaveSlot = slot;
   }
 
   private decayNeeds(): void {
