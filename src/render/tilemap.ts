@@ -164,6 +164,27 @@ export function shorelineTiles(terrain: TerrainSnapshot): ShorelineTile[] {
   return out;
 }
 
+export interface TerrainProp {
+  x: number;
+  y: number;
+  /** Atlas key: `prop.cypress` or `prop.peak`. */
+  key: string;
+}
+
+/** Standing props for Forest (4) and Mountain (6). Not baked — they y-sort on the entity layer. */
+export function terrainProps(terrain: TerrainSnapshot): TerrainProp[] {
+  const { tiles, width, height } = terrain;
+  const out: TerrainProp[] = [];
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const t = tiles[y * width + x];
+      if (t === 4) out.push({ x, y, key: 'prop.cypress' });
+      else if (t === 6) out.push({ x, y, key: 'prop.peak' });
+    }
+  }
+  return out;
+}
+
 /**
  * Paint the whole terrain into the offscreen world canvas.
  * Foam is deliberately absent: it animates, so the entity layer draws it per frame.

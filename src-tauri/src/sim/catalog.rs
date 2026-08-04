@@ -50,6 +50,9 @@ pub struct BuildingDef {
     pub recipe: Option<RecipeDef>,
     #[serde(alias = "unlock_conditions", default)]
     pub unlock_conditions: Option<UnlockCondition>,
+    /// Optional atlas sprite key; the frontend falls back to `id` when absent.
+    #[serde(default)]
+    pub sprite: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

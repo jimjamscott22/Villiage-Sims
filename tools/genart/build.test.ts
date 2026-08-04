@@ -4,17 +4,21 @@ import { BASE_TERRAINS, EDGES, FOAM_EDGES, FOAM_FRAMES, TILE, VARIANTS } from '.
 
 describe('buildAtlas', () => {
   const atlas = buildAtlas();
+  const tiles = atlas.sheets.find((sheet) => sheet.name === 'tiles')!;
+  const entities = atlas.sheets.find((sheet) => sheet.name === 'entities')!;
 
-  it('emits a single tiles sheet', () => {
-    expect(atlas.sheets).toHaveLength(1);
-    expect(atlas.sheets[0].name).toBe('tiles');
-    expect(atlas.manifest.sheets).toEqual({ tiles: 'tiles.png' });
+  it('emits tiles and entities sheets', () => {
+    expect(atlas.sheets).toHaveLength(2);
+    expect(tiles).toBeDefined();
+    expect(entities).toBeDefined();
+    expect(atlas.manifest.sheets).toEqual({ tiles: 'tiles.png', entities: 'entities.png' });
   });
 
-  it('sizes the sheet buffer to its declared dimensions', () => {
-    const sheet = atlas.sheets[0];
-    expect(sheet.width).toBe(SHEET_WIDTH);
-    expect(sheet.rgba).toHaveLength(sheet.width * sheet.height * 4);
+  it('sizes each sheet buffer to its declared dimensions', () => {
+    for (const sheet of atlas.sheets) {
+      expect(sheet.width).toBe(SHEET_WIDTH);
+      expect(sheet.rgba).toHaveLength(sheet.width * sheet.height * 4);
+    }
   });
 
   it('emits a cell for every terrain variant', () => {
@@ -42,15 +46,30 @@ describe('buildAtlas', () => {
     }
   });
 
-  it('emits exactly the expected number of cells', () => {
-    const expected =
-      BASE_TERRAINS.length * VARIANTS + BASE_TERRAINS.length * EDGES.length + FOAM_EDGES.length;
-    expect(Object.keys(atlas.manifest.cells)).toHaveLength(expected);
+  it('emits building, scaffold, crop, prop and villager cells', () => {
+    for (const key of ['hut', 'farm', 'farm.field', 'granary', 'mill', 'bakery', 'scaffold.1', 'scaffold.2', 'scaffold.3']) {
+      expect(atlas.manifest.cells[key], key).toBeDefined();
+    }
+    for (const stage of [0, 1, 2, 3]) {
+      expect(atlas.manifest.cells[`wheat.${stage}`]).toBeDefined();
+    }
+    expect(atlas.manifest.cells['prop.cypress']).toBeDefined();
+    expect(atlas.manifest.cells['prop.peak']).toBeDefined();
+    expect(atlas.manifest.cells['villager.s.idle.0']).toBeDefined();
+    expect(atlas.manifest.cells['villager.lie.3']).toBeDefined();
+    expect(atlas.manifest.cells['bubble.tool']).toBeDefined();
   });
 
-  it('keeps every cell, including all its frames, inside the sheet', () => {
-    const sheet = atlas.sheets[0];
+  it('marks animated buildings with frame counts', () => {
+    expect(atlas.manifest.cells.mill.frames).toBe(4);
+    expect(atlas.manifest.cells.bakery.frames).toBe(3);
+    expect(atlas.manifest.cells['wheat.3'].frames).toBe(2);
+  });
+
+  it('keeps every cell inside its own sheet', () => {
+    const byName = Object.fromEntries(atlas.sheets.map((sheet) => [sheet.name, sheet]));
     for (const [key, cell] of Object.entries(atlas.manifest.cells)) {
+      const sheet = byName[cell.sheet];
       const span = cell.w * (cell.frames ?? 1);
       expect(cell.x + span, key).toBeLessThanOrEqual(sheet.width);
       expect(cell.y + cell.h, key).toBeLessThanOrEqual(sheet.height);
@@ -60,10 +79,13 @@ describe('buildAtlas', () => {
   it('is deterministic', () => {
     const again = buildAtlas();
     expect(again.manifest).toEqual(atlas.manifest);
-    expect(Array.from(again.sheets[0].rgba)).toEqual(Array.from(atlas.sheets[0].rgba));
+    for (let i = 0; i < atlas.sheets.length; i += 1) {
+      expect(Array.from(again.sheets[i].rgba)).toEqual(Array.from(atlas.sheets[i].rgba));
+    }
   });
 
-  it('writes actual pixels into the sheet', () => {
-    expect(atlas.sheets[0].rgba.some((byte) => byte !== 0)).toBe(true);
+  it('writes actual pixels into both sheets', () => {
+    expect(tiles.rgba.some((byte) => byte !== 0)).toBe(true);
+    expect(entities.rgba.some((byte) => byte !== 0)).toBe(true);
   });
 });

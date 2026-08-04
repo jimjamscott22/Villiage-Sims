@@ -84,10 +84,11 @@ them into sprite sheets:
 npm run art     # regenerate public/art/ from tools/genart/
 ```
 
-`public/art/tiles.png` and `public/art/atlas.json` are **committed**, so `npm run dev`
-works without ever running the generator. A test regenerates the atlas and compares it
-to the committed output, so art and source cannot drift apart. If the atlas fails to
-load at runtime, the renderer falls back to flat-color drawing and the game stays playable.
+`public/art/tiles.png`, `public/art/entities.png` and `public/art/atlas.json` are
+**committed**, so `npm run dev` works without ever running the generator. A test
+regenerates the atlas and compares it to the committed output, so art and source
+cannot drift apart. If the atlas fails to load at runtime, the renderer falls back
+to flat-color drawing and the game stays playable.
 
 ---
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseTerrainOf, planTile, priorityOf, shorelineTiles, variantIndex } from './tilemap';
+import { baseTerrainOf, planTile, priorityOf, shorelineTiles, terrainProps, variantIndex } from './tilemap';
 
 const DEEP = 0;
 const SHALLOW = 1;
@@ -198,5 +198,20 @@ describe('shorelineTiles', () => {
     ]));
     const tile = found.find((candidate) => candidate.x === 1 && candidate.y === 1);
     expect(tile?.edges).toContain('foam.nwOut');
+  });
+});
+
+describe('terrainProps', () => {
+  it('emits cypress for forest and peak for mountain', () => {
+    const props = terrainProps({
+      width: 3,
+      height: 2,
+      tileSize: 32,
+      tiles: [GRASS, FOREST, ROCK, SAND, MOUNTAIN, GRASS],
+    });
+    expect(props).toEqual([
+      { x: 1, y: 0, key: 'prop.cypress' },
+      { x: 1, y: 1, key: 'prop.peak' },
+    ]);
   });
 });

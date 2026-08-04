@@ -25,6 +25,8 @@ export class SnapshotBuffer {
         x: previous.x + (current.x - previous.x) * alpha,
         y: previous.y + (current.y - previous.y) * alpha,
         state: current.state,
+        dx: current.x - previous.x,
+        dy: current.y - previous.y,
       };
     });
 
