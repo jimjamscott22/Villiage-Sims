@@ -117,6 +117,8 @@ pub struct ClockView {
     pub season: u8,
     pub year: u32,
     pub speed: u8,
+    /// 0 Clear, 1 Rain, 2 Storm — derived from seed + date, not stored on Clock.
+    pub weather: u8,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -144,13 +146,14 @@ impl Clock {
         }
     }
 
-    pub fn view(&self) -> ClockView {
+    pub fn view(&self, weather: u8) -> ClockView {
         ClockView {
             minute: self.minute,
             day: self.day,
             season: self.season.as_u8(),
             year: self.year,
             speed: self.speed.as_u8(),
+            weather,
         }
     }
 

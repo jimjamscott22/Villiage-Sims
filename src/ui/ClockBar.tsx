@@ -1,5 +1,5 @@
 import type { ClockView } from '../state/types';
-import { SEASON_NAMES } from '../state/types';
+import { SEASON_NAMES, WEATHER_NAMES } from '../state/types';
 import { PixelText } from './PixelText';
 import { uiIconStyle } from './pixelUi';
 
@@ -20,13 +20,20 @@ const SEASON_ICONS = ['ui.icon.spring', 'ui.icon.summer', 'ui.icon.autumn', 'ui.
 export function ClockBar({ clock, onSetSpeed }: ClockBarProps) {
   const season = clock ? (SEASON_NAMES[clock.season] ?? 'Spring') : '—';
   const seasonIcon = clock != null ? SEASON_ICONS[clock.season] ?? SEASON_ICONS[0] : SEASON_ICONS[0];
+  const weather =
+    clock != null ? (WEATHER_NAMES[clock.weather] ?? WEATHER_NAMES[0]) : '—';
   const clockText =
-    clock != null ? `DAY ${clock.day} ${season.toUpperCase()} Y${clock.year}` : 'DAY - SPRING Y-';
+    clock != null
+      ? `DAY ${clock.day} ${season.toUpperCase()} Y${clock.year}`
+      : 'DAY - SPRING Y-';
 
   return (
     <div className="flex items-center gap-3 text-xs text-white/80">
       <span className="pixel-icon" style={uiIconStyle(seasonIcon)} title={season} />
       <PixelText text={clockText} />
+      <span className="text-white/55" title="Weather">
+        <PixelText text={weather.toUpperCase()} />
+      </span>
       <div className="flex gap-1">
         {SPEEDS.map((entry) => {
           const active = clock?.speed === entry.value;

@@ -26,7 +26,10 @@ fn forward_snapshots(app: tauri::AppHandle, mut snapshots: watch::Receiver<TickS
 pub fn run() {
     let app = tauri::Builder::default()
         .setup(|app| {
-            let world = World::default_world();
+            let mut world = World::default_world();
+            if let Ok(app_data) = app.path().app_data_dir() {
+                world.set_autosave_dir(Some(app_data.join("saves")));
+            }
             let catalog = world.catalog().clone();
             let (snapshot_tx, snapshot_rx) = watch::channel(world.tick_snapshot());
             let (command_tx, command_rx) = mpsc::channel();

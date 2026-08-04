@@ -63,6 +63,8 @@ export interface ClockView {
   season: number;
   year: number;
   speed: number;
+  /** 0 Clear, 1 Rain, 2 Storm. */
+  weather: number;
 }
 
 export type ChronicleBody =
@@ -102,6 +104,7 @@ export interface TickSnapshot {
   clock: ClockView;
   chronicleSeq: number;
   unlocked: string[];
+  lastAutosaveSlot?: number | null;
 }
 
 export interface RecipeDef {
@@ -171,3 +174,4 @@ export type Unlisten = () => void;
 export type TickListener = (snapshot: TickSnapshot) => void;
 
 export const SEASON_NAMES = ['Spring', 'Summer', 'Autumn', 'Winter'] as const;
+export const WEATHER_NAMES = ['Clear', 'Rain', 'Storm'] as const;
