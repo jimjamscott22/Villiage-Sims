@@ -22,6 +22,7 @@ import {
   VILLAGER_DYES,
   VILLAGER_POSES,
 } from './sprites/villagers';
+import { UI_SPRITES } from './sprites/ui';
 
 export const SHEET_WIDTH = 256;
 
@@ -125,6 +126,13 @@ function entitySources(): Source[] {
   return sources;
 }
 
+function uiSources(): Source[] {
+  return Object.entries(UI_SPRITES).map(([key, grid]) => ({
+    key,
+    frames: [rasterizeGrid(grid)],
+  }));
+}
+
 function packSheet(name: string, sources: Source[]): { sheet: BuiltSheet; cells: Record<string, AtlasCellDef> } {
   const items: PackItem[] = sources.map((source) => ({
     key: source.key,
@@ -165,15 +173,20 @@ function packSheet(name: string, sources: Source[]): { sheet: BuiltSheet; cells:
 export function buildAtlas(): BuiltAtlas {
   const tiles = packSheet('tiles', terrainSources());
   const entities = packSheet('entities', entitySources());
+  const ui = packSheet('ui', uiSources());
 
-  const merged: Record<string, AtlasCellDef> = { ...tiles.cells, ...entities.cells };
+  const merged: Record<string, AtlasCellDef> = {
+    ...tiles.cells,
+    ...entities.cells,
+    ...ui.cells,
+  };
   const sortedCells: Record<string, AtlasCellDef> = {};
   for (const key of Object.keys(merged).sort()) sortedCells[key] = merged[key];
 
   return {
-    sheets: [tiles.sheet, entities.sheet],
+    sheets: [tiles.sheet, entities.sheet, ui.sheet],
     manifest: {
-      sheets: { tiles: 'tiles.png', entities: 'entities.png' },
+      sheets: { tiles: 'tiles.png', entities: 'entities.png', ui: 'ui.png' },
       cells: sortedCells,
     },
   };

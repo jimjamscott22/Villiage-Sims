@@ -12,3 +12,39 @@
 html, body, #root { width: 100%; min-width: 320px; height: 100%; margin: 0; }
 body { overflow: hidden; }
 button, canvas { touch-action: none; }
+
+.pixel-panel {
+  border-style: solid;
+  border-width: 6px;
+  border-image: url(/art/ui.png) 6 fill repeat;
+  image-rendering: pixelated;
+  background-color: #1b3038;
+}
+
+.pixel-btn {
+  border-style: solid;
+  border-width: 4px;
+  border-image: url(/art/ui.png) 6 fill repeat;
+  image-rendering: pixelated;
+  background-color: #26454f;
+}
+
+.pixel-btn:hover:not(:disabled) {
+  background-color: #2f5562;
+}
+
+.pixel-btn-active {
+  background-color: #3f6f8f;
+}
+
+.pixel-focus:focus-visible {
+  outline: 2px solid #3f6f8f;
+  outline-offset: 2px;
+}
+
+.pixel-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}

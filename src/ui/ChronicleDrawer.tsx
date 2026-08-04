@@ -30,14 +30,14 @@ export function ChronicleDrawer({
 
   return (
     <section
-      className="shrink-0 border-t border-white/10 bg-[#121c18] text-xs text-white/80"
+      className="pixel-panel shrink-0 text-xs text-white/80"
       data-testid="chronicle-drawer"
     >
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={!collapsed}
-        className="flex h-7 w-full items-center gap-2 px-4 text-left hover:bg-white/5"
+        className="pixel-focus flex h-8 w-full items-center gap-2 px-4 text-left hover:bg-white/5"
       >
         <span className="text-white/45">{collapsed ? '▸' : '▾'}</span>
         <span className="text-white/45">Chronicle</span>
@@ -80,7 +80,7 @@ export function ChronicleDrawer({
                       <button
                         type="button"
                         onClick={() => onFocus(entry.focus as [number, number])}
-                        className="w-full rounded px-1 py-0.5 text-left hover:bg-white/10"
+                        className="pixel-focus w-full rounded px-1 py-0.5 text-left hover:bg-white/10"
                       >
                         {text}
                       </button>

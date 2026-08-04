@@ -12,6 +12,7 @@ import type {
 import { BuildMenu } from './ui/BuildMenu';
 import { ChronicleDrawer } from './ui/ChronicleDrawer';
 import { ClockBar } from './ui/ClockBar';
+import { PixelText } from './ui/PixelText';
 import { ResourceBar } from './ui/ResourceBar';
 
 const DETAIL_POLL_MS = 250;
@@ -157,8 +158,10 @@ export default function App() {
 
   return (
     <main className="flex h-full flex-col bg-[#17211b] text-[#f7f4e9]">
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
-        <h1 className="text-base font-semibold">VillageSim</h1>
+      <header className="pixel-panel flex h-12 shrink-0 items-center justify-between px-4">
+        <h1 className="text-base">
+          <PixelText text="VILLAGESIM" />
+        </h1>
         <ClockBar clock={clock} onSetSpeed={(speed) => { void onSetSpeed(speed); }} />
         <span className="text-xs text-white/60">
           {transport.mode === 'tauri' ? 'Simulation connected' : 'Browser demo'}

@@ -39,9 +39,10 @@ describe('cellRect', () => {
 describe('committed manifest', () => {
   const manifest = JSON.parse(readFileSync('public/art/atlas.json', 'utf8')) as AtlasManifest;
 
-  it('declares the tiles and entities sheets', () => {
+  it('declares the tiles, entities and ui sheets', () => {
     expect(manifest.sheets.tiles).toBe('tiles.png');
     expect(manifest.sheets.entities).toBe('entities.png');
+    expect(manifest.sheets.ui).toBe('ui.png');
   });
 
   it('covers all five base terrains with four variants each', () => {
@@ -63,6 +64,21 @@ describe('committed manifest', () => {
     expect(manifest.cells['prop.peak']).toBeDefined();
     expect(manifest.cells['villager.s.idle.0']).toBeDefined();
     expect(manifest.cells['bubble.tool']).toBeDefined();
+  });
+
+  it('covers Phase 3 ui cells', () => {
+    for (const key of [
+      'ui.panel',
+      'font.strip',
+      'ui.icon.wood',
+      'ui.icon.pause',
+      'ui.icon.spring',
+      'ui.bar.notch',
+      'ui.bracket.tl',
+    ]) {
+      expect(manifest.cells[key], key).toBeDefined();
+    }
+    expect(manifest.cells['font.strip'].h).toBe(14);
   });
 
   it('gives every cell a positive size', () => {

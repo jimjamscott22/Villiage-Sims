@@ -1,25 +1,32 @@
 import type { ClockView } from '../state/types';
 import { SEASON_NAMES } from '../state/types';
+import { PixelText } from './PixelText';
+import { uiIconStyle } from './pixelUi';
 
 interface ClockBarProps {
   clock: ClockView | null;
   onSetSpeed: (speed: number) => void;
 }
 
-const SPEEDS: Array<{ value: number; label: string }> = [
-  { value: 0, label: 'Pause' },
-  { value: 1, label: '1×' },
-  { value: 2, label: '2×' },
-  { value: 3, label: '3×' },
+const SPEEDS: Array<{ value: number; icon: string; label: string }> = [
+  { value: 0, icon: 'ui.icon.pause', label: 'Pause' },
+  { value: 1, icon: 'ui.icon.speed1', label: '1x' },
+  { value: 2, icon: 'ui.icon.speed2', label: '2x' },
+  { value: 3, icon: 'ui.icon.speed3', label: '3x' },
 ];
 
+const SEASON_ICONS = ['ui.icon.spring', 'ui.icon.summer', 'ui.icon.autumn', 'ui.icon.winter'] as const;
+
 export function ClockBar({ clock, onSetSpeed }: ClockBarProps) {
-  const season = clock ? SEASON_NAMES[clock.season] ?? 'Spring' : '—';
+  const season = clock ? (SEASON_NAMES[clock.season] ?? 'Spring') : '—';
+  const seasonIcon = clock != null ? SEASON_ICONS[clock.season] ?? SEASON_ICONS[0] : SEASON_ICONS[0];
+  const clockText =
+    clock != null ? `DAY ${clock.day} ${season.toUpperCase()} Y${clock.year}` : 'DAY - SPRING Y-';
+
   return (
     <div className="flex items-center gap-3 text-xs text-white/80">
-      <span className="tabular-nums">
-        Day {clock?.day ?? '—'} · {season} · Year {clock?.year ?? '—'}
-      </span>
+      <span className="pixel-icon" style={uiIconStyle(seasonIcon)} title={season} />
+      <PixelText text={clockText} />
       <div className="flex gap-1">
         {SPEEDS.map((entry) => {
           const active = clock?.speed === entry.value;
@@ -27,12 +34,13 @@ export function ClockBar({ clock, onSetSpeed }: ClockBarProps) {
             <button
               key={entry.value}
               type="button"
+              title={entry.label}
               onClick={() => onSetSpeed(entry.value)}
-              className={`rounded px-2 py-1 transition ${
-                active ? 'bg-emerald-800/80 text-white' : 'bg-white/5 text-white/70 hover:bg-white/10'
+              className={`pixel-btn pixel-focus flex items-center justify-center p-0.5 transition ${
+                active ? 'pixel-btn-active' : ''
               }`}
             >
-              {entry.label}
+              <span className="pixel-icon" style={uiIconStyle(entry.icon)} />
             </button>
           );
         })}

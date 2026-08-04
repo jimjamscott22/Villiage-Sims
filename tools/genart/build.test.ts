@@ -6,12 +6,18 @@ describe('buildAtlas', () => {
   const atlas = buildAtlas();
   const tiles = atlas.sheets.find((sheet) => sheet.name === 'tiles')!;
   const entities = atlas.sheets.find((sheet) => sheet.name === 'entities')!;
+  const ui = atlas.sheets.find((sheet) => sheet.name === 'ui')!;
 
-  it('emits tiles and entities sheets', () => {
-    expect(atlas.sheets).toHaveLength(2);
+  it('emits tiles, entities and ui sheets', () => {
+    expect(atlas.sheets).toHaveLength(3);
     expect(tiles).toBeDefined();
     expect(entities).toBeDefined();
-    expect(atlas.manifest.sheets).toEqual({ tiles: 'tiles.png', entities: 'entities.png' });
+    expect(ui).toBeDefined();
+    expect(atlas.manifest.sheets).toEqual({
+      tiles: 'tiles.png',
+      entities: 'entities.png',
+      ui: 'ui.png',
+    });
   });
 
   it('sizes each sheet buffer to its declared dimensions', () => {
@@ -84,8 +90,16 @@ describe('buildAtlas', () => {
     }
   });
 
-  it('writes actual pixels into both sheets', () => {
+  it('writes actual pixels into every sheet', () => {
     expect(tiles.rgba.some((byte) => byte !== 0)).toBe(true);
     expect(entities.rgba.some((byte) => byte !== 0)).toBe(true);
+    expect(ui.rgba.some((byte) => byte !== 0)).toBe(true);
+  });
+
+  it('emits Phase 3 ui cells', () => {
+    expect(atlas.manifest.cells['ui.panel']).toBeDefined();
+    expect(atlas.manifest.cells['font.strip'].h).toBe(14);
+    expect(atlas.manifest.cells['ui.icon.wood']).toBeDefined();
+    expect(atlas.manifest.cells['ui.bracket.tl']).toBeDefined();
   });
 });
