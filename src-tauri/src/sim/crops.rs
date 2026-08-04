@@ -21,6 +21,9 @@ pub struct CropDef {
     pub r#yield: BTreeMap<String, u32>,
     #[serde(default, alias = "seed_cost")]
     pub seed_cost: BTreeMap<String, u32>,
+    /// Optional atlas sprite key; the frontend falls back to `id` when absent.
+    #[serde(default)]
+    pub sprite: Option<String>,
 }
 
 impl CropDef {
@@ -120,6 +123,7 @@ mod tests {
             water_required: true,
             r#yield: BTreeMap::new(),
             seed_cost: BTreeMap::new(),
+            sprite: None,
         }
     }
 

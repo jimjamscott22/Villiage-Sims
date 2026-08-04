@@ -8,8 +8,10 @@ import { ART_SCALE, drawCell, loadAtlas } from './atlas';
 import { drawBuildings, drawCrops, drawVillagers } from './drawEntities';
 import { drawGhost } from './drawGhost';
 import { drawTerrain } from './drawTerrain';
-import type { ShorelineTile } from './tilemap';
-import { bakeTerrain, shorelineTiles } from './tilemap';
+import type { Facing } from './scene';
+import { atlasHasEntities, buildDrawList, paintScene } from './scene';
+import type { ShorelineTile, TerrainProp } from './tilemap';
+import { bakeTerrain, shorelineTiles, terrainProps } from './tilemap';
 
 const TICK_MS = 50;
 const FOAM_TICKS_PER_FRAME = 8;
@@ -163,6 +165,8 @@ export function Canvas({
     let terrainLayer: HTMLCanvasElement | null = null;
     let atlas: Atlas | null = null;
     let shoreline: ShorelineTile[] = [];
+    let props: TerrainProp[] = [];
+    const lastFacing = new Map<number, Facing>();
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let worldWidth = 0;
     let worldHeight = 0;
@@ -308,12 +312,47 @@ export function Canvas({
       }
       rendered = buffer.interpolate(now, TICK_MS);
       if (rendered) {
-        const footprints = (catalogRef.current?.buildings ?? []).map(
-          (building) => building.footprint as [number, number],
-        );
-        drawBuildings(ctx, rendered.buildings, terrain.tileSize, footprints);
-        drawCrops(ctx, rendered.crops ?? [], terrain.tileSize);
-        drawVillagers(ctx, rendered.villagers, camera.zoom, selectedVillagerIdRef.current);
+        const catalog = catalogRef.current;
+        if (atlas && atlasHasEntities(atlas) && catalog) {
+          const list = buildDrawList({
+            snapshot: rendered,
+            catalog,
+            props,
+            tileSize: terrain.tileSize,
+            tick: tickRef.current,
+            reduceMotion,
+            selectedBuildingId: selectedBuildingIdRef.current,
+            selectedVillagerId: selectedVillagerIdRef.current,
+            lastFacing,
+            atlas,
+          });
+          paintScene(ctx, atlas, list);
+        } else {
+          const footprints = (catalog?.buildings ?? []).map(
+            (building) => building.footprint as [number, number],
+          );
+          drawBuildings(ctx, rendered.buildings, terrain.tileSize, footprints);
+          drawCrops(ctx, rendered.crops ?? [], terrain.tileSize);
+          drawVillagers(ctx, rendered.villagers, camera.zoom, selectedVillagerIdRef.current);
+          if (selectedBuildingIdRef.current != null) {
+            const selected = rendered.buildings.find(
+              (building) => building.id === selectedBuildingIdRef.current,
+            );
+            if (selected) {
+              const [fw, fh] = footprints[selected.kind] ?? [1, 1];
+              const width = (selected.rot % 2 === 0 ? fw : fh) * terrain.tileSize;
+              const height = (selected.rot % 2 === 0 ? fh : fw) * terrain.tileSize;
+              ctx.strokeStyle = '#f4c95d';
+              ctx.lineWidth = 2 / Math.max(camera.zoom, 0.01);
+              ctx.strokeRect(
+                selected.x * terrain.tileSize,
+                selected.y * terrain.tileSize,
+                width,
+                height,
+              );
+            }
+          }
+        }
       }
 
       const kind = selectedKindRef.current;
@@ -330,21 +369,6 @@ export function Canvas({
         );
       } else if (crop && hoverTile) {
         drawGhost(ctx, hoverTile[0], hoverTile[1], [1, 1], terrain.tileSize, hoverValid);
-      }
-
-      if (rendered && selectedBuildingIdRef.current != null) {
-        const selected = rendered.buildings.find((building) => building.id === selectedBuildingIdRef.current);
-        if (selected) {
-          const footprints = (catalogRef.current?.buildings ?? []).map(
-            (building) => building.footprint as [number, number],
-          );
-          const [fw, fh] = footprints[selected.kind] ?? [1, 1];
-          const width = (selected.rot % 2 === 0 ? fw : fh) * terrain.tileSize;
-          const height = (selected.rot % 2 === 0 ? fh : fw) * terrain.tileSize;
-          ctx.strokeStyle = '#f4c95d';
-          ctx.lineWidth = 2 / Math.max(camera.zoom, 0.01);
-          ctx.strokeRect(selected.x * terrain.tileSize, selected.y * terrain.tileSize, width, height);
-        }
       }
     };
 
@@ -371,6 +395,7 @@ export function Canvas({
         if (atlas) {
           bakeTerrain(terrainContext, atlas, terrain);
           shoreline = shorelineTiles(terrain);
+          props = terrainProps(terrain);
         } else {
           drawTerrain(terrainContext, terrain);
         }

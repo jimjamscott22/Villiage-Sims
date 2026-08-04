@@ -20,6 +20,9 @@ export interface VillagerView {
   y: number;
   /** 0 Idle, 1 Moving, 2 Working, 3 Eating, 4 Sleeping, 5 Socializing. */
   state?: number;
+  /** Position delta vs previous snapshot — used for facing. Absent when unknown. */
+  dx?: number;
+  dy?: number;
 }
 
 export interface VillagerDetail {
@@ -126,6 +129,8 @@ export interface BuildingDef {
   capacity?: number;
   recipe?: RecipeDef;
   unlockConditions?: UnlockCondition;
+  /** Optional atlas key; falls back to `id` when omitted. */
+  sprite?: string;
 }
 
 export interface CropDef {
@@ -137,6 +142,8 @@ export interface CropDef {
   waterRequired: boolean;
   yield?: Record<string, number>;
   seedCost?: Record<string, number>;
+  /** Optional atlas key; falls back to `id` when omitted. */
+  sprite?: string;
 }
 
 export interface TraitDef {

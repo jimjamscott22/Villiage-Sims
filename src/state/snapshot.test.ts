@@ -48,4 +48,22 @@ describe('SnapshotBuffer', () => {
     expect(rendered?.resources.wood).toBe(120);
     expect(rendered?.clock.day).toBe(1);
   });
+
+  it('emits dx/dy from the snapshot delta', () => {
+    const buffer = new SnapshotBuffer();
+    buffer.push(tick(1, 10), 950);
+    buffer.push(tick(2, 20), 1000);
+    const villager = buffer.interpolate(1025, 50)?.villagers[0];
+    expect(villager?.dx).toBe(10);
+    expect(villager?.dy).toBe(0);
+  });
+
+  it('emits zero deltas when the villager is stationary', () => {
+    const buffer = new SnapshotBuffer();
+    buffer.push(tick(1, 10), 950);
+    buffer.push(tick(2, 10), 1000);
+    const villager = buffer.interpolate(1025, 50)?.villagers[0];
+    expect(villager?.dx).toBe(0);
+    expect(villager?.dy).toBe(0);
+  });
 });
