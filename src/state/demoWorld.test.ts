@@ -252,7 +252,9 @@ describe('DemoWorld pathfinding', () => {
   });
 
   it('loads the M8 demo catalog with flour storage and recipes', () => {
-    expect(DEMO_CATALOG.buildings).toHaveLength(5);
+    expect(DEMO_CATALOG.buildings).toHaveLength(6);
+    // Building kind is an index into this list, so new entries must be appended.
+    expect(DEMO_CATALOG.buildings[5]?.id).toBe('well');
     expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'granary')?.stores).toEqual(['grain', 'flour', 'food']);
     expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'mill')?.recipe).toEqual({
       inputs: { grain: 2 },

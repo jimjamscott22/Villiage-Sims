@@ -55,6 +55,15 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib
 npm run dev
 ```
 
+### Props & assets
+
+- Decor scatter: `prop.bush` (grass), `prop.boulder` (rock), `prop.palm` and `prop.reeds` (sand,
+  reeds only where the tile touches water). Placed deterministically by a tile hash in
+  `terrainProps()`; flagged `decor` so `buildDrawList` hides them under building footprints.
+- `well` — a 1×1 amenity building (15 stone / 5 wood), unlocked at population 4, no jobs.
+- Candidate future additions are catalogued in
+  [`docs/props-and-assets-backlog.md`](docs/props-and-assets-backlog.md).
+
 ## Next up
 
 Finish Milestone 10: autosave rotation, weather, and camera/interaction polish.
