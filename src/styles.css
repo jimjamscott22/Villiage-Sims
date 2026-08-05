@@ -16,7 +16,8 @@ button, canvas { touch-action: none; }
 .pixel-panel {
   border-style: solid;
   border-width: 6px;
-  border-image: url(/art/ui.png) 6 fill repeat;
+  /* Standalone 18×18 frame — border-image cannot crop ui.png atlas cells. */
+  border-image: url(/art/panel.png) 6 fill repeat;
   image-rendering: pixelated;
   background-color: #1b3038;
 }
@@ -24,7 +25,7 @@ button, canvas { touch-action: none; }
 .pixel-btn {
   border-style: solid;
   border-width: 4px;
-  border-image: url(/art/ui.png) 6 fill repeat;
+  border-image: url(/art/panel.png) 6 fill repeat;
   image-rendering: pixelated;
   background-color: #26454f;
 }
