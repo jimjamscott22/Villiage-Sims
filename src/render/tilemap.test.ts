@@ -11,7 +11,7 @@ const MOUNTAIN = 6;
 
 /** Build a grid from rows of terrain bytes. */
 function grid(rows: number[][]) {
-  return { tiles: rows.flat(), width: rows[0].length, height: rows.length };
+  return { tiles: rows.flat(), width: rows[0].length, height: rows.length, tileSize: 32 };
 }
 
 describe('baseTerrainOf', () => {
@@ -209,9 +209,47 @@ describe('terrainProps', () => {
       tileSize: 32,
       tiles: [GRASS, FOREST, ROCK, SAND, MOUNTAIN, GRASS],
     });
-    expect(props).toEqual([
+    expect(props.filter((prop) => !prop.decor)).toEqual([
       { x: 1, y: 0, key: 'prop.cypress' },
       { x: 1, y: 1, key: 'prop.peak' },
     ]);
+  });
+
+  it('scatters decor only on grass, sand and rock', () => {
+    const rows = Array.from({ length: 24 }, (_, y) =>
+      Array.from({ length: 24 }, (_, x) => [GRASS, SAND, ROCK, FOREST, MOUNTAIN][(x + y) % 5]),
+    );
+    const props = terrainProps(grid(rows));
+    const decor = props.filter((prop) => prop.decor);
+    expect(decor.length).toBeGreaterThan(0);
+    for (const prop of decor) {
+      const terrain = rows[prop.y][prop.x];
+      expect([GRASS, SAND, ROCK]).toContain(terrain);
+      if (terrain === GRASS) expect(prop.key).toBe('prop.bush');
+      if (terrain === ROCK) expect(prop.key).toBe('prop.boulder');
+      if (terrain === SAND) expect(['prop.palm', 'prop.reeds']).toContain(prop.key);
+    }
+  });
+
+  it('is deterministic for the same tiles', () => {
+    const rows = Array.from({ length: 12 }, (_, y) =>
+      Array.from({ length: 12 }, (_, x) => (x * y) % 4 === 0 ? GRASS : ROCK),
+    );
+    expect(terrainProps(grid(rows))).toEqual(terrainProps(grid(rows)));
+  });
+
+  it('picks reeds on sand that touches water and palms inland', () => {
+    // A one-tile sand strip: the left cell borders shallow water, the right does not.
+    const rows = [
+      [SAND, SAND, SAND, SAND],
+      [SHALLOW, GRASS, GRASS, GRASS],
+    ];
+    const sandKeys = new Set(
+      terrainProps(grid(rows))
+        .filter((prop) => prop.y === 0)
+        .map((prop) => prop.key),
+    );
+    expect([...sandKeys].every((key) => key === 'prop.reeds' || key === 'prop.palm')).toBe(true);
+    expect(sandKeys.has('prop.reeds')).toBe(true);
   });
 });

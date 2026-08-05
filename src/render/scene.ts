@@ -241,7 +241,18 @@ export function buildDrawList(input: SceneInput): DrawEntry[] {
     });
   }
 
+  // Decor scatter sits on buildable ground, so anything under a footprint is dropped.
+  // Terrain-defining props (cypress, peak) are never covered: those tiles aren't buildable.
+  const covered = new Set<string>();
+  for (const building of snapshot.buildings) {
+    const [fw, fh] = footprintOf(catalog.buildings[building.kind], building.rot);
+    for (let dy = 0; dy < fh; dy += 1) {
+      for (let dx = 0; dx < fw; dx += 1) covered.add(`${building.x + dx},${building.y + dy}`);
+    }
+  }
+
   for (const prop of props) {
+    if (prop.decor && covered.has(`${prop.x},${prop.y}`)) continue;
     pushSprite(list, {
       rank: 1,
       id: `p:${prop.x},${prop.y}`,

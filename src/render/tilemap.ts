@@ -167,19 +167,63 @@ export function shorelineTiles(terrain: TerrainSnapshot): ShorelineTile[] {
 export interface TerrainProp {
   x: number;
   y: number;
-  /** Atlas key: `prop.cypress` or `prop.peak`. */
+  /** Atlas key: `prop.cypress`, `prop.peak`, `prop.bush`, … */
   key: string;
+  /**
+   * Scatter decoration rather than a terrain-defining prop. Decor sits on
+   * buildable tiles, so the scene hides it under building footprints.
+   */
+  decor?: boolean;
 }
 
-/** Standing props for Forest (4) and Mountain (6). Not baked — they y-sort on the entity layer. */
+/** Salt for the decor scatter hash. Distinct from the variant salt so the two never correlate. */
+const DECOR_SALT = 7;
+
+/** Scatter chance per tile, keyed by terrain byte. Tuned to read as sparse detail, not clutter. */
+const BUSH_CHANCE = 0.07;
+const PALM_CHANCE = 0.05;
+const REED_CHANCE = 0.28;
+const BOULDER_CHANCE = 0.1;
+
+function decorFor(tiles: ArrayLike<number>, width: number, height: number, x: number, y: number): string | null {
+  const t = tiles[y * width + x];
+  const roll = hash01(x, y, DECOR_SALT);
+  if (t === 3) return roll < BUSH_CHANCE ? 'prop.bush' : null;
+  if (t === 5) return roll < BOULDER_CHANCE ? 'prop.boulder' : null;
+  if (t !== 2) return null;
+  // Sand: reeds only where the tile actually touches water, palms further inland.
+  const touchesWater = SIDES.some((side) => {
+    const nx = x + side.dx;
+    const ny = y + side.dy;
+    if (nx < 0 || ny < 0 || nx >= width || ny >= height) return false;
+    const neighbour = tiles[ny * width + nx];
+    return neighbour === 0 || neighbour === 1;
+  });
+  if (touchesWater) return roll < REED_CHANCE ? 'prop.reeds' : null;
+  return roll < PALM_CHANCE ? 'prop.palm' : null;
+}
+
+/**
+ * Standing props for Forest (4) and Mountain (6), plus a deterministic decor
+ * scatter (bushes, boulders, palms, reeds) on the open terrains. Not baked —
+ * they y-sort on the entity layer.
+ */
 export function terrainProps(terrain: TerrainSnapshot): TerrainProp[] {
   const { tiles, width, height } = terrain;
   const out: TerrainProp[] = [];
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const t = tiles[y * width + x];
-      if (t === 4) out.push({ x, y, key: 'prop.cypress' });
-      else if (t === 6) out.push({ x, y, key: 'prop.peak' });
+      if (t === 4) {
+        out.push({ x, y, key: 'prop.cypress' });
+        continue;
+      }
+      if (t === 6) {
+        out.push({ x, y, key: 'prop.peak' });
+        continue;
+      }
+      const key = decorFor(tiles, width, height, x, y);
+      if (key) out.push({ x, y, key, decor: true });
     }
   }
   return out;

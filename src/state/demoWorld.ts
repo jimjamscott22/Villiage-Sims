@@ -112,6 +112,19 @@ export const DEMO_CATALOG: Catalog = {
         requiresBuilding: 'mill',
       },
     },
+    {
+      id: 'well',
+      name: 'Well',
+      footprint: [1, 1],
+      cost: { stone: 15, wood: 5 },
+      buildTicks: 50,
+      category: 'amenity',
+      validTerrain: ['grass', 'sand'],
+      jobs: [],
+      unlockConditions: {
+        minPopulation: 4,
+      },
+    },
   ],
   crops: DEMO_CROPS,
   traits: [

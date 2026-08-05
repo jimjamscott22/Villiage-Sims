@@ -78,5 +78,18 @@
       "min_population": 7,
       "requires_building": "mill"
     }
+  },
+  {
+    "id": "well",
+    "name": "Well",
+    "footprint": [1, 1],
+    "cost": { "stone": 15, "wood": 5 },
+    "build_ticks": 50,
+    "category": "amenity",
+    "valid_terrain": ["grass", "sand"],
+    "jobs": [],
+    "unlock_conditions": {
+      "min_population": 4
+    }
   }
 ]
