@@ -1,6 +1,12 @@
 import type { BuildingDef, CropDef, TickSnapshot } from '../state/types';
 import type { Atlas } from './atlas';
 import { ART_SCALE, drawCell, frameCount } from './atlas';
+import {
+  footprintIntersects,
+  tileInBounds,
+  type TileBounds,
+  type TileSpatialIndex,
+} from './spatial';
 import type { TerrainProp } from './tilemap';
 
 export type Facing = 'n' | 'e' | 's' | 'w';
@@ -97,6 +103,16 @@ export interface SceneInput {
   snapshot: TickSnapshot;
   catalog: { buildings: BuildingDef[]; crops: CropDef[] };
   props: TerrainProp[];
+  /**
+   * Optional spatial index of `props`. When set with `viewTiles`, only props in
+   * the visible tile AABB are considered (avoids scanning the full 128×128 set).
+   */
+  propsIndex?: TileSpatialIndex<TerrainProp>;
+  /**
+   * Inclusive tile viewport (+ margin). When set, buildings/crops/props/villagers
+   * outside the rect are omitted from the draw list.
+   */
+  viewTiles?: TileBounds;
   tileSize: number;
   tick: number;
   reduceMotion: boolean;
@@ -105,6 +121,12 @@ export interface SceneInput {
   /** Mutable map retained across frames so idle villagers keep their last facing. */
   lastFacing: Map<number, Facing>;
   atlas: Atlas;
+}
+
+/** Stats returned alongside the draw list when callers need perf counters. */
+export interface DrawListResult {
+  list: DrawEntry[];
+  propsDrawn: number;
 }
 
 function pushSprite(
@@ -144,10 +166,17 @@ function pushSprite(
 
 /** Build a sorted draw list. Pure aside from mutating `lastFacing`. */
 export function buildDrawList(input: SceneInput): DrawEntry[] {
+  return buildDrawListWithStats(input).list;
+}
+
+/** Like `buildDrawList`, but also reports how many props survived culling. */
+export function buildDrawListWithStats(input: SceneInput): DrawListResult {
   const {
     snapshot,
     catalog,
     props,
+    propsIndex,
+    viewTiles,
     tileSize,
     tick,
     reduceMotion,
@@ -158,10 +187,12 @@ export function buildDrawList(input: SceneInput): DrawEntry[] {
   } = input;
   const list: DrawEntry[] = [];
   const farmKind = catalog.buildings.findIndex((b) => b.id === 'farm');
+  let propsDrawn = 0;
 
   for (const building of snapshot.buildings) {
     const def = catalog.buildings[building.kind];
     const [fw, fh] = footprintOf(def, building.rot);
+    if (viewTiles && !footprintIntersects(building.x, building.y, fw, fh, viewTiles)) continue;
 
     if (building.kind === farmKind || def?.id === 'farm') {
       pushSprite(list, {
@@ -223,6 +254,7 @@ export function buildDrawList(input: SceneInput): DrawEntry[] {
   }
 
   for (const crop of snapshot.crops ?? []) {
+    if (viewTiles && !tileInBounds(crop.x, crop.y, viewTiles)) continue;
     const def = catalog.crops[crop.kind];
     const base = spriteKey(def, 'wheat');
     const staged = `${base}.${crop.stage}`;
@@ -243,6 +275,8 @@ export function buildDrawList(input: SceneInput): DrawEntry[] {
 
   // Decor scatter sits on buildable ground, so anything under a footprint is dropped.
   // Terrain-defining props (cypress, peak) are never covered: those tiles aren't buildable.
+  // Covered tiles use the full (already viewport-culled) building list so decor under a
+  // partially-visible footprint stays suppressed even when only part of the building draws.
   const covered = new Set<string>();
   for (const building of snapshot.buildings) {
     const [fw, fh] = footprintOf(catalog.buildings[building.kind], building.rot);
@@ -251,8 +285,9 @@ export function buildDrawList(input: SceneInput): DrawEntry[] {
     }
   }
 
-  for (const prop of props) {
-    if (prop.decor && covered.has(`${prop.x},${prop.y}`)) continue;
+  const pushProp = (prop: TerrainProp) => {
+    if (prop.decor && covered.has(`${prop.x},${prop.y}`)) return;
+    propsDrawn += 1;
     pushSprite(list, {
       rank: 1,
       id: `p:${prop.x},${prop.y}`,
@@ -264,9 +299,23 @@ export function buildDrawList(input: SceneInput): DrawEntry[] {
       footprintH: 1,
       atlas,
     });
+  };
+
+  if (propsIndex && viewTiles) {
+    propsIndex.forEachInBounds(viewTiles, pushProp);
+  } else {
+    for (const prop of props) {
+      if (viewTiles && !tileInBounds(prop.x, prop.y, viewTiles)) continue;
+      pushProp(prop);
+    }
   }
 
   for (const villager of snapshot.villagers) {
+    if (viewTiles) {
+      const tx = Math.floor(villager.x / tileSize);
+      const ty = Math.floor(villager.y / tileSize);
+      if (!tileInBounds(tx, ty, viewTiles)) continue;
+    }
     const derived = facingFromDelta(villager.dx ?? 0, villager.dy ?? 0);
     const facing: Facing = derived ?? lastFacing.get(villager.id) ?? 's';
     lastFacing.set(villager.id, facing);
@@ -337,7 +386,7 @@ export function buildDrawList(input: SceneInput): DrawEntry[] {
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
 
-  return list;
+  return { list, propsDrawn };
 }
 
 /** Paint a previously built draw list. */

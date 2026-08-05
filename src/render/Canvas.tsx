@@ -8,8 +8,14 @@ import { ART_SCALE, drawCell, loadAtlas } from './atlas';
 import { drawBuildings, drawCrops, drawVillagers } from './drawEntities';
 import { drawGhost } from './drawGhost';
 import { drawTerrain } from './drawTerrain';
+import { formatPerfOverlay, PerfTracker, perfEnabledFromSearch } from './perfStats';
 import type { Facing } from './scene';
-import { atlasHasEntities, buildDrawList, paintScene } from './scene';
+import { atlasHasEntities, buildDrawListWithStats, paintScene } from './scene';
+import {
+  terrainBlitRect,
+  TileSpatialIndex,
+  visibleTileBounds,
+} from './spatial';
 import type { ShorelineTile, TerrainProp } from './tilemap';
 import { bakeTerrain, shorelineTiles, terrainProps } from './tilemap';
 
@@ -165,9 +171,13 @@ export function Canvas({
     let terrainLayer: HTMLCanvasElement | null = null;
     let atlas: Atlas | null = null;
     let shoreline: ShorelineTile[] = [];
+    let shorelineIndex = new TileSpatialIndex<ShorelineTile>();
     let props: TerrainProp[] = [];
+    let propsIndex = new TileSpatialIndex<TerrainProp>();
     const lastFacing = new Map<number, Facing>();
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const perfEnabled = perfEnabledFromSearch(window.location.search);
+    const perf = new PerfTracker();
     let worldWidth = 0;
     let worldHeight = 0;
     let rendered: TickSnapshot | null = null;
@@ -191,6 +201,9 @@ export function Canvas({
     let hoverTile: [number, number] | null = null;
     let hoverValid = false;
     let lastValidateKey = '';
+    let lastDrawListLength = 0;
+    let lastPropsDrawn = 0;
+    let lastShorelineDrawn = 0;
 
     const fail = (message: string) => {
       errorRef.current = message;
@@ -273,6 +286,7 @@ export function Canvas({
     };
 
     const draw = (now: number) => {
+      const frameStart = performance.now();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (!terrain || !terrainLayer) return;
@@ -291,33 +305,52 @@ export function Canvas({
         }
       }
 
+      const view = camera.visibleWorldRect(viewWidth, viewHeight);
+      const viewTiles = visibleTileBounds(view, terrain.tileSize);
+
       camera.applyTransform(ctx, dpr);
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(terrainLayer, 0, 0);
+      // Blit only the visible slice of the 4096×4096 terrain layer (spec: source-rect).
+      const blit = terrainBlitRect(view, worldWidth, worldHeight);
+      if (blit) {
+        ctx.drawImage(
+          terrainLayer,
+          blit.sx,
+          blit.sy,
+          blit.sw,
+          blit.sh,
+          blit.sx,
+          blit.sy,
+          blit.sw,
+          blit.sh,
+        );
+      }
+
+      let shorelineDrawn = 0;
       if (atlas && shoreline.length > 0) {
+        const tileSize = terrain.tileSize;
         const frame = reduceMotion
           ? 0
           : Math.floor(tickRef.current / FOAM_TICKS_PER_FRAME) % FOAM_FRAMES;
-        const view = camera.visibleWorldRect(viewWidth, viewHeight);
-        const minX = Math.floor(view.x / terrain.tileSize) - 1;
-        const minY = Math.floor(view.y / terrain.tileSize) - 1;
-        const maxX = Math.ceil((view.x + view.w) / terrain.tileSize) + 1;
-        const maxY = Math.ceil((view.y + view.h) / terrain.tileSize) + 1;
-        for (const tile of shoreline) {
-          if (tile.x < minX || tile.x > maxX || tile.y < minY || tile.y > maxY) continue;
-          const dx = tile.x * terrain.tileSize;
-          const dy = tile.y * terrain.tileSize;
-          for (const edge of tile.edges) drawCell(ctx, atlas, edge, dx, dy, frame, ART_SCALE);
-        }
+        shorelineIndex.forEachInBounds(viewTiles, (tile) => {
+          shorelineDrawn += 1;
+          const dx = tile.x * tileSize;
+          const dy = tile.y * tileSize;
+          for (const edge of tile.edges) drawCell(ctx, atlas!, edge, dx, dy, frame, ART_SCALE);
+        });
       }
+      lastShorelineDrawn = shorelineDrawn;
+
       rendered = buffer.interpolate(now, TICK_MS);
       if (rendered) {
         const catalog = catalogRef.current;
         if (atlas && atlasHasEntities(atlas) && catalog) {
-          const list = buildDrawList({
+          const { list, propsDrawn } = buildDrawListWithStats({
             snapshot: rendered,
             catalog,
             props,
+            propsIndex,
+            viewTiles,
             tileSize: terrain.tileSize,
             tick: tickRef.current,
             reduceMotion,
@@ -326,6 +359,8 @@ export function Canvas({
             lastFacing,
             atlas,
           });
+          lastDrawListLength = list.length;
+          lastPropsDrawn = propsDrawn;
           paintScene(ctx, atlas, list);
         } else {
           const footprints = (catalog?.buildings ?? []).map(
@@ -370,6 +405,33 @@ export function Canvas({
       } else if (crop && hoverTile) {
         drawGhost(ctx, hoverTile[0], hoverTile[1], [1, 1], terrain.tileSize, hoverValid);
       }
+
+      const frameMs = performance.now() - frameStart;
+      perf.setDrawStats({
+        drawListLength: lastDrawListLength,
+        propsTotal: props.length,
+        propsDrawn: lastPropsDrawn,
+        shorelineTotal: shoreline.length,
+        shorelineDrawn: lastShorelineDrawn,
+      });
+      perf.recordFrame(now, frameMs);
+
+      if (perfEnabled) {
+        const lines = formatPerfOverlay(perf.snapshot());
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.imageSmoothingEnabled = false;
+        const pad = 8;
+        const lineH = 14;
+        const boxW = 220;
+        const boxH = pad * 2 + lines.length * lineH;
+        ctx.fillStyle = 'rgba(12, 18, 12, 0.72)';
+        ctx.fillRect(8, 8, boxW, boxH);
+        ctx.fillStyle = '#b6f28a';
+        ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+        for (let i = 0; i < lines.length; i += 1) {
+          ctx.fillText(lines[i], 8 + pad, 8 + pad + (i + 1) * lineH - 3);
+        }
+      }
     };
 
     const animate = (now: number) => {
@@ -395,7 +457,11 @@ export function Canvas({
         if (atlas) {
           bakeTerrain(terrainContext, atlas, terrain);
           shoreline = shorelineTiles(terrain);
+          shorelineIndex = new TileSpatialIndex<ShorelineTile>();
+          shorelineIndex.build(shoreline);
           props = terrainProps(terrain);
+          propsIndex = new TileSpatialIndex<TerrainProp>();
+          propsIndex.build(props);
         } else {
           drawTerrain(terrainContext, terrain);
         }
@@ -404,6 +470,11 @@ export function Canvas({
           buffer.push(snapshot, performance.now());
           tickRef.current = snapshot.tick;
           setTick(snapshot.tick);
+          try {
+            perf.setSnapshotBytes(JSON.stringify(snapshot).length);
+          } catch {
+            /* ignore */
+          }
           onSnapshotRef.current(snapshot);
         });
         if (cancelled) {
@@ -411,6 +482,7 @@ export function Canvas({
           return;
         }
         unlisten = stopListening;
+        window.__villagePerf = () => perf.snapshot();
         frame = requestAnimationFrame(animate);
       } catch (cause) {
         if (cancelled) return;
@@ -450,6 +522,7 @@ export function Canvas({
         selectedCrop: selectedCropRef.current,
         villagers: rendered?.villagers ?? [],
         error: errorRef.current,
+        perf: perf.snapshot(),
       });
 
     const onKeyDown = async (event: KeyboardEvent) => {
@@ -650,6 +723,7 @@ export function Canvas({
       canvas.removeEventListener('contextmenu', onContextMenu);
       delete window.advanceTime;
       delete window.render_game_to_text;
+      delete window.__villagePerf;
     };
   }, []);
 
