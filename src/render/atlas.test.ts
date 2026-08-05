@@ -54,7 +54,7 @@ describe('committed manifest', () => {
   });
 
   it('covers catalog building sprites, scaffolds and crop stages', () => {
-    for (const key of ['hut', 'farm', 'granary', 'mill', 'bakery', 'scaffold.1', 'scaffold.2', 'scaffold.3']) {
+    for (const key of ['hut', 'farm', 'granary', 'mill', 'bakery', 'well', 'scaffold.1', 'scaffold.2', 'scaffold.3']) {
       expect(manifest.cells[key]).toBeDefined();
     }
     for (const stage of [0, 1, 2, 3]) {
@@ -62,6 +62,9 @@ describe('committed manifest', () => {
     }
     expect(manifest.cells['prop.cypress']).toBeDefined();
     expect(manifest.cells['prop.peak']).toBeDefined();
+    for (const key of ['prop.bush', 'prop.boulder', 'prop.palm', 'prop.reeds']) {
+      expect(manifest.cells[key]).toBeDefined();
+    }
     expect(manifest.cells['villager.s.idle.0']).toBeDefined();
     expect(manifest.cells['bubble.tool']).toBeDefined();
   });

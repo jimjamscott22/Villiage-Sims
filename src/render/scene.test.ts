@@ -233,4 +233,30 @@ describe('buildDrawList', () => {
     });
     expect(list.find((e) => e.id === 'p:4,4')?.key).toBe('prop.cypress');
   });
+
+  it('hides decor scatter under a building footprint but keeps it elsewhere', () => {
+    const list = buildDrawList({
+      // kind 1 is the 3×3 farm at (2,2), so it covers tiles (2,2)…(4,4).
+      snapshot: snapshot({
+        buildings: [{ id: 5, kind: 1, x: 2, y: 2, rot: 0, state: 2, progress: 100 }],
+      }),
+      catalog: { buildings, crops },
+      props: [
+        { x: 3, y: 3, key: 'prop.bush', decor: true },
+        { x: 9, y: 9, key: 'prop.bush', decor: true },
+        { x: 3, y: 4, key: 'prop.cypress' },
+      ],
+      tileSize: 32,
+      tick: 0,
+      reduceMotion: false,
+      selectedBuildingId: null,
+      selectedVillagerId: null,
+      lastFacing,
+      atlas,
+    });
+    expect(list.find((e) => e.id === 'p:3,3')).toBeUndefined();
+    expect(list.find((e) => e.id === 'p:9,9')?.key).toBe('prop.bush');
+    // Non-decor props are terrain-defining and never suppressed.
+    expect(list.find((e) => e.id === 'p:3,4')?.key).toBe('prop.cypress');
+  });
 });

@@ -275,6 +275,48 @@ function bakeryFrame(smoke: number): SpriteGrid {
 
 export const BAKERY_FRAMES: SpriteGrid[] = [0, 1, 2].map(bakeryFrame);
 
+/** 1×1 well — stone drum, timber frame, shingled cap. 16×32, anchorY 16. */
+export const WELL: SpriteGrid = grid(16, 32, {
+  m: P.stoneMid,
+  l: P.stoneLight,
+  p: P.stonePale,
+  s: P.stoneShadow,
+  t: P.terraMid,
+  d: P.terraDark,
+  a: P.seaMid,
+  i: P.ink,
+}, (set) => {
+  // Shingled cap in the headroom (y 3..9).
+  for (let y = 3; y <= 9; y += 1) {
+    const half = y - 1;
+    for (let x = 8 - half; x <= 7 + half; x += 1) {
+      set(x, y, y === 3 || x === 8 - half || x === 7 + half ? 'd' : 't');
+    }
+  }
+  // Posts down to the drum lip.
+  for (let y = 10; y <= 21; y += 1) {
+    set(3, y, 's');
+    set(12, y, 's');
+  }
+  // Winch bar and bucket rope.
+  for (let x = 4; x <= 11; x += 1) set(x, 11, 'i');
+  for (let y = 12; y <= 15; y += 1) set(8, y, 'i');
+  for (let y = 16; y <= 18; y += 1) {
+    for (let x = 6; x <= 9; x += 1) set(x, y, y === 16 ? 's' : 'm');
+  }
+  // Stone drum on the footprint (y 22..29) with water inside the lip.
+  for (let y = 22; y <= 29; y += 1) {
+    for (let x = 2; x <= 13; x += 1) {
+      if (y === 22) set(x, y, 'p');
+      else if (x === 2 || x === 13 || y === 29) set(x, y, 's');
+      else set(x, y, (x + y) % 4 === 0 ? 'l' : 'm');
+    }
+  }
+  for (let x = 4; x <= 11; x += 1) set(x, 23, 'a');
+  // Contact shadow.
+  for (let x = 3; x <= 12; x += 1) set(x, 30, 'i');
+});
+
 function scaffold(tiles: number): SpriteGrid {
   const px = tiles * 16;
   const height = px + 8;
@@ -315,6 +357,7 @@ export const BUILDING_SPRITES: Record<string, BuildingSprite> = {
   granary: { grid: GRANARY, anchorY: 16 },
   mill: { grid: MILL_FRAMES[0], anchorY: 32, frames: MILL_FRAMES },
   bakery: { grid: BAKERY_FRAMES[0], anchorY: 16, frames: BAKERY_FRAMES },
+  well: { grid: WELL, anchorY: 16 },
   'scaffold.1': { grid: SCAFFOLD_1, anchorY: 8 },
   'scaffold.2': { grid: SCAFFOLD_2, anchorY: 8 },
   'scaffold.3': { grid: SCAFFOLD_3, anchorY: 8 },

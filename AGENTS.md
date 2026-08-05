@@ -69,6 +69,14 @@ status/handoff notes are in `progress.md` (check this first — it's updated eve
   will fail. The drift test compares decoded pixels, not raw PNG bytes, because `zlib` output
   varies with the Node version.
 - Only the 29 colors in `tools/genart/palette.ts` may appear in art; the rasterizer throws otherwise.
+- A building's `kind` is its index in `src-tauri/data/buildings.json`, and saves store that index.
+  Append new buildings; never insert or reorder. Mirror every catalog change into `DEMO_CATALOG`
+  (`src/state/demoWorld.ts`) or the browser-demo drifts from the desktop build.
+- Terrain props come in two flavours (`src/render/tilemap.ts`): terrain-defining (cypress on forest,
+  peak on mountain) and `decor` scatter (bush/boulder/palm/reeds) placed by a tile hash on buildable
+  ground. `buildDrawList` suppresses `decor` under building footprints; the terrain-defining props
+  are never suppressed because those tiles can't be built on. Ideas for further art are catalogued
+  in `docs/props-and-assets-backlog.md`.
 - Vitest runs in a **Node** environment — no jsdom is installed. Tests must not touch `document`,
   `window`, `Image` or canvas contexts. Keep pure logic (`planTile`, `cellRect`) separate from
   painters (`bakeTerrain`, `drawCell`) so it stays testable.
