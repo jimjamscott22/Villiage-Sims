@@ -1,0 +1,32 @@
+graph TB
+    subgraph RustSim["Rust Authoritative Simulation (20 Hz Thread)"]
+        World["World State<br/>(Tiles, Villagers, Buildings, Crops, Resources)"]
+        Clock["Clock & Seasons<br/>(Pause / 1x / 2x / 3x Speed)"]
+        UtilityAI["Utility AI & Needs Decay<br/>(Scoring + Hysteresis Gating)"]
+        Pathfinding["A* Pathfinding & Job System<br/>(TendCrops, Haul, Gather, Produce)"]
+        Chronicle["Chronicle & Persistence<br/>(200-entry log & bincode v2)"]
+        Catalog["Data-Driven Catalog<br/>(buildings.json & crops.json)"]
+    end
+
+    subgraph Renderer["React 19 + Canvas Renderer (60 FPS RAF)"]
+        Interpolation["Interpolation Engine<br/>(2-Snapshot buffer, alpha factor)"]
+        CanvasStack["3-Layer Canvas Stack<br/>(Offscreen Terrain, Dynamic Entities, Build Ghost)"]
+        ReactUI["React UI<br/>(BuildMenu, ResourceBar, ClockBar, VillagerPanel, ChronicleDrawer)"]
+        Transport["Transport Layer Switch<br/>(Tauri IPC vs Browser-Demo Fallback)"]
+        ArtAtlas["Pixel Art Atlas<br/>(public/art/tiles.png & atlas.json)"]
+    end
+
+    Transport -->|"Commands Channel (mpsc)"| RustSim
+    RustSim -->|"Tick Snapshots (tokio watch 20Hz)"| Transport
+    Transport --> Interpolation
+    Interpolation --> CanvasStack
+    ReactUI --> Transport
+    ArtAtlas --> CanvasStack
+
+    classDef rust fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px;
+    classDef react fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
+    classDef data fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
+
+    class World,Clock,UtilityAI,Pathfinding,Chronicle rust;
+    class Interpolation,CanvasStack,ReactUI,Transport react;
+    class Catalog,ArtAtlas data;

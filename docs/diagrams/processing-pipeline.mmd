@@ -1,0 +1,16 @@
+flowchart TD
+    S1["1. Input Stage<br/>(User IPC Action / 50ms Sim Timer)"] --> S2["2. Clock & Crop Stage<br/>(Advance clock ticks, crop growth, season check)"]
+    S2 --> S3["3. Utility AI & Needs Stage<br/>(Decay hunger/energy/social, score actions & apply hysteresis)"]
+    S3 --> S4["4. Movement & Economy Stage<br/>(A* path step, job assignment, haul/produce/gather execution)"]
+    S4 --> S5["5. Population & Chronicle Stage<br/>(Housing capacity births/starvation deaths, log events)"]
+    S5 --> S6["6. Viewport Culling & Broadcast Stage<br/>(Cull entities outside camera margin, emit TickSnapshot to watch channel)"]
+    S6 --> S7["7. Client Transport & Interpolation Stage<br/>(Store last 2 snapshots, calculate alpha based on RAF time)"]
+    S7 --> S8["8. Layered Canvas Render Stage<br/>(Blit offscreen terrain, render sorted villager & building sprites)"]
+
+    classDef input fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px;
+    classDef process fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
+    classDef output fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
+
+    class S1 input;
+    class S2,S3,S4,S5 process;
+    class S6,S7,S8 output;

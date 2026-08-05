@@ -1,0 +1,46 @@
+graph TD
+    subgraph RustCore["Rust Sim Core (src-tauri/src/sim)"]
+        World["World Struct (world.rs)"]
+        Agents["Villagers & Needs (agents.rs, needs.rs)"]
+        Utility["Utility Evaluation (utility.rs)"]
+        Jobs["JobBoard & Economy (jobs.rs, economy.rs)"]
+        Pathfind["A* Pathfinder (pathfind.rs)"]
+        Catalog["Content Catalog (catalog.rs)"]
+        Chronicle["Chronicle Event Log (chronicle.rs)"]
+        Persist["Persistence Manager (persist.rs)"]
+        IPC["Tauri IPC Handlers (commands.rs)"]
+
+        World --> Agents
+        World --> Utility
+        World --> Jobs
+        World --> Pathfind
+        World --> Catalog
+        World --> Chronicle
+        World --> Persist
+        IPC --> World
+    end
+
+    subgraph Frontend["React + Canvas Frontend (src/)"]
+        TransportIF["Transport Contract Interface (transport.ts)"]
+        TauriTrans["TauriTransport (IPC Bridge)"]
+        BrowserTrans["BrowserTransport (DemoWorld TS Sim)"]
+        CanvasComponent["Canvas Component (Canvas.tsx)"]
+        DrawModule["Render Module (drawTerrain, drawEntities, drawGhost)"]
+        UIComponents["UI Layer (BuildMenu, ResourceBar, ClockBar, VillagerPanel, ChronicleDrawer)"]
+        Atlas["Sprite Atlas Manager (atlas.ts)"]
+
+        TransportIF -.- TauriTrans
+        TransportIF -.- BrowserTrans
+        UIComponents --> TransportIF
+        CanvasComponent --> TransportIF
+        CanvasComponent --> DrawModule
+        DrawModule --> Atlas
+    end
+
+    TauriTrans <.->|"Tauri IPC channel"| IPC
+
+    classDef rust fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px;
+    classDef react fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
+
+    class World,Agents,Utility,Jobs,Pathfind,Catalog,Chronicle,Persist,IPC rust;
+    class TransportIF,TauriTrans,BrowserTrans,CanvasComponent,DrawModule,UIComponents,Atlas react;

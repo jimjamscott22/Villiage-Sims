@@ -1,0 +1,44 @@
+<mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="1">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- Title -->
+    <mxCell id="title" value="VillageSim — Data Model &amp; Entity Hierarchy" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="300" y="20" width="500" height="40" as="geometry" />
+    </mxCell>
+
+    <mxCell id="world_box" value="World Aggregate Root&#10;width, height, tile_size, seed&#10;tiles: Vec&lt;u8&gt;, occupancy: Vec&lt;Option&lt;u32&gt;&gt;&#10;resources: ResourceTotals" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontStyle=1;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="360" y="80" width="360" height="80" as="geometry" />
+    </mxCell>
+
+    <mxCell id="villager_box" value="Villager&#10;id: u32, name: String&#10;x: f32, y: f32, state: AgentState&#10;hunger: f32, energy: f32, social: f32&#10;happiness: f32, traits: Vec&lt;Trait&gt;&#10;job: Option&lt;AssignedJob&gt;&#10;path: Vec&lt;(i32, i32)&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="60" y="220" width="260" height="150" as="geometry" />
+    </mxCell>
+
+    <mxCell id="building_box" value="Building&#10;id: u32, kind: String&#10;x: i32, y: i32, rot: u8&#10;state: BuildState (UnderConstruction | Complete)&#10;progress_ticks: u32&#10;inventory: Map&lt;String, u32&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="360" y="220" width="260" height="150" as="geometry" />
+    </mxCell>
+
+    <mxCell id="crop_box" value="Crop&#10;id: u32, kind: String&#10;x: i32, y: i32&#10;stage: u8, growth_progress: u32&#10;watered: bool" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="660" y="220" width="240" height="150" as="geometry" />
+    </mxCell>
+
+    <mxCell id="chronicle_box" value="Chronicle&#10;seq: u64&#10;entries: VecDeque&lt;ChronicleEntry&gt;&#10;(capacity: 200)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="60" y="420" width="260" height="100" as="geometry" />
+    </mxCell>
+
+    <mxCell id="clock_box" value="Clock&#10;tick: u64, day: u32&#10;season: Season (Spring, Summer, Autumn, Winter)&#10;speed: u8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="360" y="420" width="260" height="100" as="geometry" />
+    </mxCell>
+
+    <mxCell id="catalog_box" value="Catalog Spec&#10;buildings.json: BuildingDef&#10;crops.json: CropDef&#10;traits.json: TraitDef" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="660" y="420" width="240" height="100" as="geometry" />
+    </mxCell>
+
+    <!-- Connectors -->
+    <mxCell id="e_w_v" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;" edge="1" parent="1" source="world_box" target="villager_box" />
+    <mxCell id="e_w_b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;" edge="1" parent="1" source="world_box" target="building_box" />
+    <mxCell id="e_w_c" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;" edge="1" parent="1" source="world_box" target="crop_box" />
+  </root>
+</mxGraphModel>

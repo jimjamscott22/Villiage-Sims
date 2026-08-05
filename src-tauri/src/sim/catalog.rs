@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn builtin_catalog_loads_buildings_and_crops() {
         let catalog = Catalog::load_builtin().expect("catalog");
-        assert_eq!(catalog.buildings.len(), 5);
+        assert_eq!(catalog.buildings.len(), 6);
         assert!(catalog.find("hut").is_some());
         assert!(catalog.find("farm").is_some());
         assert!(catalog.find("granary").is_some());

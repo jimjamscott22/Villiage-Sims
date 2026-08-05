@@ -1,0 +1,73 @@
+erDiagram
+    WORLD ||--|{ VILLAGER : contains
+    WORLD ||--|{ BUILDING : contains
+    WORLD ||--|{ CROP : contains
+    WORLD ||--|| CLOCK : manages
+    WORLD ||--|| CHRONICLE : logs
+    WORLD ||--|| RESOURCE_TOTALS : tracks
+
+    WORLD {
+        u32 width
+        u32 height
+        u32 tile_size
+        u64 seed
+        Vec_u8 tiles
+        Vec_Option_u32 occupancy
+        BTreeSet_String unlocked
+    }
+
+    VILLAGER {
+        u32 id
+        String name
+        f32 x
+        f32 y
+        AgentState state
+        f32 hunger
+        f32 energy
+        f32 social
+        f32 happiness
+        Vec_String traits
+        Option_AssignedJob job
+    }
+
+    BUILDING {
+        u32 id
+        String kind
+        i32 x
+        i32 y
+        u8 rot
+        BuildState state
+        u32 progress_ticks
+        Map_String_u32 inventory
+    }
+
+    CROP {
+        u32 id
+        String kind
+        i32 x
+        i32 y
+        u8 stage
+        u32 growth_progress
+        bool watered
+    }
+
+    CLOCK {
+        u64 tick
+        u32 day
+        Season season
+        u8 speed
+    }
+
+    CHRONICLE {
+        u64 seq
+        VecDeque_ChronicleBody entries
+    }
+
+    RESOURCE_TOTALS {
+        u32 wood
+        u32 stone
+        u32 grain
+        u32 flour
+        u32 food
+        u32 gold
+    }

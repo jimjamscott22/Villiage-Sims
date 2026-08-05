@@ -1,0 +1,54 @@
+<mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="1">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- Title -->
+    <mxCell id="title" value="VillageSim — C4 Container &amp; Processing Pipeline" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="300" y="20" width="500" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- Stage 1: Input / Command Reception -->
+    <mxCell id="stage1" value="1. Input Stage&#10;User User Action / Timer Tick&#10;(mpsc SimCommand receiver)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;arcSize=12;shadow=1;" vertex="1" parent="1">
+      <mxGeometry x="350" y="80" width="400" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- Stage 2: Clock & Environment -->
+    <mxCell id="stage2" value="2. Environment &amp; Time Update&#10;Advance clock, evaluate season transitions, tick crops" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;shadow=1;" vertex="1" parent="1">
+      <mxGeometry x="350" y="170" width="400" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- Stage 3: Villager Needs & AI -->
+    <mxCell id="stage3" value="3. Needs Decay &amp; Utility AI&#10;Decay hunger/energy/social, score actions, hysteresis gating" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;shadow=1;" vertex="1" parent="1">
+      <mxGeometry x="350" y="260" width="400" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- Stage 4: Movement & Jobs -->
+    <mxCell id="stage4" value="4. Movement &amp; Economy Execution&#10;A* pathfinding, job board matching (haul, produce, tend, gather)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;shadow=1;" vertex="1" parent="1">
+      <mxGeometry x="350" y="350" width="400" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- Stage 5: Population & Chronicle -->
+    <mxCell id="stage5" value="5. Progression &amp; Chronicle Update&#10;Housing check for births, starvation deaths, log events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;shadow=1;" vertex="1" parent="1">
+      <mxGeometry x="350" y="440" width="400" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- Stage 6: Viewport Culling & Snapshot Serialization -->
+    <mxCell id="stage6" value="6. Viewport Culling &amp; Snapshot Broadcast&#10;Filter entities in camera margin, emit TickSnapshot to watch channel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;arcSize=12;shadow=1;" vertex="1" parent="1">
+      <mxGeometry x="350" y="530" width="400" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- Stage 7: Client Render Loop -->
+    <mxCell id="stage7" value="7. Client Interpolation &amp; RAF Render&#10;Interpolate last 2 snapshots by alpha, draw stacked HTML5 Canvas" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;arcSize=12;shadow=1;" vertex="1" parent="1">
+      <mxGeometry x="350" y="620" width="400" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- Connections -->
+    <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" parent="1" source="stage1" target="stage2" />
+    <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="stage2" target="stage3" />
+    <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="stage3" target="stage4" />
+    <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1" source="stage4" target="stage5" />
+    <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="stage5" target="stage6" />
+    <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#d6b656;strokeWidth=2;" edge="1" parent="1" source="stage6" target="stage7" />
+  </root>
+</mxGraphModel>

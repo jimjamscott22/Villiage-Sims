@@ -1,0 +1,84 @@
+<mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="1">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    
+    <!-- Title -->
+    <mxCell id="title" value="VillageSim — C4 System Context &amp; High-Level Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="300" y="20" width="500" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- Rust Sim Container -->
+    <mxCell id="rust_sim_container" value="Rust Authoritative Simulation Thread&#10;(20 Hz Tick Loop)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;arcSize=12;shadow=1;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="50" y="90" width="400" height="520" as="geometry" />
+    </mxCell>
+
+    <mxCell id="world_state" value="World State&#10;(Tiles, Villagers, Buildings, Crops, Resources, JobBoard)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;strokeWidth=2;shadow=1;" vertex="1" parent="rust_sim_container">
+      <mxGeometry x="40" y="50" width="320" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="sim_clock" value="Clock &amp; Seasons&#10;(Pause / 1x / 2x / 3x Speed)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;shadow=1;" vertex="1" parent="rust_sim_container">
+      <mxGeometry x="40" y="130" width="320" height="50" as="geometry" />
+    </mxCell>
+
+    <mxCell id="utility_ai" value="Utility AI &amp; Needs Decay&#10;(Scoring curves + Hysteresis decision gating)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;shadow=1;" vertex="1" parent="rust_sim_container">
+      <mxGeometry x="40" y="200" width="320" height="50" as="geometry" />
+    </mxCell>
+
+    <mxCell id="pathfinding" value="Pathfinding &amp; Jobs&#10;(A* Grid pathfinding, Hauling, Harvesting)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;shadow=1;" vertex="1" parent="rust_sim_container">
+      <mxGeometry x="40" y="270" width="320" height="50" as="geometry" />
+    </mxCell>
+
+    <mxCell id="chronicle_engine" value="Chronicle &amp; Persistence&#10;(200-entry event log, bincode save/load v2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;shadow=1;" vertex="1" parent="rust_sim_container">
+      <mxGeometry x="40" y="340" width="320" height="50" as="geometry" />
+    </mxCell>
+
+    <mxCell id="catalog_json" value="Data-Driven Catalog&#10;(buildings.json &amp; crops.json)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;shadow=1;" vertex="1" parent="rust_sim_container">
+      <mxGeometry x="110" y="410" width="180" height="80" as="geometry" />
+    </mxCell>
+
+    <!-- React Webview Container -->
+    <mxCell id="react_webview" value="React 19 + Canvas Renderer&#10;(60 FPS RAF Viewport)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;arcSize=12;shadow=1;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="650" y="90" width="400" height="520" as="geometry" />
+    </mxCell>
+
+    <mxCell id="interpolation" value="Interpolation Engine&#10;(2-Snapshot buffer, alpha blending)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;strokeWidth=2;shadow=1;" vertex="1" parent="react_webview">
+      <mxGeometry x="40" y="50" width="320" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="canvas_stack" value="3-Layer Canvas Stack&#10;(Offscreen Terrain, Dynamic Entities, Build Overlay)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;shadow=1;" vertex="1" parent="react_webview">
+      <mxGeometry x="40" y="130" width="320" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="react_ui" value="React UI Components&#10;(BuildMenu, ResourceBar, ClockBar, VillagerPanel, ChronicleDrawer)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;shadow=1;" vertex="1" parent="react_webview">
+      <mxGeometry x="40" y="210" width="320" height="70" as="geometry" />
+    </mxCell>
+
+    <mxCell id="transport_layer" value="Transport Layer Switch&#10;(Tauri IPC vs Browser-Demo Fallback)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;shadow=1;" vertex="1" parent="react_webview">
+      <mxGeometry x="40" y="300" width="320" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="asset_atlas" value="Committed Pixel Art Atlas&#10;(public/art/tiles.png &amp; atlas.json)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;shadow=1;" vertex="1" parent="react_webview">
+      <mxGeometry x="110" y="400" width="180" height="80" as="geometry" />
+    </mxCell>
+
+    <!-- Channels / Communication -->
+    <mxCell id="snapshots_channel" value="Snapshots Stream&#10;(tokio::sync::watch 20Hz emit('tick'))" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;strokeWidth=3;fontSize=12;fontStyle=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="rust_sim_container" target="react_webview">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="550" y="220" />
+          <mxPoint x="550" y="220" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <mxCell id="commands_channel" value="Intents / Commands Stream&#10;(std::sync::mpsc SimCommand + oneshot)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;strokeWidth=3;fontSize=12;fontStyle=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="react_webview" target="rust_sim_container">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="550" y="450" />
+          <mxPoint x="550" y="450" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+  </root>
+</mxGraphModel>
