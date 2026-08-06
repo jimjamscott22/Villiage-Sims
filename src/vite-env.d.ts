@@ -4,6 +4,17 @@ declare global {
   interface Window {
     advanceTime?: (ms: number) => void;
     render_game_to_text?: () => string;
+    /** Live render/sim perf counters (updated every RAF / tick). */
+    __villagePerf?: () => {
+      fps: number;
+      frameMs: number;
+      drawListLength: number;
+      snapshotBytes: number;
+      propsTotal: number;
+      propsDrawn: number;
+      shorelineTotal: number;
+      shorelineDrawn: number;
+    };
     __villageTransport?: {
       moveVillagerTo(x: number, y: number): Promise<void>;
       placeBuilding(
