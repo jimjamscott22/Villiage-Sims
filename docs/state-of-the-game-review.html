@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VillageSim — State of the Game Review</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
+      --bg-inset: #17233b;
+      --text-primary: #f8fafc;
+      --text-body: #cbd5e1;
+      --text-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #7dd3fc;
+      --border: #334155;
+      --code-bg: #090d16;
+      --good: #4ade80;
+      --warn: #fbbf24;
+      --bad: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.65;
+      margin: 0;
+      padding: 2rem 1rem;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: var(--bg-card);
+      padding: 3rem;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+    }
+    @media (max-width: 640px) { .container { padding: 1.5rem; } body { padding: 1rem 0.5rem; } }
+    h1 {
+      color: var(--accent);
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0.5rem;
+      margin-top: 0;
+      font-size: 2.2rem;
+      line-height: 1.2;
+    }
+    h2 {
+      color: var(--accent-hover);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.3rem;
+      margin-top: 2.5rem;
+      font-size: 1.6rem;
+    }
+    h3 { color: #e2e8f0; margin-top: 1.75rem; font-size: 1.2rem; }
+    p, li { color: var(--text-body); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      background: var(--code-bg);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-family: 'Fira Code', Consolas, Monaco, monospace;
+      font-size: 0.88em;
+      word-break: break-word;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+    pre code { background: none; padding: 0; color: var(--text-body); }
+    .subtitle { color: var(--text-secondary); margin-top: 0; font-size: 0.95rem; }
+    .table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+    table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 0.94rem; }
+    th, td { border: 1px solid var(--border); padding: 0.6rem 0.8rem; text-align: left; vertical-align: top; }
+    th { background: var(--bg-inset); color: var(--accent-hover); font-weight: 600; }
+    td { color: var(--text-body); }
+    .pill {
+      display: inline-block; padding: 0.1rem 0.55rem; border-radius: 999px;
+      font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+    }
+    .p-good { background: rgba(74,222,128,0.15); color: var(--good); border: 1px solid rgba(74,222,128,0.35); }
+    .p-warn { background: rgba(251,191,36,0.15); color: var(--warn); border: 1px solid rgba(251,191,36,0.35); }
+    .p-bad  { background: rgba(248,113,113,0.15); color: var(--bad);  border: 1px solid rgba(248,113,113,0.35); }
+    .finding {
+      background: var(--bg-inset);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 1.1rem 1.35rem;
+      margin: 1.25rem 0;
+    }
+    .finding.sev-high { border-left-color: var(--bad); }
+    .finding.sev-med  { border-left-color: var(--warn); }
+    .finding.sev-low  { border-left-color: var(--good); }
+    .finding h3 { margin-top: 0; }
+    .finding .meta { color: var(--text-secondary); font-size: 0.85rem; margin: -0.4rem 0 0.8rem; }
+    .evidence {
+      font-family: 'Fira Code', Consolas, Monaco, monospace;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      background: var(--code-bg);
+      border-radius: 6px;
+      padding: 0.6rem 0.8rem;
+      margin-top: 0.8rem;
+      overflow-x: auto;
+    }
+    .callout {
+      background: rgba(56,189,248,0.08);
+      border: 1px solid rgba(56,189,248,0.3);
+      border-radius: 8px;
+      padding: 1rem 1.35rem;
+      margin: 1.5rem 0;
+    }
+    .callout strong { color: var(--accent-hover); }
+    footer {
+      margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--border);
+      color: var(--text-secondary); font-size: 0.85rem;
+    }
+    ol.plan > li { margin-bottom: 0.6rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <h1>VillageSim — State of the Game Review</h1>
+  <p class="subtitle">
+    Review date: 7 August 2026 · Branch reviewed: <code>main</code> at <code>9b6895d</code>
+    ("perf: instrument overlay and cull viewport render work", #32)
+  </p>
+
+  <h2>Verdict</h2>
+
+  <p>
+    VillageSim is in genuinely good shape as an <em>engine</em>. The architecture the spec set out —
+    authoritative Rust sim, thin interpolating renderer, data-driven content — is real, is honoured
+    throughout the code, and the whole thing builds and tests clean. Nine of ten milestones are
+    complete and the tenth is nearly there.
+  </p>
+  <p>
+    It is in noticeably weaker shape as a <em>game</em>. There are six buildings, one crop, and three
+    character traits that have no mechanical effect whatsoever. The systems are built; the content
+    that would make them interesting is not.
+  </p>
+
+  <div class="callout">
+    <p style="margin:0">
+      <strong>The single most important thing to do next</strong> is not to finish M10 and not to add
+      content. It is to resolve the fact that <strong>the simulation is currently implemented twice</strong> —
+      2,487 lines of Rust in <code>world.rs</code> and 2,404 lines of TypeScript in <code>demoWorld.ts</code>,
+      hand-mirrored, with no automated test that they agree. Every gameplay feature added from here
+      costs double and can silently diverge. Fixing that first makes everything after it cheaper;
+      leaving it makes the content work that the game most needs roughly twice as expensive as it
+      should be.
+    </p>
+  </div>
+
+  <h2>What I verified</h2>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Check</th><th>Result</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>npm test</code></td>
+        <td><span class="pill p-good">PASS</span></td>
+        <td>182 tests across 22 files, 3.4s</td>
+      </tr>
+      <tr>
+        <td><code>npm run build</code></td>
+        <td><span class="pill p-good">PASS</span></td>
+        <td>Typecheck clean; 296 KB JS (92 KB gzip), 22 KB CSS</td>
+      </tr>
+      <tr>
+        <td><code>cargo test --lib</code></td>
+        <td><span class="pill p-warn">NOT RUN</span></td>
+        <td>Could not build in this environment — <code>gdk-3.0</code> system libraries are absent and the sandbox has no package-install rights. 108 <code>#[test]</code> functions exist and CI installs the deps and runs them, so this is an environment limitation, not evidence of failure. The Rust side is <strong>unverified in this review</strong>.</td>
+      </tr>
+      <tr>
+        <td>CI configuration</td>
+        <td><span class="pill p-good">SOUND</span></td>
+        <td><code>.github/workflows/ci.yml</code> runs fmt, clippy <code>-D warnings</code>, cargo test, npm test and npm build on every PR</td>
+      </tr>
+      <tr>
+        <td>Determinism hygiene</td>
+        <td><span class="pill p-good">GOOD</span></td>
+        <td>No <code>HashMap</code>/<code>HashSet</code> anywhere in sim production code — <code>BTreeMap</code>/<code>BTreeSet</code> throughout, exactly as the spec demands</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Health by area</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Area</th><th>State</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Sim / render split</td><td><span class="pill p-good">Strong</span></td><td>Command channel in, snapshot watch channel out; frontend holds no authoritative state</td></tr>
+      <tr><td>Determinism discipline</td><td><span class="pill p-good">Strong</span></td><td>Ordered collections throughout; weather derived from <code>(seed, date)</code> rather than stored</td></tr>
+      <tr><td>Persistence</td><td><span class="pill p-good">Strong</span></td><td>Versioned bincode, magic header, 64 MB cap, byte-identical round-trip test</td></tr>
+      <tr><td>Art pipeline</td><td><span class="pill p-good">Strong</span></td><td>Generated, committed, drift-tested by decoded pixels; palette enforced</td></tr>
+      <tr><td>Frontend rendering</td><td><span class="pill p-good">Good</span></td><td>Three-layer canvas, offscreen terrain, viewport culling, perf overlay</td></tr>
+      <tr><td>Test coverage</td><td><span class="pill p-warn">Uneven</span></td><td>290 tests total, but the spec's two highest-value tests are missing (see F4)</td></tr>
+      <tr><td>Tick payload</td><td><span class="pill p-warn">Drifting</span></td><td>Buildings culled; villagers, crops and unlock strings are not (see F3)</td></tr>
+      <tr><td>Code structure</td><td><span class="pill p-warn">Concentrating</span></td><td><code>World</code> is a 2,487-line god object with ~110 methods (see F2)</td></tr>
+      <tr><td>Gameplay content</td><td><span class="pill p-bad">Thin</span></td><td>6 buildings, 1 crop, 3 no-op traits, 1 dead resource (see F6, F7)</td></tr>
+      <tr><td>Sim duplication</td><td><span class="pill p-bad">Risk</span></td><td>Whole sim mirrored in TypeScript, unchecked (see F1)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>Findings</h2>
+  <p class="subtitle">Ranked by how much they will cost if left alone.</p>
+
+  <div class="finding sev-high">
+    <h3>F1 — The simulation is implemented twice, and nothing checks that the two agree</h3>
+    <p class="meta">Severity: high · Category: architecture / maintainability</p>
+    <p>
+      <code>src/state/demoWorld.ts</code> is 2,404 lines that re-implement the Rust simulation in
+      TypeScript: utility scoring curves, needs decay, hysteresis, job claiming, hauling, production
+      recipes, node regeneration, storm damage, autosave slot rotation, and the building catalog.
+      Every tuning constant is transcribed by hand. They currently match exactly — I diffed them —
+      but that is maintained by discipline alone.
+    </p>
+    <p>
+      <code>AGENTS.md</code> already documents the hazard ("Mirror every catalog change into
+      <code>DEMO_CATALOG</code> … or the browser-demo drifts from the desktop build"), which is the
+      tell: a known trap guarded only by a note in a file. There is no test that runs the same seed
+      and command sequence through both and compares. Drift will be silent, and it will be
+      discovered as "the demo behaves differently" long after the change that caused it.
+    </p>
+    <p>The demo has also <em>already</em> diverged in scope: it does not simulate births or deaths at all.</p>
+    <div class="evidence">
+src/state/demoWorld.ts        2404 lines  (DemoWorld: full sim reimplementation)
+src-tauri/src/sim/world.rs    2487 lines of production code (World)
+src/state/demoWorld.ts:142-174   ~30 tuning constants transcribed from Rust
+src-tauri/src/sim/utility.rs:32-44, needs.rs:5-7, nodes.rs:7-11   the originals
+    </div>
+    <p><strong>Three ways out, cheapest first:</strong></p>
+    <ol>
+      <li>
+        <strong>Golden-trace conformance test (days).</strong> Add a Rust test that runs a fixed seed
+        and scripted command list for N ticks and writes a JSON trace of snapshots to
+        <code>tests/fixtures/</code>. Add a Vitest test that replays the same script through
+        <code>DemoWorld</code> and asserts the traces match. Doesn't remove the duplication, but drift
+        becomes a red CI run instead of a silent bug. <em>Do this regardless of what you pick below.</em>
+      </li>
+      <li>
+        <strong>Compile the sim to WASM (weeks — the real fix).</strong> The sim crate has no Tauri
+        dependency in its core; build <code>sim/</code> to <code>wasm32-unknown-unknown</code> and have
+        the browser transport drive the actual simulation. Deletes ~2,400 lines, makes the demo
+        genuinely faithful, and removes the double cost from every future feature.
+      </li>
+      <li>
+        <strong>Demote the demo to snapshot playback (days).</strong> If the demo only exists for
+        headless render testing and screenshots, it doesn't need to simulate — it needs a recorded
+        snapshot stream. Cheapest by far, but gives up interactive browser testing of gameplay.
+      </li>
+    </ol>
+  </div>
+
+  <div class="finding sev-high">
+    <h3>F2 — <code>World</code> has absorbed the systems that were supposed to live in modules</h3>
+    <p class="meta">Severity: high · Category: architecture</p>
+    <p>
+      The module layout looks right — <code>jobs.rs</code>, <code>crops.rs</code>, <code>economy.rs</code>,
+      <code>pathfind.rs</code>, <code>nodes.rs</code> — but the modules are mostly type definitions and
+      constants. The behaviour is all in <code>World</code>: roughly 110 methods spanning pathfinding,
+      job assignment, hauling logistics, crop tending, production recipes, population dynamics,
+      weather effects, autosave, placement validation and demolition.
+    </p>
+    <p>
+      Concretely, <code>economy.rs</code> is 138 lines while the hauling and production logic that
+      belongs to it — <code>find_haul_task</code>, <code>deposit_to_storage</code>,
+      <code>take_from_endpoint</code>, <code>nearest_storage_for</code>, <code>tick_produce</code>,
+      <code>tick_haul</code> — sits in <code>world.rs</code> across several hundred lines. Same story
+      for crops and jobs.
+    </p>
+    <p>
+      This is why F1 hurts so much: there is no seam to test a subsystem in isolation, so the demo has
+      to re-implement the whole thing rather than share a piece of it. It's also the thing that will
+      make adding the content the game needs feel heavy.
+    </p>
+    <div class="evidence">
+src-tauri/src/sim/world.rs:87-2486   impl World — ~110 methods
+  :973   find_haul_task          :1584  tick_produce      → belongs in economy.rs
+  :2086  tick_crops              :2323  tend_water_crops  → belongs in crops.rs
+  :2179  refresh_gather_jobs     :1287  job_actionable    → belongs in jobs.rs
+src-tauri/src/sim/economy.rs   138 lines (types + constants only)
+    </div>
+    <p>
+      <strong>Suggested approach:</strong> don't attempt a big-bang refactor. Extract one subsystem
+      per PR, starting with hauling/production into <code>economy.rs</code>, using a
+      <code>&amp;mut</code> context struct rather than methods on <code>World</code>. The 44 existing
+      <code>world.rs</code> tests are a good safety net for this.
+    </p>
+  </div>
+
+  <div class="finding sev-med">
+    <h3>F3 — The tick payload has quietly drifted back toward spec trap #1</h3>
+    <p class="meta">Severity: medium · Category: performance</p>
+    <p>
+      The spec names full-world snapshots as "the single biggest risk in this architecture" and says
+      to viewport-cull from M3 onward. <code>building_views()</code> does cull. Villagers and crops
+      do not — every villager and <em>every crop on the map</em> is serialized into every tick at
+      20 Hz regardless of where the camera is.
+    </p>
+    <p>
+      The payload also carries <code>unlocked: Vec&lt;String&gt;</code> — a list of building id strings
+      re-sent 20 times a second even though it changes a handful of times per playthrough. That is
+      spec trap #2 (serializing strings) in miniature, and it is trivially fixable as a bitmask or a
+      sequence number with an on-demand fetch, exactly the pattern <code>chronicle_seq</code> already
+      uses successfully.
+    </p>
+    <p>
+      Today the map has one crop type and a handful of farms so nothing hurts. At the spec's stated
+      target — 100 villagers, 128×128, farms across the map — crops are the term that grows without
+      bound. Worth noting the frontend measures <code>snapshotBytes</code> in the <code>?perf=1</code>
+      overlay but nothing asserts a budget, and there is <strong>no tick-duration instrumentation on
+      the Rust side at all</strong>, so the spec's ≤5 ms tick budget is currently unmeasured.
+    </p>
+    <div class="evidence">
+src-tauri/src/sim/world.rs:623   tick_snapshot()
+  villagers: self.villagers.iter().map(…)     ← every villager, unculled
+  crops:     self.crops.iter().map(Crop::view) ← every crop, unculled
+  unlocked:  self.unlocked().iter().cloned()   ← Vec&lt;String&gt; @ 20 Hz
+src-tauri/src/sim/world.rs:1859  building_views()  ← culls correctly, the model to copy
+    </div>
+    <p>
+      <strong>Fix:</strong> reuse the viewport rect from <code>building_views()</code> for villagers
+      and crops; swap <code>unlocked</code> for an <code>unlocked_seq</code> + <code>get_unlocked</code>
+      command. Then add a Rust test asserting a serialized snapshot stays under 20 KB on a densely
+      populated world, and a tick-duration histogram behind a debug flag.
+    </p>
+  </div>
+
+  <div class="finding sev-med">
+    <h3>F4 — The two tests the spec calls highest-value don't exist</h3>
+    <p class="meta">Severity: medium · Category: testing</p>
+    <p>
+      §14 of the spec names four test categories. Unit coverage is good (290 tests) and the save
+      round-trip test is present and genuinely rigorous (<code>persist.rs:164</code> asserts
+      byte-identical re-save). The other two are missing:
+    </p>
+    <ul>
+      <li>
+        <strong>Full-sim determinism.</strong> The spec calls this "the highest-value test in the
+        project". <code>weather_is_deterministic</code> covers the weather function only; nothing runs
+        the same seed and command sequence for N ticks and compares a world hash. The
+        <code>BTreeMap</code> discipline that makes determinism possible is therefore
+        unenforced — a single <code>HashMap</code> added in future passes CI silently.
+      </li>
+      <li>
+        <strong>Headless soak.</strong> No 10,000-tick no-panic / no-starvation-deadlock run. This is
+        the cheap test that catches economy stalls, and an economy stall is precisely the failure mode
+        a village sim has.
+      </li>
+    </ul>
+    <p>
+      Both are small to write and both directly protect properties the architecture depends on. The
+      determinism test is also a prerequisite for doing F1's golden-trace test properly.
+    </p>
+    <div class="evidence">
+present: src-tauri/src/persist.rs:164   save_round_trip_is_byte_identical_and_continues
+present: src-tauri/src/sim/weather.rs:119   weather_is_deterministic  (weather fn only)
+missing: same-seed world-hash equality after N ticks
+missing: 10,000-tick headless soak
+    </div>
+  </div>
+
+  <div class="finding sev-med">
+    <h3>F5 — Right-click "move here" ignores which villager you selected</h3>
+    <p class="meta">Severity: medium · Category: correctness / UX</p>
+    <p>
+      Clicking a villager sets <code>selectedVillagerId</code> and populates the villager panel. But
+      the move order doesn't carry that id: <code>moveVillagerTo(x, y)</code> reaches
+      <code>World::order_move</code>, which calls <code>nearest_villager_index_to(x, y)</code> and
+      commands whichever villager is closest to the <em>destination</em>.
+    </p>
+    <p>
+      So: select Ash, right-click across the map near Briar, and Briar walks. Worse, that call does
+      <code>release_job_at</code> first, so an unrelated villager silently drops their job. This reads
+      as a leftover from M4, when there was only one villager — it survived M7's move to five.
+    </p>
+    <div class="evidence">
+src/render/Canvas.tsx:684   onContextMenu → transport.moveVillagerTo(tile[0], tile[1])
+                             (selectedVillagerIdRef is in scope, not passed)
+src-tauri/src/sim/world.rs:678   order_move(x, y) → nearest_villager_index_to(x, y)
+    </div>
+    <p>
+      <strong>Fix:</strong> thread the selected id through the command and fall back to nearest only
+      when nothing is selected. Small change; touches the IPC signature, both transports and the demo.
+    </p>
+  </div>
+
+  <div class="finding sev-med">
+    <h3>F6 — Traits are described to the player but have no mechanical effect</h3>
+    <p class="meta">Severity: medium · Category: gameplay honesty</p>
+    <p>
+      <code>traits.json</code> defines three traits with specific promises: Fast Walker "moves 25%
+      faster", Strong Back "can carry more goods when hauling", Green Thumb "tends crops with
+      extraordinary skill". These strings are shown to the player in <code>VillagerPanel</code>.
+    </p>
+    <p>
+      No gameplay code reads them. Traits are assigned at spawn, persisted in saves, sent in villager
+      detail, and rendered — and that is the complete extent of it. Movement uses the constant
+      <code>MOVE_SPEED_TILES_PER_SEC</code> unconditionally; hauling uses the constant
+      <code>CARRY_STACK_MAX</code>; crop tending has no trait branch at all.
+    </p>
+    <p>
+      This is worse than a missing feature, because the UI actively tells the player something untrue.
+      M9 is marked complete on the strength of it. The fix is small — three multipliers at three call
+      sites — and it converts a cosmetic list into the thing that makes individual villagers feel
+      distinct, which is the whole pitch of the game.
+    </p>
+    <div class="evidence">
+src-tauri/data/traits.json          3 traits, each with a stated numeric effect
+src-tauri/src/sim/world.rs:135,418  assigned round-robin by index/id
+src-tauri/src/sim/world.rs:674      returned in villager_detail
+grep -rn "traits" src-tauri/src/sim/  → no read outside assignment + display
+    </div>
+  </div>
+
+  <div class="finding sev-low">
+    <h3>F7 — The content is much thinner than the engine that serves it</h3>
+    <p class="meta">Severity: low individually, high cumulatively · Category: gameplay</p>
+    <p>
+      The data-driven content system works well — a building is declared in JSON with footprint, cost,
+      terrain, recipe, storage, jobs and unlock conditions, no code changes needed. It is serving
+      <strong>6 buildings and 1 crop</strong>.
+    </p>
+    <ul>
+      <li>
+        <strong>One crop makes seasons nearly inert.</strong> Wheat grows in spring and summer. The
+        clock models four seasons, crops stall in winter, and weather waters them — an entire
+        subsystem whose only expression is "wheat sometimes doesn't grow."
+      </li>
+      <li>
+        <strong>Gold is a dead resource.</strong> Declared in <code>ResourceTotals</code>, given an
+        icon and a slot in the HUD, and never produced or spent by anything. It is permanently zero on
+        screen.
+      </li>
+      <li>
+        <strong>The production chain is one link deep.</strong> grain → flour → bread, and that's the
+        economy. Hauling, storage capacity and buffer caps are all built to support more.
+      </li>
+      <li>
+        <strong>The unlock tree has almost nothing to gate.</strong> With six buildings, progression
+        is over within minutes.
+      </li>
+    </ul>
+    <p>
+      This is the cheapest ratio of effort to felt improvement anywhere in the project — most of it is
+      JSON — but it is exactly the work that F1 doubles, since every catalog entry must be mirrored
+      into <code>DEMO_CATALOG</code> by hand.
+    </p>
+  </div>
+
+  <div class="finding sev-low">
+    <h3>F8 — Population growth is a placeholder wearing a milestone's name</h3>
+    <p class="meta">Severity: low · Category: gameplay</p>
+    <p>
+      M9 is "population growth, births/deaths". What's implemented: every 200 ticks (10 seconds of
+      real time), if the villager count is under housing capacity, a villager materialises at the
+      centre of the map. No parents, no age, no gestation, no relationship to which hut has room. The
+      only death is starvation after 300 ticks at zero hunger; nobody ages or dies of anything else.
+    </p>
+    <p>
+      Population is therefore a step function that rises to the housing cap and then stops forever. A
+      further detail: <code>EXTRA_VILLAGER_NAMES</code> holds 15 names indexed modulo the villager id,
+      so past ~16 villagers the village fills with duplicate names — and traits are assigned by the
+      same modulo, so the same name reliably carries the same trait.
+    </p>
+    <div class="evidence">
+src-tauri/src/sim/world.rs:405   self.clock.tick % 200 == 0  → spawn at map centre
+src-tauri/src/sim/world.rs:412   name = EXTRA_VILLAGER_NAMES[next_id % 15]
+src-tauri/src/sim/world.rs:422   trait = traits_pool[next_id % 3]
+src-tauri/src/sim/agents.rs:84   EXTRA_VILLAGER_NAMES: [&str; 15]
+    </div>
+  </div>
+
+  <div class="finding sev-low">
+    <h3>F9 — Documentation overstates what M10 has left, and references tooling that isn't here</h3>
+    <p class="meta">Severity: low · Category: documentation</p>
+    <p>
+      <code>progress.md</code> lists M10's remainder as "camera/interaction polish (hover tooltips,
+      selection highlight)". Selection highlight is already implemented — both for buildings
+      (<code>scene.ts:241</code>) and villagers (<code>scene.ts:368</code>,
+      <code>drawEntities.ts:16-22</code>). What's actually missing is hover tooltips, and there is no
+      pointer-hover inspection path at all.
+    </p>
+    <p>
+      Separately, <code>AGENTS.md</code> describes deterministic hooks "used by the Playwright smoke
+      flow described in the M1 plan". The hooks (<code>advanceTime</code>,
+      <code>render_game_to_text</code>) do exist and work. The Playwright flow does not — there is no
+      Playwright dependency, no config, and no spec files in the repo. Either build the smoke test or
+      stop referring to it; right now a new contributor will go looking for something that was never
+      committed.
+    </p>
+    <p>
+      Minor UX gaps in the same area: save/load is hard-wired to slot 1 with a
+      <code>window.confirm()</code> dialog and no way to browse or load the three rotating autosave
+      slots the sim is diligently writing.
+    </p>
+  </div>
+
+  <h2>What to do next</h2>
+
+  <p>
+    Ordered so that each step makes the following ones cheaper. The theme: <strong>stop the bleeding
+    on duplication before pouring content in</strong>, because content is what the game most needs and
+    duplication is what makes content expensive.
+  </p>
+
+  <h3>Now — one to two weeks</h3>
+  <ol class="plan">
+    <li>
+      <strong>Add the determinism and soak tests (F4).</strong> Same seed + command script → identical
+      world hash after N ticks; and a 10,000-tick headless run asserting no panic and no starvation
+      deadlock. Small, high-leverage, and a prerequisite for step 2.
+    </li>
+    <li>
+      <strong>Add the Rust↔demo conformance test (F1, mitigation).</strong> Generate a golden snapshot
+      trace from the Rust sim, commit it as a fixture, replay it through <code>DemoWorld</code> in
+      Vitest. This converts silent drift into a failing build — worth doing even if you later delete
+      the demo entirely.
+    </li>
+    <li>
+      <strong>Fix the move-order bug (F5).</strong> Thread the selected villager id through
+      <code>moveVillagerTo</code>. It's the one outright behavioural bug found in this review.
+    </li>
+    <li>
+      <strong>Give traits their effects (F6).</strong> Three multipliers at three call sites. Stops the
+      UI making false claims, and is the cheapest gameplay depth available.
+    </li>
+    <li>
+      <strong>Close M10 honestly (F9).</strong> Hover tooltips are the real remaining item; add them,
+      correct <code>progress.md</code>, and either commit the Playwright smoke test or remove the
+      reference to it.
+    </li>
+  </ol>
+
+  <h3>Next — the decision that shapes the rest of the project</h3>
+  <ol class="plan" start="6">
+    <li>
+      <strong>Decide what the browser demo is for, then commit to it (F1).</strong> This is the call to
+      make deliberately rather than by drift:
+      <ul>
+        <li>If it exists so gameplay can be tested and demoed headlessly → <strong>compile the sim to
+          WASM</strong> and delete <code>demoWorld.ts</code>. Highest cost, but it removes the double
+          tax from every feature after it.</li>
+        <li>If it exists so the <em>renderer</em> can be tested headlessly → <strong>demote it to
+          snapshot playback</strong> and delete the simulation half. Cheap, and honest about scope.</li>
+      </ul>
+      Either answer is defensible. Maintaining a hand-mirrored second simulation indefinitely is not.
+    </li>
+    <li>
+      <strong>Begin extracting subsystems from <code>World</code> (F2)</strong>, one per PR, starting
+      with hauling and production into <code>economy.rs</code>. The 44 existing tests make this safe.
+      Do it alongside step 6, not before — the WASM decision affects where the seams should fall.
+    </li>
+    <li>
+      <strong>Cull villagers and crops from the tick payload, and drop the string list (F3),</strong>
+      then add the 20 KB budget assertion and Rust-side tick timing so the spec's performance targets
+      are measured rather than assumed.
+    </li>
+  </ol>
+
+  <h3>Later — once a feature costs what it should</h3>
+  <ol class="plan" start="9">
+    <li>
+      <strong>Content pass (F7).</strong> Three or four more crops with real seasonal spread, a second
+      production chain, buildings worth gating the unlock tree on, and either a use for gold or its
+      removal from the HUD. Mostly JSON — which is precisely why it should follow step 6.
+    </li>
+    <li>
+      <strong>Deepen population (F8).</strong> Age, parentage, natural death, and births tied to
+      specific housing. Expand the name pool and randomise trait assignment from the world seed. This
+      is what turns a headcount into a village with a history — and the chronicle system to narrate it
+      is already built and waiting.
+    </li>
+    <li>
+      <strong>Save management UI (F9).</strong> A slot browser exposing the three autosaves the sim
+      already writes, replacing the hard-wired slot 1 and the <code>window.confirm</code>.
+    </li>
+  </ol>
+
+  <div class="callout">
+    <p style="margin:0">
+      <strong>If only one thing gets done:</strong> make the decision in step 6. Everything the game
+      actually needs from here — crops, buildings, chains, traits, population depth — is content, and
+      content is the category the duplication penalises most. The engine is good. It is being asked to
+      carry two copies of itself while the shelves stay empty.
+    </p>
+  </div>
+
+  <h2>Scope of this review</h2>
+  <p>
+    I read the Rust simulation, the frontend renderer and state layer, the content data files, the
+    build and CI configuration, and the project documentation, and I ran the frontend test suite and
+    production build. I did not run the Rust test suite — the required GTK/WebKit system libraries are
+    absent from this environment and could not be installed — so all statements about Rust behaviour
+    are from reading the source, not from execution. I did not run the desktop app, which needs a
+    display, and I did not profile at the spec's stated load of 100 villagers; the performance
+    observations in F3 are analytical, drawn from what the snapshot code serializes rather than from
+    measurement.
+  </p>
+
+  <footer>
+    VillageSim state-of-the-game review · <code>main</code> @ <code>9b6895d</code> · 7 August 2026<br>
+    Companion documents:
+    <a href="villagesim-spec.md">villagesim-spec.md</a> (roadmap) ·
+    <a href="../progress.md">progress.md</a> (milestone status) ·
+    <a href="project-summary.html">project-summary.html</a> (architecture overview)
+  </footer>
+
+</div>
+</body>
+</html>
