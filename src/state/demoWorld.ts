@@ -1543,7 +1543,9 @@ export class DemoWorld {
     const tiles = this.farmFootprintTiles(buildingId);
     if (tiles.length === 0) return false;
     const season = SEASON_IDS[this.clock.season];
-    const canPlant = DEMO_CROPS.some((def) => def.id === 'wheat' && def.seasons.includes(season));
+    const wheat = DEMO_CROPS.find((def) => def.id === 'wheat');
+    const seasonOk = wheat != null && wheat.seasons.includes(season);
+    const canPlant = seasonOk && this.canAffordSeedCost(buildingId, wheat?.seedCost ?? {});
     return tiles.some(([x, y]) => {
       const crop = this.crops.find((entry) => entry.x === x && entry.y === y);
       if (!crop) return canPlant;
@@ -1840,15 +1842,22 @@ export class DemoWorld {
     this.crops.splice(cropIndex, 1);
   }
 
-  private spendSeedCost(farmId: number, seedCost: Record<string, number>): boolean {
+  private canAffordSeedCost(farmId: number, seedCost: Record<string, number>): boolean {
     const entries = Object.entries(seedCost);
     if (entries.length === 0) return true;
     const farm = this.buildings.find((entry) => entry.id === farmId);
     if (!farm) return false;
-    const canPay = entries.every(
+    return entries.every(
       ([resource, amount]) => inventoryGet(farm.inventory, resource) + resourceGet(this.resources, resource) >= amount,
     );
-    if (!canPay) return false;
+  }
+
+  private spendSeedCost(farmId: number, seedCost: Record<string, number>): boolean {
+    if (!this.canAffordSeedCost(farmId, seedCost)) return false;
+    const entries = Object.entries(seedCost);
+    if (entries.length === 0) return true;
+    const farm = this.buildings.find((entry) => entry.id === farmId);
+    if (!farm) return false;
     for (const [resource, amount] of entries) {
       const fromFarm = inventoryTake(farm.inventory, resource, amount);
       const remaining = amount - fromFarm;

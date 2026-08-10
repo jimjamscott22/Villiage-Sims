@@ -2352,10 +2352,10 @@ impl World {
         if tiles.is_empty() {
             return false;
         }
-        let can_plant = self
-            .catalog
-            .find_crop("wheat")
-            .is_some_and(|(_, def)| def.grows_in(self.clock.season));
+        let wheat = self.catalog.find_crop("wheat");
+        let season_ok = wheat.is_some_and(|(_, def)| def.grows_in(self.clock.season));
+        let can_plant = season_ok
+            && wheat.is_some_and(|(_, def)| self.can_afford_seed_cost(building_id, &def.seed_cost));
         tiles.into_iter().any(|tile| {
             let Some(crop) = self.crops.iter().find(|crop| crop.tile == tile) else {
                 return can_plant;
@@ -2445,7 +2445,23 @@ impl World {
             .push(Crop::new(id, "wheat".to_string(), kind_index, tile));
     }
 
+    fn can_afford_seed_cost(&self, farm_id: u32, seed_cost: &BTreeMap<String, u32>) -> bool {
+        if seed_cost.is_empty() {
+            return true;
+        }
+        let Some(farm) = self.buildings.iter().find(|building| building.id == farm_id) else {
+            return false;
+        };
+        seed_cost.iter().all(|(resource, amount)| {
+            inventory_get(&farm.inventory, resource).saturating_add(self.resources.get(resource))
+                >= *amount
+        })
+    }
+
     fn spend_seed_cost(&mut self, farm_id: u32, seed_cost: &BTreeMap<String, u32>) -> bool {
+        if !self.can_afford_seed_cost(farm_id, seed_cost) {
+            return false;
+        }
         if seed_cost.is_empty() {
             return true;
         }
@@ -2456,14 +2472,6 @@ impl World {
         else {
             return false;
         };
-        let can_afford = seed_cost.iter().all(|(resource, amount)| {
-            inventory_get(&self.buildings[farm_index].inventory, resource)
-                .saturating_add(self.resources.get(resource))
-                >= *amount
-        });
-        if !can_afford {
-            return false;
-        }
         for (resource, amount) in seed_cost {
             let from_farm =
                 inventory_take(&mut self.buildings[farm_index].inventory, resource, *amount);
@@ -2725,6 +2733,7 @@ mod tests {
     #[test]
     fn completed_farm_advertises_tend_crops_and_villager_works() {
         let mut world = grass_world();
+        world.resources.grain = 4;
         world.place_building("farm", 2, 2, 0).unwrap();
         for _ in 0..30 {
             world.advance();
@@ -2758,6 +2767,7 @@ mod tests {
     #[test]
     fn demolish_farm_clears_jobs_and_returns_villager_to_idle() {
         let mut world = grass_world();
+        world.resources.grain = 4;
         let placed = world.place_building("farm", 2, 2, 0).unwrap();
         for _ in 0..30 {
             world.advance();
@@ -2778,6 +2788,7 @@ mod tests {
     #[test]
     fn player_move_releases_job_claim() {
         let mut world = grass_world();
+        world.resources.grain = 4;
         world.place_building("farm", 2, 2, 0).unwrap();
         for _ in 0..30 {
             world.advance();
@@ -2878,8 +2889,24 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        let farm_id = world.buildings()[0].id;
+        assert!(
+            !world.farm_needs_tending(farm_id),
+            "empty farm with no seed grain must not be actionable TendCrops work"
+        );
         for _ in 0..500 {
             world.advance();
+            assert!(
+                world
+                    .villagers()
+                    .iter()
+                    .all(|villager| villager.current_job.is_none()
+                        || world
+                            .job_board()
+                            .get(villager.current_job.unwrap())
+                            .is_some_and(|job| job.kind != JobKind::TendCrops)),
+                "villagers must not stay claimed on unaffordable TendCrops"
+            );
         }
         assert!(
             world.crops().is_empty(),
@@ -2948,6 +2975,7 @@ mod tests {
     #[test]
     fn hungry_villager_eats_without_releasing_job() {
         let mut world = grass_world();
+        world.resources.grain = 4;
         world.place_building("farm", 2, 2, 0).unwrap();
         for _ in 0..30 {
             world.advance();
@@ -3046,6 +3074,7 @@ mod tests {
         }
         world.job_board = JobBoard::new();
         world.clock = Clock::new();
+        world.resources.grain = 4;
         world.place_building("farm", 2, 2, 0).unwrap();
         for _ in 0..30 {
             world.advance();

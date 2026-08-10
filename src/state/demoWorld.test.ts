@@ -149,6 +149,7 @@ describe('DemoWorld pathfinding', () => {
       tiles: new Array(16 * 16).fill(3),
     };
     const world = new DemoWorld(terrain);
+    world.resources.grain = 4;
     const v = world.snapshot().villagers[0];
     const tx = Math.floor(v.x / 32);
     const ty = Math.floor(v.y / 32);
@@ -559,8 +560,21 @@ describe('DemoWorld pathfinding', () => {
   it('does not auto-plant wheat when seed grain cannot be paid', () => {
     const world = new DemoWorld(grassTerrain());
     expect(world.resources.grain).toBe(0);
-    completeBuilding(world, 'farm', 2, 2);
-    for (let i = 0; i < 500; i += 1) world.advance();
+    const farmId = completeBuilding(world, 'farm', 2, 2);
+    const internals = world as unknown as {
+      farmNeedsTending(buildingId: number): boolean;
+      villagers: Array<{ currentJob: number | null }>;
+      jobs: Array<{ id: number; kind: string }>;
+    };
+    expect(internals.farmNeedsTending(farmId)).toBe(false);
+    for (let i = 0; i < 500; i += 1) {
+      world.advance();
+      for (const villager of internals.villagers) {
+        if (villager.currentJob == null) continue;
+        const job = internals.jobs.find((entry) => entry.id === villager.currentJob);
+        expect(job?.kind).not.toBe('tend_crops');
+      }
+    }
     expect(world.crops).toHaveLength(0);
   });
 
