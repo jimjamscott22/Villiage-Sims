@@ -53,7 +53,11 @@ export default function App() {
           if (!cancelled) setVillagerDetail(detail);
         })
         .catch(() => {
-          /* detail optional until sim ready */
+          // Villager may have died or the world was replaced by a load.
+          if (!cancelled) {
+            setSelectedVillagerId(null);
+            setVillagerDetail(null);
+          }
         });
     };
     refresh();
@@ -87,6 +91,10 @@ export default function App() {
     setPopulation(snapshot.villagers.length);
     setHousingCapacity(snapshot.housingCapacity ?? 0);
     setUnlocked(snapshot.unlocked ?? []);
+    setSelectedVillagerId((current) => {
+      if (current == null) return current;
+      return snapshot.villagers.some((villager) => villager.id === current) ? current : null;
+    });
     if (snapshot.lastAutosaveSlot != null) {
       setPersistenceStatus(`Autosaved · Slot ${snapshot.lastAutosaveSlot}`);
     }
@@ -145,6 +153,8 @@ export default function App() {
       setSelectedKind(null);
       setSelectedCrop(null);
       setSelectedBuildingId(null);
+      setSelectedVillagerId(null);
+      setVillagerDetail(null);
       setRotation(0);
       setChronicle([]);
       chronicleSeqRef.current = -1;

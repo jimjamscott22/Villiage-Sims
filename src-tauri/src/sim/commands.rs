@@ -34,6 +34,7 @@ pub enum SimCommand {
     MoveVillagerTo {
         x: i32,
         y: i32,
+        villager_id: Option<u32>,
         reply: oneshot::Sender<Result<(), String>>,
     },
     GetVillagerDetail {

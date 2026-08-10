@@ -131,8 +131,10 @@
 
   <h1>VillageSim — State of the Game Review</h1>
   <p class="subtitle">
-    Review date: 7 August 2026 · Branch reviewed: <code>main</code> at <code>9b6895d</code>
-    ("perf: instrument overlay and cull viewport render work", #32)
+    Original review: 7 August 2026 · Branch reviewed: <code>main</code> at <code>9b6895d</code>
+    ("perf: instrument overlay and cull viewport render work", #32)<br>
+    Graphics &amp; mechanics follow-up: 10 August 2026 — visual browser-demo QA + correctness fixes
+    (seed planting, storm jobs, cargo deposits, selected-villager move orders, demo unlock monotonicity).
   </p>
 
   <h2>Verdict</h2>
@@ -172,7 +174,7 @@
       <tr>
         <td><code>npm test</code></td>
         <td><span class="pill p-good">PASS</span></td>
-        <td>182 tests across 22 files, 3.4s</td>
+        <td>186 tests across 22 files (Aug 10 follow-up)</td>
       </tr>
       <tr>
         <td><code>npm run build</code></td>
@@ -181,8 +183,13 @@
       </tr>
       <tr>
         <td><code>cargo test --lib</code></td>
-        <td><span class="pill p-warn">NOT RUN</span></td>
-        <td>Could not build in this environment — <code>gdk-3.0</code> system libraries are absent and the sandbox has no package-install rights. 108 <code>#[test]</code> functions exist and CI installs the deps and runs them, so this is an environment limitation, not evidence of failure. The Rust side is <strong>unverified in this review</strong>.</td>
+        <td><span class="pill p-good">PASS</span></td>
+        <td>112 lib tests (Aug 10 follow-up; includes new regression coverage)</td>
+      </tr>
+      <tr>
+        <td>Browser-demo visual QA</td>
+        <td><span class="pill p-good">PASS</span></td>
+        <td>Terrain/atlas crisp; camera pan/zoom; build ghost; chronicle; y-sort OK. Move-order now uses selected villager.</td>
       </tr>
       <tr>
         <td>CI configuration</td>
@@ -513,7 +520,47 @@ src-tauri/src/sim/agents.rs:84   EXTRA_VILLAGER_NAMES: [&str; 15]
     </p>
   </div>
 
-  <h2>What to do next</h2>
+  <h2>Aug 10 follow-up — graphics &amp; mechanics</h2>
+
+  <p>
+    A dedicated pass over rendering and sim correctness (code review + browser-demo visual QA)
+    confirmed the pixel pipeline is healthy and surfaced several mechanical bugs that are now fixed
+    on this branch.
+  </p>
+
+  <h3>Graphics verdict</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Area</th><th>Result</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Terrain + shoreline foam</td><td><span class="pill p-good">Excellent</span></td><td>Offscreen bake stays crisp at all zooms; no missing atlas cells</td></tr>
+      <tr><td>Entities / y-sort</td><td><span class="pill p-good">Good</span></td><td>Villagers, buildings, props layer correctly; selection brackets present</td></tr>
+      <tr><td>Camera</td><td><span class="pill p-good">Good</span></td><td>Pan + cursor-anchored zoom solid; optional zoom snap still open</td></tr>
+      <tr><td>Build ghost</td><td><span class="pill p-warn">Adequate</span></td><td>Valid/invalid tint works; hatched overlay from the pixel-art spec never landed</td></tr>
+      <tr><td>HUD</td><td><span class="pill p-good">Good</span></td><td>Pixel ResourceBar / ClockBar / BuildMenu / Chronicle chrome live</td></tr>
+      <tr><td>M10 polish left</td><td><span class="pill p-warn">Open</span></td><td>Hover tooltips; weather VFX; scaffold progress on the pixel path; crop watered cue</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Correctness bugs fixed in this follow-up</h3>
+  <ul>
+    <li><strong>Free TendCrops planting</strong> — <code>spend_seed_cost</code> return was ignored; wheat planted with empty grain stockpile. Now gated; bootstrap remains free via manual <code>plant_crop</code>.</li>
+    <li><strong>Storm left production jobs live</strong> — damaged mills/bakeries kept Produce jobs and could finish recipes while under construction. Storm now strips site jobs; Produce also requires <code>Complete</code>.</li>
+    <li><strong>Cargo loss</strong> — starvation death and player move orders dropped <code>carrying</code> without depositing; both now return goods to the stockpile.</li>
+    <li><strong>Move order ignored selection (F5)</strong> — right-click now targets the selected villager; unselected clicks still try nearest-then-next candidates that can path.</li>
+    <li><strong>Demo unlock re-lock</strong> — browser-demo replaced <code>unlocked</code> each tick from <code>satisfiedUnlocks()</code>, so demolishing a prereq re-locked buildings. Unlocks are now monotonic like Rust.</li>
+    <li><strong>Villager hit radius</strong> — slightly enlarged to reduce missed clicks when selecting sprites.</li>
+  </ul>
+
+  <h3>Still open (mechanics / content)</h3>
+  <ul>
+    <li>Traits remain cosmetic (F6) — descriptions claim move/haul/tend bonuses the sim never reads.</li>
+    <li>Gold is still dead content; happiness modifiers from the spec are unimplemented.</li>
+    <li>Browser-demo still skips births/deaths; demo saves still omit chronicle/unlocked payloads.</li>
+    <li>Dual-sim duplication (F1) remains the largest structural risk.</li>
+  </ul>
+
 
   <p>
     Ordered so that each step makes the following ones cheaper. The theme: <strong>stop the bleeding
@@ -535,8 +582,9 @@ src-tauri/src/sim/agents.rs:84   EXTRA_VILLAGER_NAMES: [&str; 15]
       the demo entirely.
     </li>
     <li>
-      <strong>Fix the move-order bug (F5).</strong> Thread the selected villager id through
-      <code>moveVillagerTo</code>. It's the one outright behavioural bug found in this review.
+      <strong>Fix the move-order bug (F5).</strong> <em>Done in the Aug 10 follow-up</em> —
+      selected villager id is threaded through <code>moveVillagerTo</code>, with nearest-pathable
+      fallback when none is selected.
     </li>
     <li>
       <strong>Give traits their effects (F6).</strong> Three multipliers at three call sites. Stops the

@@ -647,10 +647,10 @@ export class DemoWorld {
     const satisfied = this.satisfiedUnlocks();
     for (const id of satisfied) {
       if (!this.unlocked.includes(id)) {
+        this.unlocked.push(id);
         this.pushChronicle(null, { kind: 'buildingUnlocked', building: id });
       }
     }
-    this.unlocked = satisfied;
   }
 
   private spawnStartingVillagers(): void {
@@ -1010,36 +1010,50 @@ export class DemoWorld {
     return building ? inventoryTake(building.inventory, resource, amount) : 0;
   }
 
-  moveVillagerTo(x: number, y: number): void {
+  moveVillagerTo(x: number, y: number, villagerId?: number | null): void {
     if (!this.inBounds(x, y)) throw new Error('out of bounds');
     if (!this.isPassable(x, y)) throw new Error('tile impassable');
-    const index = this.nearestVillagerIndexTo(x, y);
-    if (index < 0) throw new Error('no villagers');
-    this.releaseJobAt(index);
-    const villager = this.villagers[index];
-    const start = this.posToTile(villager.x, villager.y);
-    const path = this.computePath(start, [x, y]);
-    if (!path) throw new Error('no path');
-    villager.state = 'moving';
-    villager.purpose = 'player';
-    villager.target = [x, y];
-    villager.path = path;
-    villager.repathCooldown = 0;
-    villager.currentAction = null;
+    const candidates = (() => {
+      if (villagerId == null) return this.villagerIndicesByDistanceTo(x, y);
+      const index = this.villagers.findIndex((entry) => entry.id === villagerId);
+      // Stale UI selection (death / load) — fall back like an untargeted order.
+      if (index < 0) return this.villagerIndicesByDistanceTo(x, y);
+      return [index];
+    })();
+    if (candidates.length === 0) throw new Error('no villagers');
+    let lastError = 'no path';
+    for (const index of candidates) {
+      const villager = this.villagers[index];
+      const start = this.posToTile(villager.x, villager.y);
+      const path = this.computePath(start, [x, y]);
+      if (!path) {
+        lastError = 'no path';
+        continue;
+      }
+      if (villager.carrying) {
+        this.depositToStockpile(villager.carrying.resource, villager.carrying.amount);
+        villager.carrying = null;
+      }
+      this.releaseJobAt(index);
+      villager.state = 'moving';
+      villager.purpose = 'player';
+      villager.target = [x, y];
+      villager.path = path;
+      villager.repathCooldown = 0;
+      villager.currentAction = null;
+      return;
+    }
+    throw new Error(lastError);
   }
 
-  private nearestVillagerIndexTo(x: number, y: number): number {
-    let bestIndex = -1;
-    let bestDist = Infinity;
-    for (let i = 0; i < this.villagers.length; i += 1) {
-      const [vx, vy] = this.posToTile(this.villagers[i].x, this.villagers[i].y);
-      const dist = Math.abs(vx - x) + Math.abs(vy - y);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestIndex = i;
-      }
-    }
-    return bestIndex;
+  private villagerIndicesByDistanceTo(x: number, y: number): number[] {
+    return this.villagers
+      .map((villager, index) => {
+        const [vx, vy] = this.posToTile(villager.x, villager.y);
+        return { index, dist: Math.abs(vx - x) + Math.abs(vy - y) };
+      })
+      .sort((a, b) => a.dist - b.dist || a.index - b.index)
+      .map((entry) => entry.index);
   }
 
   validatePlacement(kind: string, x: number, y: number, rotation: number): PlacementValidity {
@@ -1198,6 +1212,22 @@ export class DemoWorld {
     building.complete = false;
     building.progressTicks = Math.floor(def.buildTicks / 2);
     building.recipeTicks = 0;
+    const buildingId = building.id;
+    const released = this.jobs
+      .filter((job) => job.site === buildingId && job.claimedBy != null)
+      .map((job) => job.claimedBy!);
+    this.jobs = this.jobs.filter((job) => job.site !== buildingId);
+    for (const villager of this.villagers) {
+      if (!released.includes(villager.id)) continue;
+      villager.currentJob = null;
+      if (
+        villager.state === 'working'
+        || (villager.state === 'moving' && villager.purpose === 'work')
+      ) {
+        this.clearToIdle(villager);
+        if (villager.currentAction === 'work') villager.currentAction = null;
+      }
+    }
   }
 
   private maybeAutosave(): void {
@@ -1499,7 +1529,7 @@ export class DemoWorld {
         return this.villagers[villagerIndex].carrying != null || this.findHaulTask() != null;
       case 'produce': {
         const building = this.buildings.find((entry) => entry.id === job.site);
-        if (!building) return false;
+        if (!building || !building.complete) return false;
         if (building.recipeTicks > 0) return true;
         const recipe = DEMO_CATALOG.buildings[building.kindIndex]?.recipe;
         return recipe != null && Object.entries(recipe.inputs).every(
@@ -1513,7 +1543,9 @@ export class DemoWorld {
     const tiles = this.farmFootprintTiles(buildingId);
     if (tiles.length === 0) return false;
     const season = SEASON_IDS[this.clock.season];
-    const canPlant = DEMO_CROPS.some((def) => def.id === 'wheat' && def.seasons.includes(season));
+    const wheat = DEMO_CROPS.find((def) => def.id === 'wheat');
+    const seasonOk = wheat != null && wheat.seasons.includes(season);
+    const canPlant = seasonOk && this.canAffordSeedCost(buildingId, wheat?.seedCost ?? {});
     return tiles.some(([x, y]) => {
       const crop = this.crops.find((entry) => entry.x === x && entry.y === y);
       if (!crop) return canPlant;
@@ -1810,15 +1842,22 @@ export class DemoWorld {
     this.crops.splice(cropIndex, 1);
   }
 
-  private spendSeedCost(farmId: number, seedCost: Record<string, number>): boolean {
+  private canAffordSeedCost(farmId: number, seedCost: Record<string, number>): boolean {
     const entries = Object.entries(seedCost);
     if (entries.length === 0) return true;
     const farm = this.buildings.find((entry) => entry.id === farmId);
     if (!farm) return false;
-    const canPay = entries.every(
+    return entries.every(
       ([resource, amount]) => inventoryGet(farm.inventory, resource) + resourceGet(this.resources, resource) >= amount,
     );
-    if (!canPay) return false;
+  }
+
+  private spendSeedCost(farmId: number, seedCost: Record<string, number>): boolean {
+    if (!this.canAffordSeedCost(farmId, seedCost)) return false;
+    const entries = Object.entries(seedCost);
+    if (entries.length === 0) return true;
+    const farm = this.buildings.find((entry) => entry.id === farmId);
+    if (!farm) return false;
     for (const [resource, amount] of entries) {
       const fromFarm = inventoryTake(farm.inventory, resource, amount);
       const remaining = amount - fromFarm;
@@ -1843,7 +1882,7 @@ export class DemoWorld {
       && !this.crops.some((crop) => crop.x === tx && crop.y === ty)
     );
     if (!empty) return;
-    this.spendSeedCost(job.site, wheat.seedCost ?? {});
+    if (!this.spendSeedCost(job.site, wheat.seedCost ?? {})) return;
     const id = this.nextCropId;
     this.nextCropId += 1;
     this.crops.push({
@@ -2100,7 +2139,7 @@ export class DemoWorld {
     const job = this.jobs.find((entry) => entry.id === jobId);
     if (!job) return;
     const building = this.buildings.find((entry) => entry.id === job.site);
-    if (!building) return;
+    if (!building || !building.complete) return;
     const recipe = DEMO_CATALOG.buildings[building.kindIndex].recipe;
     if (!recipe) return;
     if (building.recipeTicks === 0) {

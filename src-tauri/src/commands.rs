@@ -113,11 +113,17 @@ pub(crate) async fn move_villager_to(
     state: State<'_, AppState>,
     x: i32,
     y: i32,
+    villager_id: Option<u32>,
 ) -> Result<(), String> {
     let (reply, receiver) = oneshot::channel();
     state
         .commands
-        .send(SimCommand::MoveVillagerTo { x, y, reply })
+        .send(SimCommand::MoveVillagerTo {
+            x,
+            y,
+            villager_id,
+            reply,
+        })
         .map_err(|_| "simulation command channel closed".to_string())?;
     receiver
         .await
