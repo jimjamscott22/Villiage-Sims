@@ -227,8 +227,13 @@ impl World {
                 let result = self.demolish(entity_id);
                 let _ = reply.send(result);
             }
-            SimCommand::MoveVillagerTo { x, y, reply } => {
-                let result = self.order_move(x, y);
+            SimCommand::MoveVillagerTo {
+                x,
+                y,
+                villager_id,
+                reply,
+            } => {
+                let result = self.order_move_villager(x, y, villager_id);
                 let _ = reply.send(result);
             }
             SimCommand::GetVillagerDetail { id, reply } => {
@@ -387,18 +392,19 @@ impl World {
         }
         for (id, name) in &dead_ids {
             self.job_board.release_claimed_by(*id);
-            let focus = self
-                .villagers
-                .iter()
-                .find(|v| v.id == *id)
-                .map(|v| self.pos_to_tile(v.pos));
-            self.villagers.retain(|v| v.id != *id);
-            let body = ChronicleBody::VillagerDied {
-                id: *id,
-                name: name.clone(),
-                cause: "starvation".to_string(),
-            };
-            self.chronicle.push(&self.clock, focus, body);
+            if let Some(index) = self.villagers.iter().position(|v| v.id == *id) {
+                if let Some(carrying) = self.villagers[index].carrying.take() {
+                    self.deposit_to_stockpile(&carrying.resource, carrying.amount);
+                }
+                let focus = Some(self.pos_to_tile(self.villagers[index].pos));
+                self.villagers.remove(index);
+                let body = ChronicleBody::VillagerDied {
+                    id: *id,
+                    name: name.clone(),
+                    cause: "starvation".to_string(),
+                };
+                self.chronicle.push(&self.clock, focus, body);
+            }
         }
 
         // Birth checks
@@ -676,41 +682,71 @@ impl World {
     }
 
     pub fn order_move(&mut self, x: i32, y: i32) -> Result<(), String> {
+        self.order_move_villager(x, y, None)
+    }
+
+    /// Move a villager to `(x, y)`. When `villager_id` is set, that villager is
+    /// ordered; otherwise the nearest villager that can path there is chosen.
+    pub fn order_move_villager(
+        &mut self,
+        x: i32,
+        y: i32,
+        villager_id: Option<u32>,
+    ) -> Result<(), String> {
         if !self.in_bounds(x, y) {
             return Err("out of bounds".into());
         }
         if !self.is_passable(x, y) {
             return Err("tile impassable".into());
         }
-        let index = self
-            .nearest_villager_index_to(x, y)
-            .ok_or_else(|| "no villagers".to_string())?;
-        self.release_job_at(index);
-        let start = self.pos_to_tile(self.villagers[index].pos);
-        let path = self
-            .compute_path(start, (x, y))
-            .ok_or_else(|| "no path".to_string())?;
-        self.villagers[index].state = AgentState::MovingTo {
-            target: (x, y),
-            purpose: MovePurpose::PlayerOrder,
+        let candidates = if let Some(id) = villager_id {
+            let index = self
+                .villagers
+                .iter()
+                .position(|villager| villager.id == id)
+                .ok_or_else(|| format!("unknown villager {id}"))?;
+            vec![index]
+        } else {
+            self.villager_indices_by_distance_to(x, y)
         };
-        self.villagers[index].path = Some(path);
-        self.villagers[index].repath_cooldown = 0;
-        self.villagers[index].current_action = None;
-        Ok(())
+        if candidates.is_empty() {
+            return Err("no villagers".into());
+        }
+        let mut last_err = "no path".to_string();
+        for index in candidates {
+            let start = self.pos_to_tile(self.villagers[index].pos);
+            let Some(path) = self.compute_path(start, (x, y)) else {
+                last_err = "no path".into();
+                continue;
+            };
+            if let Some(carrying) = self.villagers[index].carrying.take() {
+                self.deposit_to_stockpile(&carrying.resource, carrying.amount);
+            }
+            self.release_job_at(index);
+            self.villagers[index].state = AgentState::MovingTo {
+                target: (x, y),
+                purpose: MovePurpose::PlayerOrder,
+            };
+            self.villagers[index].path = Some(path);
+            self.villagers[index].repath_cooldown = 0;
+            self.villagers[index].current_action = None;
+            return Ok(());
+        }
+        Err(last_err)
     }
 
-    fn nearest_villager_index_to(&self, x: i32, y: i32) -> Option<usize> {
-        let mut best: Option<(usize, i32)> = None;
-        for (index, villager) in self.villagers.iter().enumerate() {
-            let (vx, vy) = self.pos_to_tile(villager.pos);
-            let dist = (vx - x).abs() + (vy - y).abs();
-            match best {
-                Some((_, best_dist)) if dist >= best_dist => {}
-                _ => best = Some((index, dist)),
-            }
-        }
-        best.map(|(index, _)| index)
+    fn villager_indices_by_distance_to(&self, x: i32, y: i32) -> Vec<usize> {
+        let mut ranked: Vec<(i32, usize)> = self
+            .villagers
+            .iter()
+            .enumerate()
+            .map(|(index, villager)| {
+                let (vx, vy) = self.pos_to_tile(villager.pos);
+                ((vx - x).abs() + (vy - y).abs(), index)
+            })
+            .collect();
+        ranked.sort_by_key(|&(dist, index)| (dist, index));
+        ranked.into_iter().map(|(_, index)| index).collect()
     }
 
     fn complete_buildings(&mut self) {
@@ -1303,6 +1339,9 @@ impl World {
                 else {
                     return false;
                 };
+                if building.state != BuildState::Complete {
+                    return false;
+                }
                 if building.recipe_ticks > 0 {
                     return true;
                 }
@@ -1592,6 +1631,9 @@ impl World {
         else {
             return;
         };
+        if self.buildings[index].state != BuildState::Complete {
+            return;
+        }
         let Some(recipe) = self
             .catalog
             .get(self.buildings[index].kind_index)
@@ -2065,10 +2107,14 @@ impl World {
             return;
         };
         let half = def.build_ticks / 2;
+        let building_id = self.buildings[index].id;
         self.buildings[index].state = BuildState::UnderConstruction {
             progress_ticks: half,
         };
         self.buildings[index].recipe_ticks = 0;
+        // Incomplete buildings must not keep advertising Work jobs (produce/tend/haul).
+        let released = self.job_board.remove_site(building_id);
+        self.clear_released_work_claims(released);
     }
 
     fn maybe_autosave(&mut self) {
@@ -2390,7 +2436,9 @@ impl World {
         let Some(tile) = empty else {
             return;
         };
-        self.spend_seed_cost(job.site, &seed_cost);
+        if !self.spend_seed_cost(job.site, &seed_cost) {
+            return;
+        }
         let id = self.next_crop_id;
         self.next_crop_id = self.next_crop_id.saturating_add(1);
         self.crops
@@ -2804,6 +2852,7 @@ mod tests {
     #[test]
     fn tend_crops_auto_plants_and_waters() {
         let mut world = grass_world();
+        world.resources.grain = 4;
         world.place_building("farm", 2, 2, 0).unwrap();
         for _ in 0..30 {
             world.advance();
@@ -2819,6 +2868,23 @@ mod tests {
             "TendCrops should auto-plant wheat on empty farm tiles"
         );
         assert!(world.crops().iter().any(|crop| crop.watered));
+    }
+
+    #[test]
+    fn tend_crops_skips_auto_plant_without_seed_grain() {
+        let mut world = grass_world();
+        assert_eq!(world.resources.grain, 0);
+        world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..30 {
+            world.advance();
+        }
+        for _ in 0..500 {
+            world.advance();
+        }
+        assert!(
+            world.crops().is_empty(),
+            "TendCrops must not plant wheat when seed grain cannot be paid"
+        );
     }
 
     #[test]
@@ -3312,6 +3378,7 @@ mod tests {
         world.villagers.truncate(1);
         world.resources.wood = 500;
         world.resources.stone = 500;
+        world.resources.grain = 4;
         place_complete(&mut world, "farm", 7, 7);
         place_complete(&mut world, "granary", 12, 7);
         place_complete(&mut world, "mill", 12, 11);
@@ -3594,6 +3661,73 @@ mod tests {
             }
             other => panic!("expected storm damage, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn storm_strips_jobs_from_damaged_building() {
+        let mut world = grass_world();
+        world.resources.stone = 100;
+        let mill_id = place_complete(&mut world, "mill", 0, 0);
+        assert!(
+            world
+                .job_board()
+                .jobs()
+                .iter()
+                .any(|job| job.site == mill_id && job.kind == JobKind::Produce),
+            "completed mill should advertise produce"
+        );
+        // seed 1 / spring day 15 is Storm.
+        world.advance_clock(14, None).unwrap();
+        assert_eq!(world.current_weather(), Weather::Storm);
+        assert!(
+            world
+                .job_board()
+                .jobs()
+                .iter()
+                .all(|job| job.site != mill_id),
+            "storm-damaged buildings must lose their job slots"
+        );
+        assert!(matches!(
+            world
+                .buildings
+                .iter()
+                .find(|building| building.id == mill_id)
+                .unwrap()
+                .state,
+            BuildState::UnderConstruction { .. }
+        ));
+    }
+
+    #[test]
+    fn player_move_deposits_carried_goods() {
+        let mut world = grass_world();
+        world.villagers[0].carrying = Some(CarryStack {
+            resource: "grain".into(),
+            amount: 3,
+            dest: HaulEndpoint::Stockpile,
+        });
+        world.order_move(7, 7).unwrap();
+        assert!(world.villagers[0].carrying.is_none());
+        assert_eq!(world.resources.grain, 3);
+    }
+
+    #[test]
+    fn order_move_prefers_requested_villager() {
+        let mut world = grass_world();
+        world.villagers.push(world.villagers[0].clone());
+        world.villagers[1].id = 99;
+        world.villagers[1].pos = world.tile_center(7, 0);
+        world.villagers[0].pos = world.tile_center(0, 0);
+        world.order_move_villager(7, 7, Some(99)).unwrap();
+        assert!(matches!(
+            world.villagers[1].state,
+            AgentState::MovingTo {
+                purpose: MovePurpose::PlayerOrder,
+                target: (7, 7),
+                ..
+            }
+        ));
+        assert!(matches!(world.villagers[0].state, AgentState::Idle));
     }
 
     #[test]

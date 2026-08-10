@@ -70,7 +70,10 @@ npm run dev
 
 ## Next up
 
-Finish Milestone 10: camera/interaction polish (hover tooltips, selection highlight).
+Finish Milestone 10: camera/interaction polish (hover tooltips remain; selection
+brackets exist). Aug 10 follow-up fixed seed planting, storm job stripping, cargo
+deposits on death/move, selected-villager move orders, and demo unlock monotonicity
+— see `docs/state-of-the-game-review.html`.
 The pixel-art redesign (Phases 1–3) is complete — see
 `docs/superpowers/specs/2026-07-31-pixel-art-ui-redesign-design.md`.
 

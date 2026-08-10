@@ -639,7 +639,7 @@ export function Canvas({
       const snapshot = rendered ?? buffer.interpolate(performance.now(), TICK_MS);
       if (!snapshot) return;
       const [worldX, worldY] = camera.screenToWorld(pointerX, pointerY);
-      const hitRadius = Math.max(10, 14 / Math.max(camera.zoom, 0.01));
+      const hitRadius = Math.max(16, 22 / Math.max(camera.zoom, 0.01));
       let closestVillager: { id: number; dist: number } | null = null;
       for (const villager of snapshot.villagers) {
         const dist = Math.hypot(villager.x - worldX, villager.y - worldY);
@@ -689,7 +689,7 @@ export function Canvas({
       pointerY = event.clientY - bounds.top;
       const tile = tileAtPointer();
       if (!tile) return;
-      void transport.moveVillagerTo(tile[0], tile[1]).catch((cause) => {
+      void transport.moveVillagerTo(tile[0], tile[1], selectedVillagerIdRef.current).catch((cause) => {
         fail(cause instanceof Error ? cause.message : String(cause));
       });
     };

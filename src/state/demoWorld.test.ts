@@ -469,6 +469,7 @@ describe('DemoWorld pathfinding', () => {
     (world as unknown as { villagers: unknown[] }).villagers.splice(1);
     world.resources.wood = 500;
     world.resources.stone = 500;
+    world.resources.grain = 4;
     completeBuilding(world, 'farm', 7, 7);
     completeBuilding(world, 'granary', 12, 7);
     completeBuilding(world, 'mill', 12, 11);
@@ -553,5 +554,54 @@ describe('DemoWorld pathfinding', () => {
     world.advanceClock(1, null);
     expect(world.snapshot().lastAutosaveSlot).toBe(1);
     expect(saves.has(1)).toBe(true);
+  });
+
+  it('does not auto-plant wheat when seed grain cannot be paid', () => {
+    const world = new DemoWorld(grassTerrain());
+    expect(world.resources.grain).toBe(0);
+    completeBuilding(world, 'farm', 2, 2);
+    for (let i = 0; i < 500; i += 1) world.advance();
+    expect(world.crops).toHaveLength(0);
+  });
+
+  it('keeps unlocks after a prerequisite condition lapses', () => {
+    const world = new DemoWorld(grassTerrain(16, 16));
+    const internals = world as unknown as { villagers: unknown[]; unlocked: string[] };
+    // Seed at population 4 so granary starts locked, then cross the threshold.
+    internals.villagers.splice(4);
+    internals.unlocked = (world as unknown as { satisfiedUnlocks(): string[] }).satisfiedUnlocks();
+    expect(world.snapshot().unlocked).not.toContain('granary');
+
+    const clone = structuredClone(internals.villagers[0]) as { id: number };
+    clone.id = 9999;
+    internals.villagers.push(clone);
+    world.advance();
+    expect(world.snapshot().unlocked).toContain('granary');
+
+    internals.villagers.splice(4);
+    world.advance();
+    expect(world.snapshot().unlocked).toContain('granary');
+  });
+
+  it('deposits carried goods when the player issues a move order', () => {
+    const world = new DemoWorld(grassTerrain());
+    const id = nearestVillagerId(world, 6, 6);
+    const villagers = (world as unknown as {
+      villagers: Array<{ id: number; carrying: { resource: string; amount: number; dest: 'stockpile' } | null }>;
+    }).villagers;
+    const villager = villagers.find((entry) => entry.id === id)!;
+    villager.carrying = { resource: 'grain', amount: 3, dest: 'stockpile' };
+    world.moveVillagerTo(6, 6, id);
+    expect(villager.carrying).toBeNull();
+    expect(world.resources.grain).toBe(3);
+  });
+
+  it('moves the requested villager when an id is provided', () => {
+    const world = new DemoWorld(grassTerrain());
+    const [a, b] = world.snapshot().villagers;
+    world.moveVillagerTo(6, 6, b.id);
+    const snap = world.snapshot();
+    expect(snap.villagers.find((entry) => entry.id === b.id)?.state).toBe(1);
+    expect(snap.villagers.find((entry) => entry.id === a.id)?.state).not.toBe(1);
   });
 });

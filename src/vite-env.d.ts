@@ -16,7 +16,7 @@ declare global {
       shorelineDrawn: number;
     };
     __villageTransport?: {
-      moveVillagerTo(x: number, y: number): Promise<void>;
+      moveVillagerTo(x: number, y: number, villagerId?: number | null): Promise<void>;
       placeBuilding(
         kind: string,
         x: number,
