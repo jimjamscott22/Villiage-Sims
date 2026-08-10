@@ -1013,13 +1013,13 @@ export class DemoWorld {
   moveVillagerTo(x: number, y: number, villagerId?: number | null): void {
     if (!this.inBounds(x, y)) throw new Error('out of bounds');
     if (!this.isPassable(x, y)) throw new Error('tile impassable');
-    const candidates = villagerId != null
-      ? (() => {
-        const index = this.villagers.findIndex((entry) => entry.id === villagerId);
-        if (index < 0) throw new Error(`unknown villager ${villagerId}`);
-        return [index];
-      })()
-      : this.villagerIndicesByDistanceTo(x, y);
+    const candidates = (() => {
+      if (villagerId == null) return this.villagerIndicesByDistanceTo(x, y);
+      const index = this.villagers.findIndex((entry) => entry.id === villagerId);
+      // Stale UI selection (death / load) — fall back like an untargeted order.
+      if (index < 0) return this.villagerIndicesByDistanceTo(x, y);
+      return [index];
+    })();
     if (candidates.length === 0) throw new Error('no villagers');
     let lastError = 'no path';
     for (const index of candidates) {

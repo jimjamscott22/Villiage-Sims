@@ -618,4 +618,10 @@ describe('DemoWorld pathfinding', () => {
     expect(snap.villagers.find((entry) => entry.id === b.id)?.state).toBe(1);
     expect(snap.villagers.find((entry) => entry.id === a.id)?.state).not.toBe(1);
   });
+
+  it('falls back when a stale villager id is requested', () => {
+    const world = new DemoWorld(grassTerrain());
+    expect(() => world.moveVillagerTo(6, 6, 9999)).not.toThrow();
+    expect(world.snapshot().villagers.some((entry) => entry.state === 1)).toBe(true);
+  });
 });

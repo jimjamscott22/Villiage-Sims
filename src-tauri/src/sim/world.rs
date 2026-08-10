@@ -700,12 +700,15 @@ impl World {
             return Err("tile impassable".into());
         }
         let candidates = if let Some(id) = villager_id {
-            let index = self
+            match self
                 .villagers
                 .iter()
                 .position(|villager| villager.id == id)
-                .ok_or_else(|| format!("unknown villager {id}"))?;
-            vec![index]
+            {
+                Some(index) => vec![index],
+                // Stale UI selection (death / load) — fall back like an untargeted order.
+                None => self.villager_indices_by_distance_to(x, y),
+            }
         } else {
             self.villager_indices_by_distance_to(x, y)
         };
@@ -3757,6 +3760,23 @@ mod tests {
             }
         ));
         assert!(matches!(world.villagers[0].state, AgentState::Idle));
+    }
+
+    #[test]
+    fn order_move_falls_back_when_requested_villager_is_gone() {
+        let mut world = grass_world();
+        world.villagers[0].pos = world.tile_center(0, 0);
+        world
+            .order_move_villager(7, 7, Some(9_999))
+            .expect("stale selection should fall back to a living villager");
+        assert!(matches!(
+            world.villagers[0].state,
+            AgentState::MovingTo {
+                purpose: MovePurpose::PlayerOrder,
+                target: (7, 7),
+                ..
+            }
+        ));
     }
 
     #[test]
