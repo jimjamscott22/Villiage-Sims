@@ -161,13 +161,15 @@ mod tests {
     }
 
     #[test]
-    fn save_round_trip_is_byte_identical_and_continues() {
-        let mut original = World::generate(24, 24, 32, 9);
+    fn fifty_villager_save_round_trip_is_byte_identical_and_continues() {
+        let mut original = World::generate(64, 64, 32, 9);
+        original.populate_for_test(50);
         for _ in 0..137 {
             original.advance();
         }
         let first = encode_world(&original).expect("encode original");
         let mut loaded = decode_world(&first).expect("decode save");
+        assert_eq!(loaded.villagers().len(), 50);
         let second = encode_world(&loaded).expect("encode loaded");
         assert_eq!(first, second);
 

@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-08-04 (M10 autosave + weather; camera polish remains).
+Last updated: 2026-08-10 (M10 complete: hover inspection and 50-villager persistence verified).
 
 ## Status
 
@@ -15,14 +15,14 @@ Last updated: 2026-08-04 (M10 autosave + weather; camera polish remains).
 | M7 — Utility AI | Complete on `main` | [#10](https://github.com/jimjamscott22/Villiage-Sims/pull/10) (+ [#11](https://github.com/jimjamscott22/Villiage-Sims/pull/11) hysteresis fix) |
 | M8 — Economy and production chains | Complete on `main` | [#12](https://github.com/jimjamscott22/Villiage-Sims/pull/12) |
 | **M9 — Population and progression** | **Complete** | — |
-| **M10 — Persistence and polish** | **In progress: save/load + chronicle + autosave + weather done; camera/interaction polish remains** | — |
+| **M10 — Persistence and polish** | **Complete** | — |
 | Art — Phase 1 (pipeline + terrain) | Complete | [#21](https://github.com/jimjamscott22/Villiage-Sims/pull/21) |
 | Art — Phase 2 (entities + y-sort) | Complete | — |
 | **Art — Phase 3 (pixel HUD)** | **Complete** | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 
-## What works today (M1–M10 partial)
+## What works today (M1–M10)
 
 - Tauri 2 + React Canvas; Rust owns a 20 Hz sim thread; frontend interpolates at RAF.
 - Seeded `128×128` island terrain (`noise`), pan/zoom camera, offscreen terrain blit.
@@ -43,6 +43,10 @@ Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
   autosave through slots 1–3 every in-game day.
 - Weather: deterministic daily Clear/Rain/Storm from seed+date. Rain/Storm water outdoor crops;
   Storm knocks one building back to half-built. Shown in the ClockBar.
+- Interaction polish: pixel selection brackets plus hover tooltips for villagers, buildings and
+  crops. Hover inspection is suppressed during build/plant placement so the ghost remains clear.
+- Persistence acceptance: a 50-villager save is byte-identical after reload and remains identical
+  after both the original and loaded simulations advance.
 
 ### Key paths
 
@@ -70,10 +74,11 @@ npm run dev
 
 ## Next up
 
-Finish Milestone 10: camera/interaction polish (hover tooltips remain; selection
-brackets exist). Aug 10 follow-up fixed seed planting, storm job stripping, cargo
-deposits on death/move, selected-villager move orders, and demo unlock monotonicity
-— see `docs/state-of-the-game-review.html`.
+Milestone 10 is complete. The next engineering priority is reducing the Rust/browser-demo parity
+risk and adding the deterministic world-hash and long-running soak tests identified in
+`docs/state-of-the-game-review.html`. The Aug 10 follow-up also fixed seed planting, storm job
+stripping, cargo deposits on death/move, selected-villager move orders, and demo unlock
+monotonicity.
 The pixel-art redesign (Phases 1–3) is complete — see
 `docs/superpowers/specs/2026-07-31-pixel-art-ui-redesign-design.md`.
 

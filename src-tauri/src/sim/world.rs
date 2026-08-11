@@ -470,6 +470,20 @@ impl World {
     }
 
     #[cfg(test)]
+    pub fn populate_for_test(&mut self, target: usize) {
+        let cx = self.width as i32 / 2;
+        let cy = self.height as i32 / 2;
+        while self.villagers.len() < target {
+            let id = self.next_villager_id;
+            self.next_villager_id = self.next_villager_id.saturating_add(1);
+            let tile = self.find_walkable_near(cx, cy).unwrap_or((cx, cy));
+            let name = format!("Test Villager {id}");
+            self.villagers
+                .push(Villager::new(id, name, self.tile_center(tile.0, tile.1)));
+        }
+    }
+
+    #[cfg(test)]
     pub fn job_board(&self) -> &JobBoard {
         &self.job_board
     }
