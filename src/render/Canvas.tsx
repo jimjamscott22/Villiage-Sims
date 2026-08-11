@@ -88,6 +88,7 @@ export function Canvas({
   onSnapshot,
   focusTile,
 }: CanvasProps) {
+  const viewportRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cameraRef = useRef(new Camera());
   const terrainRef = useRef<TerrainSnapshot | null>(null);
@@ -592,7 +593,10 @@ export function Canvas({
     const onKeyDown = async (event: KeyboardEvent) => {
       if (event.key.toLowerCase() === 'f') {
         if (document.fullscreenElement) await document.exitFullscreen();
-        else await canvas.requestFullscreen();
+        else {
+          // Keep overlays (like entity hover tooltips) in the fullscreen subtree.
+          await (viewportRef.current ?? canvas).requestFullscreen();
+        }
         return;
       }
       if (event.key.toLowerCase() === 'r' && selectedKindRef.current) {
@@ -794,7 +798,7 @@ export function Canvas({
   }, []);
 
   return (
-    <section className="relative min-h-0 flex-1 overflow-hidden bg-[#0b151c]">
+    <section ref={viewportRef} className="relative min-h-0 flex-1 overflow-hidden bg-[#0b151c]">
       <canvas
         ref={canvasRef}
         aria-label="Village simulation"
