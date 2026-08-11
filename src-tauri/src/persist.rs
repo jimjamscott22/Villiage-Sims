@@ -161,13 +161,15 @@ mod tests {
     }
 
     #[test]
-    fn save_round_trip_is_byte_identical_and_continues() {
-        let mut original = World::generate(24, 24, 32, 9);
+    fn fifty_villager_save_round_trip_is_byte_identical_and_continues() {
+        let mut original = World::generate(64, 64, 32, 9);
+        original.populate_for_test(50);
         for _ in 0..137 {
             original.advance();
         }
         let first = encode_world(&original).expect("encode original");
         let mut loaded = decode_world(&first).expect("decode save");
+        assert_eq!(loaded.villagers().len(), 50);
         let second = encode_world(&loaded).expect("encode loaded");
         assert_eq!(first, second);
 
@@ -211,7 +213,10 @@ mod tests {
 
         // Capture the chronicle state before encoding
         let expected_entries = world.chronicle().to_vec();
-        assert!(!expected_entries.is_empty(), "test needs at least one chronicle entry");
+        assert!(
+            !expected_entries.is_empty(),
+            "test needs at least one chronicle entry"
+        );
         let expected_seq = world.chronicle().seq();
 
         // Round-trip through encode/decode
@@ -219,8 +224,16 @@ mod tests {
         let restored = decode_world(&bytes).expect("decode");
 
         // Verify chronicle survived
-        assert_eq!(restored.chronicle().to_vec(), expected_entries, "chronicle entries should match");
-        assert_eq!(restored.chronicle().seq(), expected_seq, "chronicle seq should match");
+        assert_eq!(
+            restored.chronicle().to_vec(),
+            expected_entries,
+            "chronicle entries should match"
+        );
+        assert_eq!(
+            restored.chronicle().seq(),
+            expected_seq,
+            "chronicle seq should match"
+        );
     }
 
     #[test]
@@ -230,5 +243,4 @@ mod tests {
         let restored = decode_world(&bytes).expect("decode");
         assert_eq!(restored.unlocked(), world.unlocked());
     }
-
 }

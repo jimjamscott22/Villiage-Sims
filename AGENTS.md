@@ -16,9 +16,9 @@ status/handoff notes are in `progress.md` (check this first — it's updated eve
 - The real desktop app (`npm run tauri dev` / `cargo run`) needs a display + WebKitGTK and will
   not render in the headless cloud VM. Prefer `npm run dev` for demos/screenshots here; use
   `cargo test --lib` and `cargo check` to validate the Rust side.
-- Deterministic test hooks exposed on `window`: `advanceTime(ms)` and `render_game_to_text()`
-  (used by the Playwright smoke flow described in the M1 plan). The browser-demo timer is paused
-  when the URL has `?test=1` so time only advances via `advanceTime`.
+- Deterministic browser-smoke hooks exposed on `window`: `advanceTime(ms)` and
+  `render_game_to_text()`. The browser-demo timer is paused when the URL has `?test=1` so time only
+  advances via `advanceTime`.
 - Camera: drag to pan, wheel to zoom (cursor-anchored). `render_game_to_text()` includes camera
   state (`x`, `y`, `zoom`, viewport size).
 - Build mode (M3): select a building in the right-hand menu, click the map to place, `R` rotates,
@@ -37,7 +37,7 @@ status/handoff notes are in `progress.md` (check this first — it's updated eve
   only reads the authoritative `unlocked` list off the snapshot, it does not re-evaluate
   conditions itself. Browser-demo mirrors all of this except births/deaths, so it's fully
   testable headless.
-- Persistence (M10, in progress): Save/Load buttons in the build menu read/write a single fixed
+- Persistence (M10): Save/Load buttons in the build menu read/write a single fixed
   slot (slot 1) via `saveGame`/`loadGame`. Desktop writes a versioned binary file
   (`src-tauri/src/persist.rs`, `SAVE_VERSION` 2). Browser-demo keeps saves in-memory only.
   Autosave rotates through slots 1–3 every in-game day (desktop writes under the app data
@@ -51,8 +51,9 @@ status/handoff notes are in `progress.md` (check this first — it's updated eve
   so `villagerBorn`/`villagerDied` entries are desktop-only.
 - Weather (M10): deterministic daily Clear/Rain/Storm from `(seed, year, season, day)` — not stored
   in the save. Rain/Storm re-water outdoor crops after the daily clear; Storm knocks one building
-  back to under-construction at half progress. ClockBar shows the current weather. Next up:
-  camera/interaction polish — see `progress.md`.
+  back to under-construction at half progress. ClockBar shows the current weather.
+- Interaction polish (M10): buildings and villagers have selection brackets; hovering villagers,
+  buildings or crops shows an inspection tooltip. `render_game_to_text()` reports the hover target.
 
 ### Non-obvious gotchas
 

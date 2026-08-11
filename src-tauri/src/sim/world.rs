@@ -470,6 +470,20 @@ impl World {
     }
 
     #[cfg(test)]
+    pub fn populate_for_test(&mut self, target: usize) {
+        let cx = self.width as i32 / 2;
+        let cy = self.height as i32 / 2;
+        while self.villagers.len() < target {
+            let id = self.next_villager_id;
+            self.next_villager_id = self.next_villager_id.saturating_add(1);
+            let tile = self.find_walkable_near(cx, cy).unwrap_or((cx, cy));
+            let name = format!("Test Villager {id}");
+            self.villagers
+                .push(Villager::new(id, name, self.tile_center(tile.0, tile.1)));
+        }
+    }
+
+    #[cfg(test)]
     pub fn job_board(&self) -> &JobBoard {
         &self.job_board
     }
@@ -700,11 +714,7 @@ impl World {
             return Err("tile impassable".into());
         }
         let candidates = if let Some(id) = villager_id {
-            match self
-                .villagers
-                .iter()
-                .position(|villager| villager.id == id)
-            {
+            match self.villagers.iter().position(|villager| villager.id == id) {
                 Some(index) => vec![index],
                 // Stale UI selection (death / load) — fall back like an untargeted order.
                 None => self.villager_indices_by_distance_to(x, y),
@@ -2452,7 +2462,11 @@ impl World {
         if seed_cost.is_empty() {
             return true;
         }
-        let Some(farm) = self.buildings.iter().find(|building| building.id == farm_id) else {
+        let Some(farm) = self
+            .buildings
+            .iter()
+            .find(|building| building.id == farm_id)
+        else {
             return false;
         };
         seed_cost.iter().all(|(resource, amount)| {
@@ -3503,10 +3517,16 @@ mod tests {
         let Some(entry) = died else {
             panic!("expected a death entry");
         };
-        let ChronicleBody::VillagerDied { name: dead_name, .. } = entry.body else {
+        let ChronicleBody::VillagerDied {
+            name: dead_name, ..
+        } = entry.body
+        else {
             unreachable!();
         };
-        assert_eq!(dead_name, name, "the entry must carry the name, not just an id");
+        assert_eq!(
+            dead_name, name,
+            "the entry must carry the name, not just an id"
+        );
     }
 
     #[test]
@@ -3587,7 +3607,10 @@ mod tests {
         fifth.id = 9999;
         world.villagers.push(fifth);
         world.advance();
-        assert!(world.unlocked.contains("granary"), "granary should unlock at population 5");
+        assert!(
+            world.unlocked.contains("granary"),
+            "granary should unlock at population 5"
+        );
 
         // Drop back below the threshold. `satisfied_unlocks()` would now say
         // granary is locked again, but unlocks are monotonic — it must stay
@@ -3630,7 +3653,11 @@ mod tests {
 
         let validity = world.validate_placement("mill", 0, 2, 0);
         assert!(!validity.valid, "ghost preview must also reflect the lock");
-        assert!(validity.reason.contains("locked"), "reason was: {}", validity.reason);
+        assert!(
+            validity.reason.contains("locked"),
+            "reason was: {}",
+            validity.reason
+        );
 
         let result = world.place_building("mill", 0, 2, 0);
         let error = result.expect_err("placing a locked building must be rejected");

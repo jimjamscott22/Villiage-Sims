@@ -8,6 +8,7 @@ import { ART_SCALE, drawCell, loadAtlas } from './atlas';
 import { drawBuildings, drawCrops, drawVillagers } from './drawEntities';
 import { drawGhost } from './drawGhost';
 import { drawTerrain } from './drawTerrain';
+import { hoverTargetAt, type HoverTarget } from './hover';
 import { formatPerfOverlay, PerfTracker, perfEnabledFromSearch } from './perfStats';
 import type { Facing } from './scene';
 import { atlasHasEntities, buildDrawListWithStats, paintScene } from './scene';
@@ -44,6 +45,13 @@ interface CanvasProps {
    * below — React bails out of re-renders on `Object.is(prev, next)`, and a
    * plain `[number, number]` tuple would compare equal by reference reuse. */
   focusTile: { tile: [number, number]; nonce: number } | null;
+}
+
+interface HoverDisplay extends HoverTarget {
+  x: number;
+  y: number;
+  placeLeft: boolean;
+  placeAbove: boolean;
 }
 
 function rotatedFootprint(def: BuildingDef, rotation: number): [number, number] {
@@ -85,6 +93,7 @@ export function Canvas({
   const terrainRef = useRef<TerrainSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [hovered, setHovered] = useState<HoverDisplay | null>(null);
   const errorRef = useRef<string | null>(null);
   const tickRef = useRef(0);
   const selectedKindRef = useRef(selectedKind);
@@ -204,6 +213,8 @@ export function Canvas({
     let lastDrawListLength = 0;
     let lastPropsDrawn = 0;
     let lastShorelineDrawn = 0;
+    let hoveredTarget: HoverTarget | null = null;
+    let lastHoverSignature = '';
 
     const fail = (message: string) => {
       errorRef.current = message;
@@ -254,6 +265,57 @@ export function Canvas({
       if (!terrain) return null;
       const [wx, wy] = camera.screenToWorld(pointerX, pointerY);
       return [Math.floor(wx / terrain.tileSize), Math.floor(wy / terrain.tileSize)];
+    };
+
+    const clearHover = () => {
+      hoveredTarget = null;
+      if (lastHoverSignature === '') return;
+      lastHoverSignature = '';
+      setHovered(null);
+    };
+
+    const refreshHover = (snapshot: TickSnapshot | null = rendered) => {
+      const currentCatalog = catalogRef.current;
+      if (
+        !pointerInside
+        || dragging
+        || selectedKindRef.current
+        || selectedCropRef.current
+        || !terrain
+        || !snapshot
+        || !currentCatalog
+      ) {
+        clearHover();
+        return;
+      }
+
+      const [worldX, worldY] = camera.screenToWorld(pointerX, pointerY);
+      const target = hoverTargetAt({
+        snapshot,
+        catalog: currentCatalog,
+        worldX,
+        worldY,
+        tileSize: terrain.tileSize,
+        zoom: camera.zoom,
+      });
+      if (!target) {
+        clearHover();
+        return;
+      }
+
+      hoveredTarget = target;
+      const x = Math.round(pointerX);
+      const y = Math.round(pointerY);
+      const signature = `${target.kind}:${target.id}:${target.detail}:${x}:${y}`;
+      if (signature === lastHoverSignature) return;
+      lastHoverSignature = signature;
+      setHovered({
+        ...target,
+        x,
+        y,
+        placeLeft: x > viewWidth - 210,
+        placeAbove: y > viewHeight - 84,
+      });
     };
 
     const refreshGhost = async () => {
@@ -343,6 +405,7 @@ export function Canvas({
 
       rendered = buffer.interpolate(now, TICK_MS);
       if (rendered) {
+        refreshHover(rendered);
         const catalog = catalogRef.current;
         if (atlas && atlasHasEntities(atlas) && catalog) {
           const { list, propsDrawn } = buildDrawListWithStats({
@@ -520,6 +583,7 @@ export function Canvas({
         resources: rendered?.resources ?? null,
         selectedKind: selectedKindRef.current,
         selectedCrop: selectedCropRef.current,
+        hover: hoveredTarget,
         villagers: rendered?.villagers ?? [],
         error: errorRef.current,
         perf: perf.snapshot(),
@@ -562,6 +626,7 @@ export function Canvas({
       pointerY = event.clientY - bounds.top;
       dragging = true;
       dragMoved = false;
+      clearHover();
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
       pointerDownX = event.clientX;
@@ -668,6 +733,7 @@ export function Canvas({
     const onPointerLeave = () => {
       pointerInside = false;
       hoverTile = null;
+      clearHover();
     };
 
     const onWheel = (event: WheelEvent) => {
@@ -732,8 +798,28 @@ export function Canvas({
       <canvas
         ref={canvasRef}
         aria-label="Village simulation"
-        className="h-full w-full touch-none [image-rendering:pixelated]"
+        className={`h-full w-full touch-none [image-rendering:pixelated] ${
+          selectedKind || selectedCrop ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'
+        }`}
       />
+      {hovered && (
+        <div
+          role="tooltip"
+          data-testid="entity-tooltip"
+          data-entity={`${hovered.kind}:${hovered.id}`}
+          className="pixel-panel pointer-events-none absolute z-10 min-w-32 max-w-56 px-2 py-1.5 text-xs drop-shadow-lg"
+          style={{
+            left: hovered.x + (hovered.placeLeft ? -12 : 12),
+            top: hovered.y + (hovered.placeAbove ? -12 : 12),
+            transform: `translate(${hovered.placeLeft ? '-100%' : '0'}, ${
+              hovered.placeAbove ? '-100%' : '0'
+            })`,
+          }}
+        >
+          <div className="font-medium text-[#f7f4e9]">{hovered.title}</div>
+          <div className="mt-0.5 text-[11px] text-white/60">{hovered.detail}</div>
+        </div>
+      )}
       <span className="pointer-events-none absolute bottom-3 right-3 bg-black/55 px-2 py-1 text-xs text-white/70">
         Tick {tick}
         {selectedKind

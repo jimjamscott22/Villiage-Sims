@@ -6,7 +6,9 @@
 
 The result is a small world that keeps running whether you're watching or not: wheat ripens across the seasons, hunger creeps up until someone breaks from the fields to eat, and the whole thing stays smooth at 60fps because the renderer interpolates between simulation ticks.
 
-> **Status:** built through **Milestone 9** (population and progression). Milestone 10 is in progress — versioned save/load, chronicle, autosave rotation, and weather are in; camera/interaction polish remains — see the [roadmap](#roadmap).
+> **Status:** built through **Milestone 10**. Versioned save/load, autosave rotation, weather,
+> chronicle, selection highlights, and entity hover tooltips are complete — see the
+> [roadmap](#roadmap).
 
 ---
 
@@ -138,4 +140,4 @@ The full design lives in [`docs/villagesim-spec.md`](docs/villagesim-spec.md). P
 | M7 | Utility AI, multiple villagers, hysteresis | ✅ Done |
 | M8 | Economy — resource nodes, production chains, hauling | ✅ Done |
 | M9 | Population growth, births/deaths, traits, tech tree | ✅ Done |
-| M10 | Persistence (save/load + autosave), weather, event log, polish | 🚧 In progress |
+| M10 | Persistence (save/load + autosave), weather, event log, polish | ✅ Done |

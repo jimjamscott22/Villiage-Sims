@@ -98,7 +98,13 @@ fn mix(a: u64, b: u64, c: u64, d: u64) -> u64 {
 /// Pick a building index to damage under a storm, or `None` if there are no
 /// eligible buildings. Uses a separate hash stream so weather kind and damage
 /// target are independent.
-pub fn storm_damage_index(seed: u64, year: u32, season: Season, day: u32, building_count: usize) -> Option<usize> {
+pub fn storm_damage_index(
+    seed: u64,
+    year: u32,
+    season: Season,
+    day: u32,
+    building_count: usize,
+) -> Option<usize> {
     if building_count == 0 {
         return None;
     }
@@ -137,14 +143,22 @@ mod tests {
     fn distribution_covers_all_kinds() {
         let mut seen = [false; 3];
         for day in 1..=28 {
-            for season in [Season::Spring, Season::Summer, Season::Autumn, Season::Winter] {
+            for season in [
+                Season::Spring,
+                Season::Summer,
+                Season::Autumn,
+                Season::Winter,
+            ] {
                 for year in 1..=3 {
                     let w = weather_for(99, year, season, day);
                     seen[w.as_u8() as usize] = true;
                 }
             }
         }
-        assert!(seen[0] && seen[1] && seen[2], "expected Clear, Rain, and Storm");
+        assert!(
+            seen[0] && seen[1] && seen[2],
+            "expected Clear, Rain, and Storm"
+        );
     }
 
     #[test]
