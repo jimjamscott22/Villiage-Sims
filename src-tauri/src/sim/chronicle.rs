@@ -337,7 +337,10 @@ mod tests {
         chronicle.push(&clock, None, harvest(7, 1));
         let after_first = chronicle.seq();
         chronicle.push(&clock, None, harvest(7, 1));
-        assert!(chronicle.seq() > after_first, "coalesce must bump the revision");
+        assert!(
+            chronicle.seq() > after_first,
+            "coalesce must bump the revision"
+        );
     }
 
     #[test]
@@ -424,7 +427,9 @@ mod tests {
                     building: "granary".to_string(),
                 },
                 "buildingUnlocked",
-                vec![Box::new(|json: &str| json.contains("\"building\":\"granary\""))],
+                vec![Box::new(|json: &str| {
+                    json.contains("\"building\":\"granary\"")
+                })],
             ),
             // HarvestReady with Some(building): check site, count, building
             (
@@ -456,10 +461,7 @@ mod tests {
             ),
             // SeasonTurned: check kind, season, and year fields
             (
-                ChronicleBody::SeasonTurned {
-                    season: 2,
-                    year: 4,
-                },
+                ChronicleBody::SeasonTurned { season: 2, year: 4 },
                 "seasonTurned",
                 vec![
                     Box::new(|json: &str| json.contains("\"season\":2")),
@@ -507,10 +509,14 @@ mod tests {
         let mut chronicle = Chronicle::new();
 
         // Test with Some(focus)
-        chronicle.push(&clock, Some((3, 4)), ChronicleBody::VillagerBorn {
-            id: 1,
-            name: "Test".to_string(),
-        });
+        chronicle.push(
+            &clock,
+            Some((3, 4)),
+            ChronicleBody::VillagerBorn {
+                id: 1,
+                name: "Test".to_string(),
+            },
+        );
         let entry_with_focus = chronicle.back().unwrap();
         let view_with_focus = entry_with_focus.view();
         let json_with_focus =
@@ -522,14 +528,17 @@ mod tests {
         );
 
         // Test with None(focus)
-        chronicle.push(&clock, None, ChronicleBody::VillagerBorn {
-            id: 2,
-            name: "Test2".to_string(),
-        });
+        chronicle.push(
+            &clock,
+            None,
+            ChronicleBody::VillagerBorn {
+                id: 2,
+                name: "Test2".to_string(),
+            },
+        );
         let entry_no_focus = chronicle.back().unwrap();
         let view_no_focus = entry_no_focus.view();
-        let json_no_focus =
-            serde_json::to_string(&view_no_focus).expect("serialize without focus");
+        let json_no_focus = serde_json::to_string(&view_no_focus).expect("serialize without focus");
         assert!(
             json_no_focus.contains("\"focus\":null"),
             "focus should render as null when None; got: {}",
@@ -544,11 +553,9 @@ mod tests {
         // this will fail.
         let body = born(1);
         let config = bincode::config::standard().with_limit::<{ 64 * 1024 * 1024 }>();
-        let encoded = bincode::serde::encode_to_vec(&body, config)
-            .expect("encode storage body");
+        let encoded = bincode::serde::encode_to_vec(&body, config).expect("encode storage body");
         let (decoded, _): (ChronicleBody, usize) =
-            bincode::serde::decode_from_slice(&encoded, config)
-                .expect("decode storage body");
+            bincode::serde::decode_from_slice(&encoded, config).expect("decode storage body");
         assert_eq!(decoded, body);
     }
 }

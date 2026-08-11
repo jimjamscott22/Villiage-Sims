@@ -262,7 +262,10 @@ mod tests {
         clock.day = DAYS_PER_SEASON;
         let rollover = clock.force_day_rollover();
         assert!(rollover.day);
-        assert!(rollover.season, "crossing the last day of a season is a season change");
+        assert!(
+            rollover.season,
+            "crossing the last day of a season is a season change"
+        );
         assert_eq!(clock.season, Season::Summer);
 
         let rollover = clock.force_day_rollover();
