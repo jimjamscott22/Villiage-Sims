@@ -1,14 +1,12 @@
 import type { CSSProperties } from 'react';
-import type { AtlasCell, AtlasManifest } from '../render/atlas';
-import manifest from '../../public/art/atlas.json';
-
-const UI_MANIFEST = manifest as AtlasManifest;
+import type { AtlasCell } from '../render/atlas';
+import { getAtlasManifest } from './atlasManifest';
 
 export const UI_SHEET_URL = '/art/ui.png';
 export const PANEL_SLICE = 6;
 
 export function uiCell(key: string): AtlasCell | undefined {
-  const cell = UI_MANIFEST.cells[key];
+  const cell = getAtlasManifest().cells[key];
   if (!cell || cell.sheet !== 'ui') return undefined;
   return cell;
 }

@@ -1,7 +1,6 @@
-import manifest from '../../public/art/atlas.json';
-import type { AtlasCell, AtlasManifest } from '../render/atlas';
+import type { AtlasCell } from '../render/atlas';
+import { getAtlasManifest } from './atlasManifest';
 
-const ATLAS = manifest as AtlasManifest;
 const ENTITIES_URL = '/art/entities.png';
 
 interface AtlasThumbProps {
@@ -13,7 +12,7 @@ interface AtlasThumbProps {
 
 /** Render one entity atlas cell as a CSS background thumbnail. */
 export function AtlasThumb({ cellKey, scale = 2, className = '', desaturate = false }: AtlasThumbProps) {
-  const cell: AtlasCell | undefined = ATLAS.cells[cellKey];
+  const cell: AtlasCell | undefined = getAtlasManifest().cells[cellKey];
   if (!cell) return <span className={`inline-block ${className}`} aria-hidden />;
 
   const w = cell.w * scale;
