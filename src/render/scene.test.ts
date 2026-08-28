@@ -234,6 +234,36 @@ describe('buildDrawList', () => {
     expect(list.find((e) => e.id === 'p:4,4')?.key).toBe('prop.cypress');
   });
 
+  it('hides seasonal decor outside its season', () => {
+    const summer = buildDrawList({
+      snapshot: snapshot({ clock: { minute: 0, day: 1, season: 1, year: 1, speed: 1, weather: 0 } }),
+      catalog: { buildings, crops },
+      props: [{ x: 5, y: 5, key: 'prop.flowers', decor: true, season: 0 }],
+      tileSize: 32,
+      tick: 0,
+      reduceMotion: false,
+      selectedBuildingId: null,
+      selectedVillagerId: null,
+      lastFacing,
+      atlas,
+    });
+    expect(summer.find((e) => e.id === 'p:5,5')).toBeUndefined();
+
+    const spring = buildDrawList({
+      snapshot: snapshot({ clock: { minute: 0, day: 1, season: 0, year: 1, speed: 1, weather: 0 } }),
+      catalog: { buildings, crops },
+      props: [{ x: 5, y: 5, key: 'prop.flowers', decor: true, season: 0 }],
+      tileSize: 32,
+      tick: 0,
+      reduceMotion: false,
+      selectedBuildingId: null,
+      selectedVillagerId: null,
+      lastFacing,
+      atlas,
+    });
+    expect(spring.find((e) => e.id === 'p:5,5')?.key).toBe('prop.flowers');
+  });
+
   it('hides decor scatter under a building footprint but keeps it elsewhere', () => {
     const list = buildDrawList({
       // kind 1 is the 3×3 farm at (2,2), so it covers tiles (2,2)…(4,4).

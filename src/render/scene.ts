@@ -287,6 +287,7 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
 
   const pushProp = (prop: TerrainProp) => {
     if (prop.decor && covered.has(`${prop.x},${prop.y}`)) return;
+    if (prop.season != null && prop.season !== snapshot.clock.season) return;
     propsDrawn += 1;
     pushSprite(list, {
       rank: 1,

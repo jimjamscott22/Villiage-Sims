@@ -222,13 +222,33 @@ describe('terrainProps', () => {
     const props = terrainProps(grid(rows));
     const decor = props.filter((prop) => prop.decor);
     expect(decor.length).toBeGreaterThan(0);
+    const grassKeys = new Set(['prop.bush', 'prop.flowers', 'prop.stump', 'prop.deadfall', 'prop.mushroom']);
+    const sandKeys = new Set(['prop.palm', 'prop.reeds', 'prop.shoreRock', 'prop.driftwood']);
     for (const prop of decor) {
       const terrain = rows[prop.y][prop.x];
       expect([GRASS, SAND, ROCK]).toContain(terrain);
-      if (terrain === GRASS) expect(prop.key).toBe('prop.bush');
+      if (terrain === GRASS) expect(grassKeys.has(prop.key)).toBe(true);
       if (terrain === ROCK) expect(prop.key).toBe('prop.boulder');
-      if (terrain === SAND) expect(['prop.palm', 'prop.reeds']).toContain(prop.key);
+      if (terrain === SAND) expect(sandKeys.has(prop.key)).toBe(true);
     }
+  });
+
+  it('tags spring flowers with season 0', () => {
+    const rows = Array.from({ length: 32 }, () => Array.from({ length: 32 }, () => GRASS));
+    const flowers = terrainProps(grid(rows)).filter((prop) => prop.key === 'prop.flowers');
+    expect(flowers.length).toBeGreaterThan(0);
+    expect(flowers.every((prop) => prop.season === 0)).toBe(true);
+  });
+
+  it('places forest-edge debris beside cypress tiles', () => {
+    const rows = Array.from({ length: 8 }, (_, y) =>
+      Array.from({ length: 16 }, (_, x) => (x === 0 ? FOREST : GRASS)),
+    );
+    const edgeKeys = terrainProps(grid(rows))
+      .filter((prop) => prop.x === 1)
+      .map((prop) => prop.key);
+    const forestEdge = ['prop.stump', 'prop.deadfall', 'prop.mushroom'];
+    expect(edgeKeys.some((key) => forestEdge.includes(key))).toBe(true);
   });
 
   it('is deterministic for the same tiles', () => {

@@ -174,6 +174,13 @@ export interface TerrainProp {
    * buildable tiles, so the scene hides it under building footprints.
    */
   decor?: boolean;
+  /** When set, the prop only draws during this season (0=spring … 3=winter). */
+  season?: number;
+}
+
+interface DecorPick {
+  key: string;
+  season?: number;
 }
 
 /** Salt for the decor scatter hash. Distinct from the variant salt so the two never correlate. */
@@ -184,23 +191,68 @@ const BUSH_CHANCE = 0.07;
 const PALM_CHANCE = 0.05;
 const REED_CHANCE = 0.28;
 const BOULDER_CHANCE = 0.1;
+const FLOWER_CHANCE = 0.06;
+const FOREST_EDGE_CHANCE = 0.14;
+const MUSHROOM_CHANCE = 0.06;
+const SHORE_ROCK_CHANCE = 0.12;
+const DRIFTWOOD_CHANCE = 0.08;
 
-function decorFor(tiles: ArrayLike<number>, width: number, height: number, x: number, y: number): string | null {
+function neighbourTerrain(
+  tiles: ArrayLike<number>,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  dx: number,
+  dy: number,
+): number | null {
+  const nx = x + dx;
+  const ny = y + dy;
+  if (nx < 0 || ny < 0 || nx >= width || ny >= height) return null;
+  return tiles[ny * width + nx];
+}
+
+function touchesTerrain(
+  tiles: ArrayLike<number>,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  targets: readonly number[],
+): boolean {
+  return SIDES.some((side) => {
+    const neighbour = neighbourTerrain(tiles, width, height, x, y, side.dx, side.dy);
+    return neighbour != null && targets.includes(neighbour);
+  });
+}
+
+function decorFor(tiles: ArrayLike<number>, width: number, height: number, x: number, y: number): DecorPick | null {
   const t = tiles[y * width + x];
   const roll = hash01(x, y, DECOR_SALT);
-  if (t === 3) return roll < BUSH_CHANCE ? 'prop.bush' : null;
-  if (t === 5) return roll < BOULDER_CHANCE ? 'prop.boulder' : null;
+  if (t === 3) {
+    const nearForest = touchesTerrain(tiles, width, height, x, y, [4]);
+    if (nearForest) {
+      const edgeRoll = hash01(x, y, DECOR_SALT + 1);
+      if (edgeRoll < FOREST_EDGE_CHANCE) {
+        return { key: edgeRoll < FOREST_EDGE_CHANCE / 2 ? 'prop.stump' : 'prop.deadfall' };
+      }
+      if (edgeRoll < FOREST_EDGE_CHANCE + MUSHROOM_CHANCE) return { key: 'prop.mushroom' };
+    }
+    if (hash01(x, y, DECOR_SALT + 2) < FLOWER_CHANCE) return { key: 'prop.flowers', season: 0 };
+    return roll < BUSH_CHANCE ? { key: 'prop.bush' } : null;
+  }
+  if (t === 5) return roll < BOULDER_CHANCE ? { key: 'prop.boulder' } : null;
   if (t !== 2) return null;
-  // Sand: reeds only where the tile actually touches water, palms further inland.
-  const touchesWater = SIDES.some((side) => {
-    const nx = x + side.dx;
-    const ny = y + side.dy;
-    if (nx < 0 || ny < 0 || nx >= width || ny >= height) return false;
-    const neighbour = tiles[ny * width + nx];
-    return neighbour === 0 || neighbour === 1;
-  });
-  if (touchesWater) return roll < REED_CHANCE ? 'prop.reeds' : null;
-  return roll < PALM_CHANCE ? 'prop.palm' : null;
+  const touchesDeep = touchesTerrain(tiles, width, height, x, y, [0]);
+  const touchesWater = touchesTerrain(tiles, width, height, x, y, [0, 1]);
+  if (touchesWater) {
+    if (roll < REED_CHANCE) return { key: 'prop.reeds' };
+    const shoreRoll = hash01(x, y, DECOR_SALT + 3);
+    if (touchesDeep && shoreRoll < SHORE_ROCK_CHANCE) return { key: 'prop.shoreRock' };
+    if (shoreRoll < SHORE_ROCK_CHANCE + DRIFTWOOD_CHANCE) return { key: 'prop.driftwood' };
+    return null;
+  }
+  return roll < PALM_CHANCE ? { key: 'prop.palm' } : null;
 }
 
 /**
@@ -222,8 +274,8 @@ export function terrainProps(terrain: TerrainSnapshot): TerrainProp[] {
         out.push({ x, y, key: 'prop.peak' });
         continue;
       }
-      const key = decorFor(tiles, width, height, x, y);
-      if (key) out.push({ x, y, key, decor: true });
+      const pick = decorFor(tiles, width, height, x, y);
+      if (pick) out.push({ x, y, key: pick.key, decor: true, season: pick.season });
     }
   }
   return out;

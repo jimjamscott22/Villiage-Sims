@@ -171,12 +171,12 @@ export default function App() {
 
   return (
     <main className="flex h-full flex-col bg-[#17211b] text-[#f7f4e9]">
-      <header className="pixel-panel flex h-12 shrink-0 items-center justify-between px-4">
-        <h1 className="text-base">
+      <header className="pixel-panel flex h-12 shrink-0 items-center gap-4 px-4">
+        <h1 className="text-base border-r border-white/10 pr-4">
           <PixelText text="VILLAGESIM" />
         </h1>
         <ClockBar clock={clock} onSetSpeed={(speed) => { void onSetSpeed(speed); }} />
-        <span className="text-xs text-white/60">
+        <span className="ml-auto border-l border-white/10 pl-4 text-xs text-white/60">
           {transport.mode === 'tauri' ? 'Simulation connected' : 'Browser demo'}
         </span>
       </header>
