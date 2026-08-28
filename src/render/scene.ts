@@ -28,7 +28,8 @@ export interface DrawEntry {
 
 export const WALK_TICKS_PER_FRAME = 3;
 export const MILL_TICKS_PER_FRAME = 4;
-export const BAKERY_TICKS_PER_FRAME = 6;
+export const SMOKE_TICKS_PER_FRAME = 8;
+export const DUST_TICKS_PER_FRAME = 5;
 export const SWAY_TICKS_PER_FRAME = 12;
 
 const STATE_MOVING = 1;
@@ -70,6 +71,19 @@ function scaffoldKey(fw: number, fh: number): string {
   if (size >= 2) return 'scaffold.2';
   return 'scaffold.1';
 }
+
+interface BuildingVfx {
+  key: string;
+  /** Native-art pixel offset from the building footprint origin (top-left tile). */
+  offsetX: number;
+  offsetY: number;
+  period: number;
+}
+
+const BUILDING_VFX: Record<string, BuildingVfx> = {
+  bakery: { key: 'vfx.smoke', offsetX: 20, offsetY: 2, period: SMOKE_TICKS_PER_FRAME },
+  mill: { key: 'vfx.dust', offsetX: 14, offsetY: 50, period: DUST_TICKS_PER_FRAME },
+};
 
 function bubbleForState(state: number | undefined): string | null {
   switch (state) {
@@ -142,13 +156,16 @@ function pushSprite(
     footprintH: number;
     atlas: Atlas;
     mirror?: boolean;
+    /** Extra native-art offset from the footprint origin before scaling. */
+    offsetX?: number;
+    offsetY?: number;
   },
 ): void {
   if (!hasCell(opts.atlas, opts.key)) return;
   const cell = opts.atlas.manifest.cells[opts.key];
   const anchorY = cellAnchorY(opts.atlas, opts.key);
-  const worldX = opts.tileX * opts.tileSize;
-  const worldY = opts.tileY * opts.tileSize;
+  const worldX = opts.tileX * opts.tileSize + (opts.offsetX ?? 0) * ART_SCALE;
+  const worldY = opts.tileY * opts.tileSize + (opts.offsetY ?? 0) * ART_SCALE;
   const drawY = worldY - anchorY * ART_SCALE;
   const spriteBottom = drawY + cell.h * ART_SCALE;
   const footprintBottom = worldY + opts.footprintH * opts.tileSize;
@@ -223,8 +240,7 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
     } else {
       const key = spriteKey(def, `kind${building.kind}`);
       const frames = cellFrames(atlas, key);
-      const period =
-        key === 'mill' ? MILL_TICKS_PER_FRAME : key === 'bakery' ? BAKERY_TICKS_PER_FRAME : 1;
+      const period = key === 'mill' ? MILL_TICKS_PER_FRAME : 1;
       pushSprite(list, {
         rank: 1,
         id: `b:${building.id}`,
@@ -236,6 +252,24 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
         footprintH: fh,
         atlas,
       });
+
+      const vfx = def?.id ? BUILDING_VFX[def.id] : undefined;
+      if (vfx && hasCell(atlas, vfx.key)) {
+        const vfxFrames = cellFrames(atlas, vfx.key);
+        pushSprite(list, {
+          rank: 1,
+          id: `vfx:${building.id}`,
+          key: vfx.key,
+          frame: animFrame(tick, vfx.period, vfxFrames, reduceMotion),
+          tileX: building.x,
+          tileY: building.y,
+          tileSize,
+          footprintH: fh,
+          atlas,
+          offsetX: vfx.offsetX,
+          offsetY: vfx.offsetY,
+        });
+      }
     }
 
     if (selectedBuildingId != null && building.id === selectedBuildingId) {
