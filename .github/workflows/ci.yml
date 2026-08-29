@@ -37,17 +37,28 @@ jobs:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
+        id: setup
         with:
           workspaces: src-tauri
 
+      # Each check runs even when an earlier check failed, so one lint error
+      # cannot hide the test results — the job still fails if any of them do.
+      # Gating on `steps.setup` means a failure in setup (toolchain, system
+      # deps) skips the checks instead of burying the real cause under
+      # cascading errors; an earlier setup failure skips `setup` itself, so its
+      # outcome stops being `success` and the gate holds. Test runs before
+      # Clippy to put the most valuable signal first in the log.
       - name: Format check
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
-      - name: Clippy
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-
       - name: Test
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
+      - name: Clippy
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
   web:
     name: Web (test, build)
@@ -61,7 +72,15 @@ jobs:
           cache: npm
 
       - run: npm ci
+        id: setup
 
-      - run: npm test
+      # Same reasoning as the Rust job: a failing test suite should not hide
+      # whether the build still compiles. `npm ci` is setup rather than a
+      # check, so a failure there skips both.
+      - name: Test
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: npm test
 
-      - run: npm run build
+      - name: Build
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: npm run build
