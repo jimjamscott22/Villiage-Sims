@@ -695,10 +695,6 @@ impl World {
         })
     }
 
-    pub fn order_move(&mut self, x: i32, y: i32) -> Result<(), String> {
-        self.order_move_villager(x, y, None)
-    }
-
     /// Move a villager to `(x, y)`. When `villager_id` is set, that villager is
     /// ordered; otherwise the nearest villager that can path there is chosen.
     pub fn order_move_villager(
@@ -2639,7 +2635,7 @@ mod tests {
     #[test]
     fn order_move_approaches_target_over_ticks() {
         let mut world = grass_world();
-        world.order_move(5, 0).unwrap();
+        world.order_move_villager(5, 0, None).unwrap();
         assert!(matches!(
             world.villager().state,
             AgentState::MovingTo { target: (5, 0), .. }
@@ -2675,7 +2671,7 @@ mod tests {
     #[test]
     fn placing_building_on_path_triggers_repath_or_idle() {
         let mut world = grass_world();
-        world.order_move(7, 0).unwrap();
+        world.order_move_villager(7, 0, None).unwrap();
         let path_before = world.villager().path.clone().expect("path");
         assert!(path_before.contains(&(3, 0)));
         world.place_building("hut", 3, 0, 0).unwrap();
@@ -2728,7 +2724,7 @@ mod tests {
     fn path_routes_around_building() {
         let mut world = grass_world();
         world.place_building("hut", 3, 0, 0).unwrap();
-        world.order_move(6, 0).unwrap();
+        world.order_move_villager(6, 0, None).unwrap();
         let path = world.villager().path.clone().expect("path");
         assert!(!path.contains(&(3, 0)));
         assert_eq!(*path.last().unwrap(), (6, 0));
@@ -2817,7 +2813,7 @@ mod tests {
             }
         }
         assert!(world.villager().current_job.is_some());
-        world.order_move(7, 7).unwrap();
+        world.order_move_villager(7, 7, None).unwrap();
         assert!(world.villager().current_job.is_none());
         assert!(matches!(
             world.villager().state,
@@ -3765,7 +3761,7 @@ mod tests {
             amount: 3,
             dest: HaulEndpoint::Stockpile,
         });
-        world.order_move(7, 7).unwrap();
+        world.order_move_villager(7, 7, None).unwrap();
         assert!(world.villagers[0].carrying.is_none());
         assert_eq!(world.resources.grain, 3);
     }
