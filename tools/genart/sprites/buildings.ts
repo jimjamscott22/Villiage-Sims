@@ -305,6 +305,126 @@ export const WELL: SpriteGrid = grid(16, 32, {
   for (let x = 3; x <= 12; x += 1) set(x, 30, 'i');
 });
 
+/** Palette shared by the timber decor pieces. */
+const TIMBER: Pal = {
+  t: P.terraMid,
+  d: P.terraDark,
+  m: P.stoneMid,
+  g: P.stoneLight,
+  p: P.stonePale,
+  i: P.ink,
+  c: P.sandShadow,
+};
+
+/**
+ * 1×1 fence — two rails and a pair of posts. 16×24, anchorY 8.
+ * The rails run the full sprite width so abutting fence tiles read as one run.
+ */
+export const FENCE: SpriteGrid = grid(16, 24, TIMBER, (set) => {
+  for (const railY of [14, 19]) {
+    for (let x = 0; x <= 15; x += 1) {
+      set(x, railY, 'd');
+      set(x, railY + 1, 't');
+    }
+  }
+  for (const postX of [2, 12]) {
+    for (let y = 11; y <= 21; y += 1) {
+      set(postX, y, 'd');
+      set(postX + 1, y, 'm');
+    }
+  }
+  for (let x = 1; x <= 14; x += 1) set(x, 22, 'c');
+});
+
+/** 1×1 gate — posts, lintel, and a braced swing panel. 16×24, anchorY 8. */
+export const GATE: SpriteGrid = grid(16, 24, TIMBER, (set) => {
+  // Uprights and the lintel spanning them.
+  for (const postX of [1, 13]) {
+    for (let y = 6; y <= 21; y += 1) {
+      set(postX, y, 'd');
+      set(postX + 1, y, 'm');
+    }
+  }
+  for (let x = 1; x <= 14; x += 1) {
+    set(x, 6, 'd');
+    set(x, 7, 't');
+  }
+  // Panel with a diagonal brace.
+  for (let y = 11; y <= 20; y += 1) {
+    for (let x = 4; x <= 11; x += 1) {
+      set(x, y, y === 11 || y === 20 ? 'd' : 'g');
+    }
+  }
+  for (let step = 0; step <= 8; step += 1) {
+    set(4 + step, 20 - step, 'd');
+  }
+  set(10, 15, 'i');
+  for (let x = 0; x <= 15; x += 1) set(x, 22, 'c');
+});
+
+/** 1×1 signpost — a lettered board on a leaning post. 16×24, anchorY 8. */
+export const SIGNPOST: SpriteGrid = grid(16, 24, TIMBER, (set) => {
+  for (let y = 12; y <= 21; y += 1) {
+    set(7, y, 'd');
+    set(8, y, 'm');
+  }
+  // Board.
+  for (let y = 7; y <= 13; y += 1) {
+    for (let x = 2; x <= 13; x += 1) {
+      set(x, y, y === 7 || y === 13 || x === 2 || x === 13 ? 'd' : 'p');
+    }
+  }
+  // Two lines of illegible lettering — reads as text at 2× without spelling anything.
+  for (let x = 4; x <= 11; x += 1) set(x, 9, 'i');
+  for (let x = 4; x <= 8; x += 1) set(x, 11, 'i');
+  for (let x = 5; x <= 10; x += 1) set(x, 22, 'c');
+});
+
+/**
+ * 2×2 storehouse — plank walls, gabled roof, wide cart doors. 32×48, anchorY 16.
+ * The generic wood/stone counterpart to the grain-only granary.
+ */
+export const STOREHOUSE: SpriteGrid = grid(32, 48, {
+  ...TIMBER,
+  s: P.stoneShadow,
+  w: P.whitewash,
+}, (set) => {
+  // Gable that widens to the full sprite at the eaves.
+  for (let y = 6; y <= 21; y += 1) {
+    const half = 2 + (y - 6);
+    for (let x = 16 - half; x <= 15 + half; x += 1) {
+      set(x, y, y === 6 || x === 16 - half || x === 15 + half ? 'd' : y < 12 ? 't' : 'd');
+    }
+  }
+  // Plank walls on the footprint.
+  for (let y = 22; y <= 44; y += 1) {
+    for (let x = 2; x <= 29; x += 1) {
+      if (y === 22 || y === 44 || x === 2 || x === 29) set(x, y, 'i');
+      else set(x, y, x % 5 === 0 ? 'm' : 'p');
+    }
+  }
+  // Cart doors, split down the middle.
+  for (let y = 30; y <= 43; y += 1) {
+    for (let x = 11; x <= 20; x += 1) {
+      set(x, y, y === 30 || x === 11 || x === 20 ? 'i' : 'g');
+    }
+  }
+  for (let y = 32; y <= 43; y += 1) set(15, y, 's');
+  set(13, 37, 'i');
+  set(18, 37, 'i');
+  // Stacked timber under the eaves — says "this is where the wood goes".
+  for (let y = 25; y <= 28; y += 1) {
+    for (let x = 4; x <= 9; x += 1) set(x, y, y % 2 === 0 ? 'd' : 't');
+  }
+  for (let y = 25; y <= 28; y += 1) {
+    for (let x = 22; x <= 27; x += 1) set(x, y, y % 2 === 0 ? 's' : 'w');
+  }
+  for (let x = 1; x <= 30; x += 1) {
+    set(x, 45, 'c');
+    set(x, 46, 'c');
+  }
+});
+
 function scaffold(tiles: number): SpriteGrid {
   const px = tiles * 16;
   const height = px + 8;
@@ -346,6 +466,10 @@ export const BUILDING_SPRITES: Record<string, BuildingSprite> = {
   mill: { grid: MILL_FRAMES[0], anchorY: 32, frames: MILL_FRAMES },
   bakery: { grid: BAKERY, anchorY: 16 },
   well: { grid: WELL, anchorY: 16 },
+  fence: { grid: FENCE, anchorY: 8 },
+  gate: { grid: GATE, anchorY: 8 },
+  signpost: { grid: SIGNPOST, anchorY: 8 },
+  storehouse: { grid: STOREHOUSE, anchorY: 16 },
   'scaffold.1': { grid: SCAFFOLD_1, anchorY: 8 },
   'scaffold.2': { grid: SCAFFOLD_2, anchorY: 8 },
   'scaffold.3': { grid: SCAFFOLD_3, anchorY: 8 },

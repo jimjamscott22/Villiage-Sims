@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Atlas, AtlasManifest } from './atlas';
 import {
+  DYE_COUNT,
   atlasHasEntities,
   buildDrawList,
   dyeIndex,
@@ -95,11 +96,21 @@ describe('facingFromDelta', () => {
 });
 
 describe('dyeIndex', () => {
-  it('wraps across six dyes', () => {
+  it('wraps across every dye', () => {
     expect(dyeIndex(0)).toBe(0);
-    expect(dyeIndex(5)).toBe(5);
-    expect(dyeIndex(6)).toBe(0);
-    expect(dyeIndex(-1)).toBe(5);
+    expect(dyeIndex(DYE_COUNT - 1)).toBe(DYE_COUNT - 1);
+    expect(dyeIndex(DYE_COUNT)).toBe(0);
+    expect(dyeIndex(-1)).toBe(DYE_COUNT - 1);
+  });
+
+  it('matches the dye count baked into the committed atlas', () => {
+    // Guards against DYE_COUNT drifting from VILLAGER_DYES in tools/genart.
+    const dyes = Object.keys(manifest.cells)
+      .filter((key) => key.startsWith('villager.s.idle.'))
+      .map((key) => Number(key.slice('villager.s.idle.'.length)));
+    expect(dyes.sort((a, b) => a - b)).toEqual(
+      Array.from({ length: DYE_COUNT }, (_, index) => index),
+    );
   });
 });
 
@@ -215,7 +226,42 @@ describe('buildDrawList', () => {
       atlas,
     });
     expect(facing.get(7)).toBe('e');
-    expect(list.find((e) => e.id === 'v:7')?.key).toBe('villager.e.idle.1');
+    expect(list.find((e) => e.id === 'v:7')?.key).toBe('villager.e.idle.7');
+  });
+
+  function villagerKey(villager: TickSnapshot['villagers'][number]): string | undefined {
+    const list = buildDrawList({
+      snapshot: snapshot({ villagers: [villager] }),
+      catalog: { buildings, crops },
+      props: [],
+      tileSize: 32,
+      tick: 0,
+      reduceMotion: false,
+      selectedBuildingId: null,
+      selectedVillagerId: null,
+      lastFacing: new Map<number, Facing>(),
+      atlas,
+    });
+    return list.find((entry) => entry.id === `v:${villager.id}`)?.key;
+  }
+
+  it('picks the carry pose for a hauling villager', () => {
+    expect(villagerKey({ id: 3, x: 10, y: 10, state: 1, dx: 3, dy: 0, carrying: true }))
+      .toBe('villager.e.carry.walk0.3');
+    expect(villagerKey({ id: 3, x: 10, y: 10, state: 0, dx: 3, dy: 0, carrying: true }))
+      .toBe('villager.e.carry.idle.3');
+  });
+
+  it('leaves an empty-handed villager on the plain pose', () => {
+    expect(villagerKey({ id: 3, x: 10, y: 10, state: 1, dx: 3, dy: 0, carrying: false }))
+      .toBe('villager.e.walk0.3');
+    expect(villagerKey({ id: 3, x: 10, y: 10, state: 1, dx: 3, dy: 0 }))
+      .toBe('villager.e.walk0.3');
+  });
+
+  it('keeps a sleeping villager lying down even while carrying', () => {
+    expect(villagerKey({ id: 3, x: 10, y: 10, state: 4, dx: 0, dy: 0, carrying: true }))
+      .toBe('villager.lie.3');
   });
 
   it('draws a scaffold while a building is under construction', () => {

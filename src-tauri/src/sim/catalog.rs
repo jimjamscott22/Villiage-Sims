@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn builtin_catalog_loads_buildings_and_crops() {
         let catalog = Catalog::load_builtin().expect("catalog");
-        assert_eq!(catalog.buildings.len(), 6);
+        assert_eq!(catalog.buildings.len(), 10);
         assert!(catalog.find("hut").is_some());
         assert!(catalog.find("farm").is_some());
         assert!(catalog.find("granary").is_some());
@@ -211,5 +211,54 @@ mod tests {
         assert!(granary.stores.as_ref().unwrap().contains(&"grain".into()));
         assert_eq!(catalog.crops.len(), 1);
         assert!(catalog.find_crop("wheat").is_some());
+    }
+
+    #[test]
+    fn decor_buildings_are_jobless_and_appended_last() {
+        let catalog = Catalog::load_builtin().expect("catalog");
+        // `kind` is a catalog index stored in saves, so the pre-existing ids must
+        // keep their positions and anything new must sit after them.
+        let ids: Vec<&str> = catalog
+            .buildings
+            .iter()
+            .map(|building| building.id.as_str())
+            .collect();
+        assert_eq!(
+            ids,
+            vec![
+                "hut",
+                "farm",
+                "granary",
+                "mill",
+                "bakery",
+                "well",
+                "fence",
+                "gate",
+                "signpost",
+                "storehouse",
+            ]
+        );
+
+        for id in ["fence", "gate", "signpost"] {
+            let def = catalog.find(id).unwrap().1;
+            assert_eq!(def.category, "decor", "{id} should be decor");
+            assert!(def.jobs.is_empty(), "{id} must not introduce a job kind");
+            assert_eq!(def.footprint, [1, 1]);
+        }
+    }
+
+    #[test]
+    fn storehouse_stores_wood_and_stone_via_the_existing_haul_job() {
+        let catalog = Catalog::load_builtin().expect("catalog");
+        let storehouse = catalog.find("storehouse").unwrap().1;
+        // `category == "storage"` is what economy.rs gates storage routing on.
+        assert_eq!(storehouse.category, "storage");
+        let stores = storehouse.stores.as_ref().expect("stores");
+        assert!(stores.contains(&"wood".to_string()));
+        assert!(stores.contains(&"stone".to_string()));
+        assert!(storehouse.capacity.unwrap() > 0);
+        // Reuses `haul`; adding a new job kind would need work in jobs.rs/utility.rs.
+        assert_eq!(storehouse.jobs.len(), 1);
+        assert_eq!(storehouse.jobs[0].kind, "haul");
     }
 }

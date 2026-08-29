@@ -47,8 +47,15 @@ export function facingFromDelta(dx: number, dy: number): Facing | null {
   return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'e' : 'w') : dy > 0 ? 's' : 'n';
 }
 
+/**
+ * Number of garment dyes the atlas is built with. Must match `VILLAGER_DYES.length`
+ * in `tools/genart/sprites/villagers.ts`; `scene.test.ts` pins it to the committed
+ * manifest so the two cannot drift.
+ */
+export const DYE_COUNT = 9;
+
 export function dyeIndex(villagerId: number): number {
-  return ((villagerId % 6) + 6) % 6;
+  return ((villagerId % DYE_COUNT) + DYE_COUNT) % DYE_COUNT;
 }
 
 function animFrame(tick: number, period: number, frames: number, reduceMotion: boolean): number {
@@ -98,6 +105,25 @@ function bubbleForState(state: number | undefined): string | null {
     default:
       return null;
   }
+}
+
+/**
+ * Atlas key for a villager body. A carrying villager falls back to the empty-handed
+ * pose when the carry cell is missing, so an atlas built before the carry poses
+ * existed still renders.
+ */
+function villagerPoseKey(
+  atlas: Atlas,
+  facing: 'n' | 'e' | 's',
+  variant: string,
+  dye: number,
+  carrying: boolean,
+): string {
+  if (carrying) {
+    const carried = `villager.${facing}.carry.${variant}.${dye}`;
+    if (hasCell(atlas, carried)) return carried;
+  }
+  return `villager.${facing}.${variant}.${dye}`;
 }
 
 function cellAnchorY(atlas: Atlas, key: string): number {
@@ -360,14 +386,17 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
     const drawFacing: 'n' | 'e' | 's' = facing === 'w' ? 'e' : facing;
     const mirror = facing === 'w';
 
+    // Nobody hauls in their sleep, so the lie pose has no carry variant.
+    const carrying = villager.carrying === true && state !== STATE_SLEEPING;
+
     let key: string;
     if (state === STATE_SLEEPING) {
       key = `villager.lie.${dye}`;
     } else if (state === STATE_MOVING) {
       const walk = animFrame(tick, WALK_TICKS_PER_FRAME, 4, false);
-      key = `villager.${drawFacing}.walk${walk}.${dye}`;
+      key = villagerPoseKey(atlas, drawFacing, `walk${walk}`, dye, carrying);
     } else {
-      key = `villager.${drawFacing}.idle.${dye}`;
+      key = villagerPoseKey(atlas, drawFacing, 'idle', dye, carrying);
     }
 
     if (hasCell(atlas, key)) {

@@ -253,9 +253,22 @@ describe('DemoWorld pathfinding', () => {
   });
 
   it('loads the M8 demo catalog with flour storage and recipes', () => {
-    expect(DEMO_CATALOG.buildings).toHaveLength(6);
+    expect(DEMO_CATALOG.buildings).toHaveLength(10);
     // Building kind is an index into this list, so new entries must be appended.
-    expect(DEMO_CATALOG.buildings[5]?.id).toBe('well');
+    // This must stay in lockstep with src-tauri/data/buildings.json.
+    expect(DEMO_CATALOG.buildings.map((entry) => entry.id)).toEqual([
+      'hut',
+      'farm',
+      'granary',
+      'mill',
+      'bakery',
+      'well',
+      'fence',
+      'gate',
+      'signpost',
+      'storehouse',
+    ]);
+    expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'storehouse')?.stores).toEqual(['wood', 'stone']);
     expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'granary')?.stores).toEqual(['grain', 'flour', 'food']);
     expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'mill')?.recipe).toEqual({
       inputs: { grain: 2 },

@@ -23,6 +23,8 @@ export interface VillagerView {
   /** Position delta vs previous snapshot — used for facing. Absent when unknown. */
   dx?: number;
   dy?: number;
+  /** True while holding a haul stack — selects the carry pose. */
+  carrying?: boolean;
 }
 
 export interface VillagerDetail {

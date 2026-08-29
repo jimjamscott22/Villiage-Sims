@@ -1,16 +1,16 @@
-# Graph Report - Villiage-Sims  (2026-08-10)
+# Graph Report - Villiage-Sims  (2026-08-29)
 
 ## Corpus Check
-- 134 files · ~145,691 words
+- 137 files · ~160,931 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1814 nodes · 3599 edges · 141 communities (126 shown, 15 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 147 edges (avg confidence: 0.84)
+- 1854 nodes · 3661 edges · 149 communities (128 shown, 21 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 162 edges (avg confidence: 0.84)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `07f338a5`
+- Built from commit: `864d6b1a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -28,23 +28,22 @@
 - scene.ts
 - demoWorld.ts
 - chronicle.rs
-- .villager_mut
+- .maybe_decide
 - Villager
 - Canvas.tsx
 - terrain.ts
 - ui.ts
-- .posToTile
 - .generate
 - compilerOptions
 - economy.rs
 - chronicle.ts
 - .findHaulTask
-- BuildMenu.tsx
-- .tickWorking
+- App.tsx
+- .placeBuilding
 - grid.ts
-- props.ts
+- vfx.ts
 - compilerOptions
-- types.ts
+- weather.rs
 - World Struct (world.rs)
 - build.ts
 - transport.ts
@@ -63,8 +62,8 @@
 - pick highest → Eat
 - atlas.ts
 - Camera
-- PixelText.tsx
-- index.ts
+- crops.rs
+- rasterizeGrid
 - Village Chronicle
 - WORLD
 - ResourceNode
@@ -73,9 +72,9 @@
 - ResourceTotals
 - Genart Art Pipeline
 - 1. Input Stage (User IPC Action / 50ms Sim Timer)
-- Option
+- .place_building
 - pathfind.ts
-- TickSnapshot
+- types.ts
 - Overlay (build ghost · selection · hover — every frame in build mode)
 - Utility AI
 - default.json
@@ -152,10 +151,18 @@
 - Milestone 8 Design
 - Pixel Art UI Redesign Design
 - Event Log / Village Chronicle Design
-- String
+- props.ts
+- resourceGet
+- Season
+- .isPassable
+- .snapshot
+- buildings.rs
+- .listenToTicks
+- PlacementValidity
+- app-icon.test.ts
 
 ## God Nodes (most connected - your core abstractions)
-1. `World` - 134 edges
+1. `World` - 133 edges
 2. `DemoWorld` - 112 edges
 3. `grass_world()` - 42 edges
 4. `Canvas()` - 31 edges
@@ -211,23 +218,23 @@
 - **Needs → score → pick with hysteresis** — docs_images_utility_ai_needs_panel, docs_images_utility_ai_utility_scoring, docs_images_utility_ai_pick_highest, docs_images_utility_ai_hysteresis_rule [EXTRACTED 1.00]
 - **VillageSim terrain tile palette** — public_art_tiles_water_autotiles, public_art_tiles_grass_autotiles, public_art_tiles_sand_autotiles [EXTRACTED 1.00]
 
-## Communities (141 total, 15 thin omitted)
+## Communities (149 total, 21 thin omitted)
 
 ### Community 0 - "World"
-Cohesion: 0.07
-Nodes (13): MovePurpose, ResourceNode, Fn, wander_tile(), gather_job_adds_wood_to_stockpile(), gather_jobs_include_reachable_wood_and_stone_nodes(), order_move_falls_back_when_requested_villager_is_gone(), order_move_prefers_requested_villager() (+5 more)
+Cohesion: 0.09
+Nodes (7): MovePurpose, ResourceNode, Fn, wander_tile(), BuildingView, Vec, World
 
 ### Community 1 - "Clock"
-Cohesion: 0.05
-Nodes (39): Default, Duration, Clock, ClockView, day_season_year_rollover(), minute_accumulates_to_day(), Rollover, rollover_reports_season_change() (+31 more)
+Cohesion: 0.17
+Nodes (9): Default, Duration, Clock, ClockView, day_season_year_rollover(), minute_accumulates_to_day(), Rollover, rollover_reports_season_change() (+1 more)
 
 ### Community 2 - "utility.rs"
 Cohesion: 0.06
 Nodes (35): farm_advertises_tend_crops_slots(), granary_advertises_haul_in_m8(), Job, JobBoard, JobKind, mill_advertises_produce_and_haul(), peek_prefers_closer_job_at_equal_priority(), peek_prefers_priority_over_distance() (+27 more)
 
 ### Community 3 - "catalog.rs"
-Cohesion: 0.06
-Nodes (44): CropDef, BuildState, PlacementResult, PlacementValidity, BuildingDef, String, terrain_allowed(), BuildingDef (+36 more)
+Cohesion: 0.08
+Nodes (42): CropDef, BuildingDef, terrain_allowed(), BuildingDef, builtin_catalog_loads_buildings_and_crops(), Catalog, decor_buildings_are_jobless_and_appended_last(), JobDef (+34 more)
 
 ### Community 4 - "src/commands.rs"
 Cohesion: 0.10
@@ -242,107 +249,103 @@ Cohesion: 0.05
 Nodes (45): Milestone 1 Design, Browser-Demo Transport, Snapshot Interpolation, Tick Loop (20 Hz), TickSnapshot, World, Milestone 2 Design, Camera Pan/Zoom (+37 more)
 
 ### Community 7 - "world.rs"
-Cohesion: 0.09
-Nodes (43): Building, BTreeMap, autonomous_jobs_run_farm_to_bakery_chain(), autosave_disabled_without_directory(), clear_day_leaves_crops_dry_after_rollover(), completed_farm_advertises_tend_crops_and_villager_works(), construction_completes_after_build_ticks(), day_rollover_clears_water_and_paused_skips_advance() (+35 more)
+Cohesion: 0.12
+Nodes (36): autonomous_jobs_run_farm_to_bakery_chain(), autosave_disabled_without_directory(), autosave_rotates_through_three_slots(), clear_day_leaves_crops_dry_after_rollover(), construction_completes_after_build_ticks(), day_rollover_clears_water_and_paused_skips_advance(), demolish_farm_removes_crops(), derived_totals_ignore_farm_buffer_and_include_granary() (+28 more)
 
 ### Community 8 - "DemoWorld"
-Cohesion: 0.11
-Nodes (5): demoAutosaveSlot(), DemoWorld, fullNeeds(), recomputeHappiness(), ChronicleBody
+Cohesion: 0.10
+Nodes (4): demoAutosaveSlot(), DemoWorld, fullNeeds(), recomputeHappiness()
 
 ### Community 9 - "persist.rs"
 Cohesion: 0.10
 Nodes (35): Arc, AtomicBool, Drop, JoinHandle, Mutex, Path, forward_snapshots(), AppHandle (+27 more)
 
 ### Community 10 - "scene.ts"
-Cohesion: 0.11
-Nodes (27): Atlas, animFrame(), atlasHasEntities(), BAKERY_TICKS_PER_FRAME, bubbleForState(), buildDrawList(), buildDrawListWithStats(), cellAnchorY() (+19 more)
+Cohesion: 0.09
+Nodes (35): Atlas, animFrame(), atlasHasEntities(), bubbleForState(), buildDrawList(), buildDrawListWithStats(), BUILDING_VFX, BuildingVfx (+27 more)
 
 ### Community 11 - "demoWorld.ts"
-Cohesion: 0.07
-Nodes (31): ACTION_ORDER, ActionKind, actionRank(), AgentStateName, CarryStack, DEMO_SAVE_VERSION, DemoBuilding, DemoClock (+23 more)
+Cohesion: 0.06
+Nodes (33): ACTION_ORDER, ActionKind, actionRank(), AgentStateName, CarryStack, chebyshev(), DEMO_CROPS, DEMO_SAVE_VERSION (+25 more)
 
 ### Community 12 - "chronicle.rs"
 Cohesion: 0.15
 Nodes (26): Item, Iterator, born(), captures_the_clock_date(), Chronicle, ChronicleBody, ChronicleBodyView, ChronicleEntry (+18 more)
 
-### Community 13 - ".villager_mut"
-Cohesion: 0.29
-Nodes (3): completed_eat_clears_action_so_hysteresis_cannot_reenter(), ResourceTotals, stale_eat_action_while_idle_does_not_block_wander()
+### Community 13 - ".maybe_decide"
+Cohesion: 0.33
+Nodes (4): completed_eat_clears_action_so_hysteresis_cannot_reenter(), hungry_villager_eats_without_releasing_job(), ResourceTotals, stale_eat_action_while_idle_does_not_block_wander()
 
 ### Community 14 - "Villager"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (14): CarryStack, Into, AgentState, MovePurpose, ActionKind, Option, Self, String (+6 more)
 
 ### Community 15 - "Canvas.tsx"
-Cohesion: 0.14
-Nodes (19): Canvas(), cropPlantValid(), HoverDisplay, rotatedFootprint(), BUILDING_COLORS, CROP_STAGE_COLORS, drawBuildings(), drawCrops() (+11 more)
+Cohesion: 0.11
+Nodes (23): drawCell(), Canvas(), cropPlantValid(), HoverDisplay, rotatedFootprint(), BUILDING_COLORS, CROP_STAGE_COLORS, drawBuildings() (+15 more)
 
 ### Community 16 - "terrain.ts"
-Cohesion: 0.12
-Nodes (23): SHEET_WIDTH, terrainSources(), hash01(), PaletteName, BASE_TERRAINS, BaseTerrain, borderDistance(), depthAt() (+15 more)
+Cohesion: 0.21
+Nodes (16): terrainSources(), hash01(), PaletteName, toRgba(), BaseTerrain, borderDistance(), depthAt(), Edge (+8 more)
 
 ### Community 17 - "ui.ts"
 Cohesion: 0.07
 Nodes (31): BAR_NOTCH, BAR_NOTCH_EMPTY, BRACKET_BL, BRACKET_BR, BRACKET_TL, BRACKET_TR, bracketCorner(), FONT_GLYPH_ORDER (+23 more)
 
-### Community 18 - ".posToTile"
-Cohesion: 0.13
-Nodes (3): chebyshev(), wanderTile(), wrapU64()
-
 ### Community 19 - ".generate"
 Cohesion: 0.13
-Nodes (12): chronicle_death_entry_carries_the_name(), chronicle_records_building_completion(), chronicle_records_season_turn(), generated_world_has_expected_dimensions(), mill_is_locked_in_a_fresh_world(), Self, TerrainSnapshot, spawns_five_villagers_on_walkable_tiles() (+4 more)
+Nodes (14): chronicle_death_entry_carries_the_name(), chronicle_records_building_completion(), chronicle_records_season_turn(), generated_world_has_expected_dimensions(), mill_is_locked_in_a_fresh_world(), BTreeSet, Self, TerrainSnapshot (+6 more)
 
 ### Community 20 - "compilerOptions"
 Cohesion: 0.07
 Nodes (26): DOM, DOM.Iterable, src, vite/client, vite.config.ts, compilerOptions, allowImportingTsExtensions, jsx (+18 more)
 
 ### Community 21 - "economy.rs"
-Cohesion: 0.22
-Nodes (19): CarryStack, derive_totals(), derive_totals_ignores_production_buffers(), HaulEndpoint, HaulTask, inventory_add(), inventory_get(), inventory_take() (+11 more)
+Cohesion: 0.12
+Nodes (24): HaulEndpoint, HaulTask, CarryStack, derive_totals(), derive_totals_ignores_production_buffers(), HaulEndpoint, HaulTask, inventory_add() (+16 more)
 
 ### Community 22 - "chronicle.ts"
-Cohesion: 0.20
-Nodes (13): buildingName(), CHRONICLE_EMPTY_MESSAGE, formatDivider(), formatEntry(), needsDivider(), seasonName(), SEASONS, BIRTH (+5 more)
+Cohesion: 0.22
+Nodes (12): buildingName(), CHRONICLE_EMPTY_MESSAGE, formatDivider(), formatEntry(), needsDivider(), seasonName(), SEASONS, BIRTH (+4 more)
 
 ### Community 23 - ".findHaulTask"
-Cohesion: 0.13
-Nodes (12): canAfford(), inventoryAdd(), inventoryGet(), inventoryTake(), inventoryTotal(), productionFreeCapacity(), recipeAllowsResource(), resourceGet() (+4 more)
+Cohesion: 0.24
+Nodes (6): inventoryTotal(), productionFreeCapacity(), recipeAllowsResource(), stockpileAccepts(), storageAccepts(), storageFreeCapacity()
 
-### Community 24 - "BuildMenu.tsx"
-Cohesion: 0.14
-Nodes (19): VillagerDetail, BuildMenu(), BuildMenuProps, formatCost(), formatRecipe(), ClockBar(), barNotchVars(), cellBgPosition() (+11 more)
+### Community 24 - "App.tsx"
+Cohesion: 0.07
+Nodes (50): App(), root, DemoSaveState, ClockView, ResourceTotals, VillagerDetail, getAtlasManifest(), getSheetSize() (+42 more)
 
-### Community 25 - ".tickWorking"
-Cohesion: 0.15
-Nodes (3): DEMO_CROPS, footprintTiles(), rotatedFootprint()
+### Community 25 - ".placeBuilding"
+Cohesion: 0.26
+Nodes (3): footprintTiles(), inventoryAdd(), rotatedFootprint()
 
 ### Community 26 - "grid.ts"
-Cohesion: 0.20
-Nodes (11): Source, mirrorHorizontal(), remapColor(), assertPaletteHex(), BY_HEX, PALETTE, Rgba, toRgba() (+3 more)
+Cohesion: 0.24
+Nodes (8): mirrorHorizontal(), remapColor(), assertPaletteHex(), BY_HEX, Rgba, Raster, BLUE, RED
 
-### Community 27 - "props.ts"
-Cohesion: 0.11
-Nodes (20): SpriteGrid, BuildingSprite, CROP_SPRITES, CropSprite, grid(), Pal, WHEAT_STAGE_3_SWAY, WHEAT_STAGES (+12 more)
+### Community 27 - "vfx.ts"
+Cohesion: 0.12
+Nodes (19): SpriteGrid, PALETTE, BuildingSprite, CROP_SPRITES, CropSprite, grid(), Pal, WHEAT_STAGE_3_SWAY (+11 more)
 
 ### Community 28 - "compilerOptions"
 Cohesion: 0.10
 Nodes (20): tools, compilerOptions, allowImportingTsExtensions, lib, module, moduleDetection, moduleResolution, noEmit (+12 more)
 
-### Community 29 - "types.ts"
-Cohesion: 0.15
-Nodes (16): App(), root, DemoSaveState, ClockView, CropView, RecipeDef, ResourceTotals, SEASON_NAMES (+8 more)
+### Community 29 - "weather.rs"
+Cohesion: 0.17
+Nodes (12): autosave_slot_for(), distribution_covers_all_kinds(), mix(), Option, Self, storm_damage_index(), storm_index_in_range(), Weather (+4 more)
 
 ### Community 30 - "World Struct (world.rs)"
 Cohesion: 0.13
 Nodes (20): Villagers & Needs (agents.rs, needs.rs), Sprite Atlas Manager (atlas.ts), BrowserTransport (DemoWorld TS Sim), Canvas Component (Canvas.tsx), Content Catalog (catalog.rs), Chronicle Event Log (chronicle.rs), Component Relationships Diagram, Render Module (drawTerrain, drawEntities, drawGhost) (+12 more)
 
 ### Community 31 - "build.ts"
-Cohesion: 0.18
-Nodes (15): AtlasCellDef, AtlasManifest, buildAtlas(), BuiltAtlas, BuiltSheet, entitySources(), fromSprite(), packSheet() (+7 more)
+Cohesion: 0.12
+Nodes (17): AtlasCellDef, AtlasManifest, BuiltAtlas, BuiltSheet, packSheet(), SHEET_WIDTH, Source, pack() (+9 more)
 
 ### Community 32 - "transport.ts"
-Cohesion: 0.21
+Cohesion: 0.20
 Nodes (12): classify(), DEFAULT_HEIGHT, DEFAULT_SEED, DEFAULT_TILE_SIZE, DEFAULT_WIDTH, fbm(), generateDemoTerrain(), hash2() (+4 more)
 
 ### Community 33 - "Authoritative Rust Simulation"
@@ -354,32 +357,24 @@ Cohesion: 0.11
 Nodes (14): buildings, crops, manifest, Facing, footprintIntersects(), packCell(), SPATIAL_CELL_TILES, terrainBlitRect() (+6 more)
 
 ### Community 35 - "tilemap.ts"
-Cohesion: 0.20
-Nodes (16): bakeTerrain(), BASE_BY_TERRAIN, BaseTerrainName, baseTerrainOf(), CORNERS, decorFor(), hash01(), isWater() (+8 more)
+Cohesion: 0.16
+Nodes (19): BASE_BY_TERRAIN, BaseTerrainName, baseTerrainOf(), CORNERS, decorFor(), DecorPick, hash01(), isWater() (+11 more)
 
 ### Community 36 - "RUST · simulation thread (20 Hz · 50 ms)"
 Cohesion: 0.12
 Nodes (18): One Authoritative World, One Thin Renderer, Camera (pan · cursor zoom), Canvas stack (terrain · entities · overlay), Clock & seasons (day · season · year), commands (mpsc channel), Data-driven content (buildings.json · crops.json · traits.json), Architecture — one authoritative world, one thin renderer, Economy (resources · buildings) (+10 more)
 
-### Community 37 - "demoWorld.test.ts"
-Cohesion: 0.08
-Nodes (8): DEMO_CATALOG, demoStormDamageIndex(), demoWeatherFor(), mixU64(), completeBuilding(), nearestVillagerId(), villagerById(), BuildingView
-
-### Community 38 - "BrowserTransport"
-Cohesion: 0.18
-Nodes (4): BrowserTransport, validateSlot(), TickListener, Unlisten
-
 ### Community 39 - "buildings.ts"
-Cohesion: 0.14
-Nodes (16): BAKERY_FRAMES, bakeryFrame(), BUILDING_SPRITES, FARM, FARM_FIELD, GRANARY, grid(), HUT (+8 more)
+Cohesion: 0.10
+Nodes (21): BAKERY, bakeryFrame(), BUILDING_SPRITES, FARM, FARM_FIELD, FENCE, GATE, GRANARY (+13 more)
 
 ### Community 40 - "Rust Authoritative Simulation (20 Hz Thread)"
 Cohesion: 0.17
 Nodes (16): Pixel Art Atlas (public/art/tiles.png & atlas.json), 3-Layer Canvas Stack (Offscreen Terrain, Dynamic Entities, Build Ghost), Data-Driven Catalog (buildings.json & crops.json), Chronicle & Persistence (200-entry log & bincode v2), Clock & Seasons (Pause / 1x / 2x / 3x Speed), Commands Channel (mpsc), High-Level Architecture Diagram, Interpolation Engine (2-Snapshot buffer, alpha factor) (+8 more)
 
 ### Community 41 - "Transport"
-Cohesion: 0.12
-Nodes (4): Transport, PlacementResult, PlacementValidity, WorldInit
+Cohesion: 0.15
+Nodes (3): Transport, PlacementResult, WorldInit
 
 ### Community 42 - "tauri.conf.json"
 Cohesion: 0.12
@@ -398,20 +393,20 @@ Cohesion: 0.17
 Nodes (15): Eat (1 − hunger)² · gated on food available → 0.49, Sleep (1 − energy)² · ×1.5 at night → 0.19, Socialize (1 − social)^1.5 · partner ≤ 8 tiles → 0.10, Wander constant 0.05 floor → 0.05, Work 0.4 · priority/10 · 1/(1+dist·0.05) → 0.34, How a villager decides — utility scoring, Energy (0.56), Happiness (derived) (+7 more)
 
 ### Community 46 - "atlas.ts"
-Cohesion: 0.16
-Nodes (16): ART_SCALE, AtlasCell, AtlasManifest, cellRect(), drawCell(), frameCount(), loadAtlas(), loadImage() (+8 more)
+Cohesion: 0.29
+Nodes (9): ART_SCALE, AtlasCell, AtlasManifest, cellRect(), frameCount(), loadAtlas(), loadImage(), animated (+1 more)
 
 ### Community 47 - "Camera"
 Cohesion: 0.18
 Nodes (3): Camera, MAX_ZOOM, MIN_ZOOM
 
-### Community 48 - "PixelText.tsx"
-Cohesion: 0.30
-Nodes (12): FONT_GLYPHS, FONT_SCALE, GLYPH_HEIGHT, GLYPH_WIDTH, glyphBackgroundPosition(), glyphBackgroundX(), glyphIndex(), GLYPHS_PER_ROW (+4 more)
+### Community 48 - "crops.rs"
+Cohesion: 0.18
+Nodes (13): Crop, crop_ready_emits_once(), CropDef, CropView, growth_requires_water_and_season(), BTreeMap, Option, Self (+5 more)
 
-### Community 49 - "index.ts"
-Cohesion: 0.26
-Nodes (10): ART_DIR, chunk(), concat(), crc32(), CRC_TABLE, decodePng(), encodePng(), SIGNATURE (+2 more)
+### Community 49 - "rasterizeGrid"
+Cohesion: 0.18
+Nodes (17): entry(), buildAtlas(), entitySources(), fromSprite(), uiSources(), rasterizeGrid(), main(), ART_DIR (+9 more)
 
 ### Community 50 - "Village Chronicle"
 Cohesion: 0.20
@@ -426,8 +421,8 @@ Cohesion: 0.27
 Nodes (7): generate_nodes(), harvest_and_regen(), ResourceNode, Option, Self, String, Vec
 
 ### Community 53 - "villagers.ts"
-Cohesion: 0.22
-Nodes (10): BODY, bubble(), BUBBLES, DYE_PLACEHOLDER, Facing, grid(), Pal, VILLAGER_POSES (+2 more)
+Cohesion: 0.19
+Nodes (12): BODY, bubble(), BUBBLES, DYE_PLACEHOLDER, Facing, grid(), paintCarry(), Pal (+4 more)
 
 ### Community 54 - "SIM · 50 ms tick timeline"
 Cohesion: 0.27
@@ -445,17 +440,17 @@ Nodes (10): Genart Art Pipeline, ART_SCALE 2x, 29-Color Art Palette, Decoded-Pix
 Cohesion: 0.20
 Nodes (10): Processing Pipeline Diagram, Linear Tick-to-Render Pipeline, 1. Input Stage (User IPC Action / 50ms Sim Timer), 2. Clock & Crop Stage (Advance clock ticks, crop growth, season check), 3. Utility AI & Needs Stage (Decay hunger/energy/social, score actions & apply hysteresis), 4. Movement & Economy Stage (A* path step, job assignment, haul/produce/gather execution), 5. Population & Chronicle Stage (Housing capacity births/starvation deaths, log events), 6. Viewport Culling & Broadcast Stage (Cull entities outside camera margin, emit TickSnapshot to watch channel) (+2 more)
 
-### Community 58 - "Option"
-Cohesion: 0.23
-Nodes (6): HaulEndpoint, HaulTask, footprint_tiles(), rotated_footprint(), Vec, Option
+### Community 58 - ".place_building"
+Cohesion: 0.14
+Nodes (15): footprint_tiles(), rotated_footprint(), Vec, completed_farm_advertises_tend_crops_and_villager_works(), demolish_farm_clears_jobs_and_returns_villager_to_idle(), demolish_refunds_cost_and_clears_occupancy(), hut_places_on_grass_and_rejects_water(), place_building_rejects_a_locked_kind() (+7 more)
 
 ### Community 59 - "pathfind.ts"
-Cohesion: 0.39
+Cohesion: 0.36
 Nodes (7): DELTAS, findPath(), heuristic(), IMPASSABLE, pack(), terrainPassable(), unpack()
 
-### Community 60 - "TickSnapshot"
-Cohesion: 0.14
-Nodes (11): CanvasProps, hoverTargetAt(), HoverTargetInput, rotatedFootprint(), catalog, VILLAGER_STATE_LABELS, SnapshotBuffer, resources (+3 more)
+### Community 60 - "types.ts"
+Cohesion: 0.10
+Nodes (19): CanvasProps, hoverTargetAt(), HoverTargetInput, rotatedFootprint(), catalog, VILLAGER_STATE_LABELS, SnapshotBuffer, resources (+11 more)
 
 ### Community 61 - "Overlay (build ghost · selection · hover — every frame in build mode)"
 Cohesion: 0.36
@@ -701,29 +696,45 @@ Nodes (3): VillageSim app icon — Square89x89Logo Windows packaging icon, Villa
 Cohesion: 1.00
 Nodes (3): VillageSim app icon — StoreLogo Windows Store packaging icon, VillageSim windows packaging asset (StoreLogo.png), Yellow circle on green checkerboard VillageSim brand mark
 
-### Community 140 - "String"
-Cohesion: 0.21
-Nodes (6): autosave_rotates_through_three_slots(), BTreeMap, BTreeSet, PathBuf, String, TickSnapshot
+### Community 140 - "props.ts"
+Cohesion: 0.12
+Nodes (16): BOULDER, BUSH, CYPRESS, DEADFALL, DRIFTWOOD, FLOWERS, grid(), MUSHROOM (+8 more)
+
+### Community 141 - "resourceGet"
+Cohesion: 0.28
+Nodes (5): canAfford(), inventoryGet(), inventoryTake(), resourceGet(), resourceSet()
+
+### Community 142 - "Season"
+Cohesion: 0.23
+Nodes (5): Option, Result, Self, String, Season
+
+### Community 144 - ".snapshot"
+Cohesion: 0.22
+Nodes (5): demoStormDamageIndex(), demoWeatherFor(), mixU64(), nearestVillagerId(), villagerById()
+
+### Community 145 - "buildings.rs"
+Cohesion: 0.24
+Nodes (6): Building, BuildState, PlacementResult, PlacementValidity, BTreeMap, String
 
 ## Knowledge Gaps
-- **335 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+330 more)
+- **361 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+356 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **15 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `entry()` connect `chronicle.ts` to `build.ts`?**
-  _High betweenness centrality (0.054) - this node is a cross-community bridge._
-- **Why does `entitySources()` connect `build.ts` to `grid.ts`, `chronicle.ts`?**
-  _High betweenness centrality (0.054) - this node is a cross-community bridge._
-- **Why does `World` connect `World` to `Clock`, `utility.rs`, `world.rs`, `persist.rs`, `chronicle.rs`, `String`, `Villager`, `.villager_mut`, `.generate`, `economy.rs`, `Option`?**
-  _High betweenness centrality (0.054) - this node is a cross-community bridge._
+- **Why does `entry()` connect `rasterizeGrid` to `chronicle.ts`?**
+  _High betweenness centrality (0.057) - this node is a cross-community bridge._
+- **Why does `entitySources()` connect `rasterizeGrid` to `grid.ts`, `build.ts`?**
+  _High betweenness centrality (0.056) - this node is a cross-community bridge._
+- **Why does `World` connect `World` to `Clock`, `utility.rs`, `world.rs`, `persist.rs`, `chronicle.rs`, `.maybe_decide`, `Villager`, `crops.rs`, `buildings.rs`, `.generate`, `economy.rs`, `.place_building`, `weather.rs`?**
+  _High betweenness centrality (0.052) - this node is a cross-community bridge._
+- **Are the 8 inferred relationships involving `Canvas()` (e.g. with `.recordFrame()` and `.setDrawStats()`) actually correct?**
+  _`Canvas()` has 8 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `name`, `private`, `version` to the rest of the system?**
-  _335 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _361 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `World` be split into smaller, more focused modules?**
-  _Cohesion score 0.07120500782472614 - nodes in this community are weakly interconnected._
-- **Should `Clock` be split into smaller, more focused modules?**
-  _Cohesion score 0.05352112676056338 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08591466978375219 - nodes in this community are weakly interconnected._
 - **Should `utility.rs` be split into smaller, more focused modules?**
   _Cohesion score 0.05734767025089606 - nodes in this community are weakly interconnected._

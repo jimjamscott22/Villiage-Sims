@@ -15,35 +15,35 @@
     },
     "bubble.fork": {
       "sheet": "entities",
-      "x": 0,
-      "y": 272,
+      "x": 192,
+      "y": 544,
       "w": 8,
       "h": 8
     },
     "bubble.speech": {
       "sheet": "entities",
-      "x": 8,
-      "y": 272,
+      "x": 200,
+      "y": 544,
       "w": 8,
       "h": 8
     },
     "bubble.tool": {
       "sheet": "entities",
-      "x": 16,
-      "y": 272,
+      "x": 208,
+      "y": 544,
       "w": 8,
       "h": 8
     },
     "bubble.zzz": {
       "sheet": "entities",
-      "x": 24,
-      "y": 272,
+      "x": 216,
+      "y": 544,
       "w": 8,
       "h": 8
     },
     "farm": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 64,
       "w": 16,
       "h": 24,
@@ -55,6 +55,14 @@
       "y": 0,
       "w": 48,
       "h": 48
+    },
+    "fence": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 64,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
     },
     "foam.e": {
       "sheet": "tiles",
@@ -547,6 +555,14 @@
       "w": 16,
       "h": 16
     },
+    "gate": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 64,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
     "granary": {
       "sheet": "entities",
       "x": 0,
@@ -557,7 +573,7 @@
     },
     "hut": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 64,
       "w": 16,
       "h": 32,
@@ -574,21 +590,21 @@
     },
     "prop.boulder": {
       "sheet": "entities",
-      "x": 224,
-      "y": 232,
+      "x": 160,
+      "y": 520,
       "w": 16,
       "h": 16
     },
     "prop.bush": {
       "sheet": "entities",
-      "x": 240,
-      "y": 232,
+      "x": 176,
+      "y": 520,
       "w": 16,
       "h": 16
     },
     "prop.cypress": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 64,
       "w": 16,
       "h": 32,
@@ -596,35 +612,35 @@
     },
     "prop.deadfall": {
       "sheet": "entities",
-      "x": 0,
-      "y": 256,
+      "x": 192,
+      "y": 520,
       "w": 16,
       "h": 16
     },
     "prop.driftwood": {
       "sheet": "entities",
-      "x": 16,
-      "y": 256,
+      "x": 208,
+      "y": 520,
       "w": 16,
       "h": 16
     },
     "prop.flowers": {
       "sheet": "entities",
-      "x": 32,
-      "y": 256,
+      "x": 224,
+      "y": 520,
       "w": 16,
       "h": 16
     },
     "prop.mushroom": {
       "sheet": "entities",
-      "x": 48,
-      "y": 256,
+      "x": 240,
+      "y": 520,
       "w": 16,
       "h": 16
     },
     "prop.palm": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 64,
       "w": 16,
       "h": 32,
@@ -632,7 +648,7 @@
     },
     "prop.peak": {
       "sheet": "entities",
-      "x": 144,
+      "x": 208,
       "y": 64,
       "w": 16,
       "h": 24,
@@ -640,29 +656,29 @@
     },
     "prop.reeds": {
       "sheet": "entities",
-      "x": 64,
-      "y": 256,
+      "x": 0,
+      "y": 544,
       "w": 16,
       "h": 16,
       "frames": 2
     },
     "prop.shoreRock": {
       "sheet": "entities",
-      "x": 96,
-      "y": 256,
+      "x": 32,
+      "y": 544,
       "w": 16,
       "h": 16
     },
     "prop.stump": {
       "sheet": "entities",
-      "x": 112,
-      "y": 256,
+      "x": 48,
+      "y": 544,
       "w": 16,
       "h": 16
     },
     "scaffold.1": {
       "sheet": "entities",
-      "x": 160,
+      "x": 224,
       "y": 64,
       "w": 16,
       "h": 24,
@@ -670,7 +686,7 @@
     },
     "scaffold.2": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 64,
       "w": 32,
       "h": 40,
@@ -683,6 +699,22 @@
       "w": 48,
       "h": 56,
       "anchorY": 8
+    },
+    "signpost": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 64,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "storehouse": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 64,
+      "w": 32,
+      "h": 48,
+      "anchorY": 16
     },
     "terrain.deepWater.0": {
       "sheet": "tiles",
@@ -980,8 +1012,8 @@
     },
     "vfx.dust": {
       "sheet": "entities",
-      "x": 128,
-      "y": 256,
+      "x": 64,
+      "y": 544,
       "w": 16,
       "h": 16,
       "frames": 3,
@@ -989,584 +1021,1952 @@
     },
     "vfx.smoke": {
       "sheet": "entities",
-      "x": 176,
-      "y": 64,
+      "x": 0,
+      "y": 112,
       "w": 16,
       "h": 24,
       "frames": 3
     },
-    "villager.e.idle.0": {
+    "villager.e.carry.idle.0": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.idle.1": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.idle.2": {
+      "sheet": "entities",
+      "x": 80,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.idle.3": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.idle.4": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.idle.5": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.idle.6": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.idle.7": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.idle.8": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk0.0": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk0.1": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk0.2": {
       "sheet": "entities",
       "x": 224,
-      "y": 64,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk0.3": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 112,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk0.4": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk0.5": {
+      "sheet": "entities",
+      "x": 16,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk0.6": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk0.7": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk0.8": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk1.0": {
+      "sheet": "entities",
+      "x": 80,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk1.1": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk1.2": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk1.3": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk1.4": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk1.5": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk1.6": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk1.7": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk1.8": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk2.0": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk2.1": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 136,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk2.2": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk2.3": {
+      "sheet": "entities",
+      "x": 16,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk2.4": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk2.5": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk2.6": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk2.7": {
+      "sheet": "entities",
+      "x": 80,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk2.8": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk3.0": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk3.1": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk3.2": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk3.3": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk3.4": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk3.5": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk3.6": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk3.7": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.carry.walk3.8": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 160,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.idle.0": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.idle.1": {
       "sheet": "entities",
-      "x": 240,
-      "y": 64,
+      "x": 16,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.idle.2": {
       "sheet": "entities",
-      "x": 0,
-      "y": 112,
+      "x": 32,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.idle.3": {
       "sheet": "entities",
-      "x": 16,
-      "y": 112,
+      "x": 48,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.idle.4": {
       "sheet": "entities",
-      "x": 32,
-      "y": 112,
+      "x": 64,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.idle.5": {
       "sheet": "entities",
-      "x": 48,
-      "y": 112,
+      "x": 80,
+      "y": 184,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.idle.6": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 184,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.idle.7": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 184,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.idle.8": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk0.0": {
       "sheet": "entities",
-      "x": 64,
-      "y": 112,
+      "x": 144,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk0.1": {
       "sheet": "entities",
-      "x": 80,
-      "y": 112,
+      "x": 160,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk0.2": {
       "sheet": "entities",
-      "x": 96,
-      "y": 112,
+      "x": 176,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk0.3": {
       "sheet": "entities",
-      "x": 112,
-      "y": 112,
+      "x": 192,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk0.4": {
       "sheet": "entities",
-      "x": 128,
-      "y": 112,
+      "x": 208,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk0.5": {
       "sheet": "entities",
-      "x": 144,
-      "y": 112,
+      "x": 224,
+      "y": 184,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk0.6": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 184,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk0.7": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 208,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk0.8": {
+      "sheet": "entities",
+      "x": 16,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk1.0": {
       "sheet": "entities",
-      "x": 160,
-      "y": 112,
+      "x": 32,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk1.1": {
       "sheet": "entities",
-      "x": 176,
-      "y": 112,
+      "x": 48,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk1.2": {
       "sheet": "entities",
-      "x": 192,
-      "y": 112,
+      "x": 64,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk1.3": {
       "sheet": "entities",
-      "x": 208,
-      "y": 112,
+      "x": 80,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk1.4": {
       "sheet": "entities",
-      "x": 224,
-      "y": 112,
+      "x": 96,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk1.5": {
       "sheet": "entities",
-      "x": 240,
-      "y": 112,
+      "x": 112,
+      "y": 208,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk1.6": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 208,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk1.7": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 208,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk1.8": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk2.0": {
       "sheet": "entities",
-      "x": 0,
-      "y": 136,
+      "x": 176,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk2.1": {
       "sheet": "entities",
-      "x": 16,
-      "y": 136,
+      "x": 192,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk2.2": {
       "sheet": "entities",
-      "x": 32,
-      "y": 136,
+      "x": 208,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk2.3": {
       "sheet": "entities",
-      "x": 48,
-      "y": 136,
+      "x": 224,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk2.4": {
       "sheet": "entities",
-      "x": 64,
-      "y": 136,
+      "x": 240,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk2.5": {
       "sheet": "entities",
-      "x": 80,
-      "y": 136,
+      "x": 0,
+      "y": 232,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk2.6": {
+      "sheet": "entities",
+      "x": 16,
+      "y": 232,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk2.7": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 232,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk2.8": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk3.0": {
       "sheet": "entities",
-      "x": 96,
-      "y": 136,
+      "x": 64,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk3.1": {
       "sheet": "entities",
-      "x": 112,
-      "y": 136,
+      "x": 80,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk3.2": {
       "sheet": "entities",
-      "x": 128,
-      "y": 136,
+      "x": 96,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk3.3": {
       "sheet": "entities",
-      "x": 144,
-      "y": 136,
+      "x": 112,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk3.4": {
       "sheet": "entities",
-      "x": 160,
-      "y": 136,
+      "x": 128,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk3.5": {
       "sheet": "entities",
+      "x": 144,
+      "y": 232,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk3.6": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 232,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk3.7": {
+      "sheet": "entities",
       "x": 176,
-      "y": 136,
+      "y": 232,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.e.walk3.8": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.lie.0": {
       "sheet": "entities",
-      "x": 192,
-      "y": 136,
+      "x": 208,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.lie.1": {
       "sheet": "entities",
-      "x": 208,
-      "y": 136,
+      "x": 224,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.lie.2": {
       "sheet": "entities",
-      "x": 224,
-      "y": 136,
+      "x": 240,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.lie.3": {
       "sheet": "entities",
-      "x": 240,
-      "y": 136,
+      "x": 0,
+      "y": 256,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.lie.4": {
       "sheet": "entities",
-      "x": 0,
-      "y": 160,
+      "x": 16,
+      "y": 256,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.lie.5": {
       "sheet": "entities",
+      "x": 32,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.lie.6": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.lie.7": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.lie.8": {
+      "sheet": "entities",
+      "x": 80,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.idle.0": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.idle.1": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.idle.2": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.idle.3": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.idle.4": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.idle.5": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.idle.6": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.idle.7": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.idle.8": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk0.0": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 256,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk0.1": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk0.2": {
+      "sheet": "entities",
       "x": 16,
-      "y": 160,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk0.3": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk0.4": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk0.5": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk0.6": {
+      "sheet": "entities",
+      "x": 80,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk0.7": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk0.8": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk1.0": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk1.1": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk1.2": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk1.3": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk1.4": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk1.5": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk1.6": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk1.7": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 280,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk1.8": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk2.0": {
+      "sheet": "entities",
+      "x": 16,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk2.1": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk2.2": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk2.3": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk2.4": {
+      "sheet": "entities",
+      "x": 80,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk2.5": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk2.6": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk2.7": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk2.8": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk3.0": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk3.1": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk3.2": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk3.3": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk3.4": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk3.5": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 304,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk3.6": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 328,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk3.7": {
+      "sheet": "entities",
+      "x": 16,
+      "y": 328,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.carry.walk3.8": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.idle.0": {
       "sheet": "entities",
-      "x": 32,
-      "y": 160,
+      "x": 48,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.idle.1": {
       "sheet": "entities",
-      "x": 48,
-      "y": 160,
+      "x": 64,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.idle.2": {
       "sheet": "entities",
-      "x": 64,
-      "y": 160,
+      "x": 80,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.idle.3": {
       "sheet": "entities",
-      "x": 80,
-      "y": 160,
+      "x": 96,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.idle.4": {
       "sheet": "entities",
-      "x": 96,
-      "y": 160,
+      "x": 112,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.idle.5": {
       "sheet": "entities",
-      "x": 112,
-      "y": 160,
+      "x": 128,
+      "y": 328,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.idle.6": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 328,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.idle.7": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 328,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.idle.8": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk0.0": {
       "sheet": "entities",
-      "x": 128,
-      "y": 160,
+      "x": 192,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk0.1": {
       "sheet": "entities",
-      "x": 144,
-      "y": 160,
+      "x": 208,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk0.2": {
       "sheet": "entities",
-      "x": 160,
-      "y": 160,
+      "x": 224,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk0.3": {
       "sheet": "entities",
-      "x": 176,
-      "y": 160,
+      "x": 240,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk0.4": {
       "sheet": "entities",
-      "x": 192,
-      "y": 160,
+      "x": 0,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk0.5": {
       "sheet": "entities",
-      "x": 208,
-      "y": 160,
+      "x": 16,
+      "y": 352,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk0.6": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 352,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk0.7": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 352,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk0.8": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk1.0": {
       "sheet": "entities",
-      "x": 224,
-      "y": 160,
+      "x": 80,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk1.1": {
       "sheet": "entities",
-      "x": 240,
-      "y": 160,
+      "x": 96,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk1.2": {
       "sheet": "entities",
-      "x": 0,
-      "y": 184,
+      "x": 112,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk1.3": {
       "sheet": "entities",
-      "x": 16,
-      "y": 184,
+      "x": 128,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk1.4": {
       "sheet": "entities",
-      "x": 32,
-      "y": 184,
+      "x": 144,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk1.5": {
       "sheet": "entities",
-      "x": 48,
-      "y": 184,
+      "x": 160,
+      "y": 352,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk1.6": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 352,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk1.7": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 352,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk1.8": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk2.0": {
       "sheet": "entities",
-      "x": 64,
-      "y": 184,
+      "x": 224,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk2.1": {
       "sheet": "entities",
-      "x": 80,
-      "y": 184,
+      "x": 240,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk2.2": {
       "sheet": "entities",
-      "x": 96,
-      "y": 184,
+      "x": 0,
+      "y": 376,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk2.3": {
       "sheet": "entities",
-      "x": 112,
-      "y": 184,
+      "x": 16,
+      "y": 376,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk2.4": {
       "sheet": "entities",
-      "x": 128,
-      "y": 184,
+      "x": 32,
+      "y": 376,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk2.5": {
       "sheet": "entities",
-      "x": 144,
-      "y": 184,
+      "x": 48,
+      "y": 376,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk2.6": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 376,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk2.7": {
+      "sheet": "entities",
+      "x": 80,
+      "y": 376,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk2.8": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 376,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk3.0": {
       "sheet": "entities",
-      "x": 160,
-      "y": 184,
+      "x": 112,
+      "y": 376,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk3.1": {
       "sheet": "entities",
-      "x": 176,
-      "y": 184,
+      "x": 128,
+      "y": 376,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk3.2": {
       "sheet": "entities",
-      "x": 192,
-      "y": 184,
+      "x": 144,
+      "y": 376,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk3.3": {
       "sheet": "entities",
-      "x": 208,
-      "y": 184,
+      "x": 160,
+      "y": 376,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk3.4": {
       "sheet": "entities",
-      "x": 224,
-      "y": 184,
+      "x": 176,
+      "y": 376,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk3.5": {
       "sheet": "entities",
+      "x": 192,
+      "y": 376,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk3.6": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 376,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk3.7": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 376,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.n.walk3.8": {
+      "sheet": "entities",
       "x": 240,
-      "y": 184,
+      "y": 376,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.idle.0": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.idle.1": {
+      "sheet": "entities",
+      "x": 16,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.idle.2": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.idle.3": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.idle.4": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.idle.5": {
+      "sheet": "entities",
+      "x": 80,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.idle.6": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.idle.7": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.idle.8": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk0.0": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk0.1": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk0.2": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk0.3": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk0.4": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk0.5": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk0.6": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 400,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk0.7": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk0.8": {
+      "sheet": "entities",
+      "x": 16,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk1.0": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk1.1": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk1.2": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk1.3": {
+      "sheet": "entities",
+      "x": 80,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk1.4": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk1.5": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk1.6": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk1.7": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk1.8": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk2.0": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk2.1": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk2.2": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk2.3": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk2.4": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 424,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk2.5": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk2.6": {
+      "sheet": "entities",
+      "x": 16,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk2.7": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk2.8": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk3.0": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk3.1": {
+      "sheet": "entities",
+      "x": 80,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk3.2": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk3.3": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk3.4": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk3.5": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk3.6": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk3.7": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 448,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.carry.walk3.8": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 448,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.idle.0": {
       "sheet": "entities",
-      "x": 0,
-      "y": 208,
+      "x": 208,
+      "y": 448,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.idle.1": {
       "sheet": "entities",
-      "x": 16,
-      "y": 208,
+      "x": 224,
+      "y": 448,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.idle.2": {
       "sheet": "entities",
-      "x": 32,
-      "y": 208,
+      "x": 240,
+      "y": 448,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.idle.3": {
       "sheet": "entities",
-      "x": 48,
-      "y": 208,
+      "x": 0,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.idle.4": {
       "sheet": "entities",
-      "x": 64,
-      "y": 208,
+      "x": 16,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.idle.5": {
       "sheet": "entities",
+      "x": 32,
+      "y": 472,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.idle.6": {
+      "sheet": "entities",
+      "x": 48,
+      "y": 472,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.idle.7": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 472,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.idle.8": {
+      "sheet": "entities",
       "x": 80,
-      "y": 208,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
@@ -1574,7 +2974,7 @@
     "villager.s.walk0.0": {
       "sheet": "entities",
       "x": 96,
-      "y": 208,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
@@ -1582,7 +2982,7 @@
     "villager.s.walk0.1": {
       "sheet": "entities",
       "x": 112,
-      "y": 208,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
@@ -1590,7 +2990,7 @@
     "villager.s.walk0.2": {
       "sheet": "entities",
       "x": 128,
-      "y": 208,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
@@ -1598,7 +2998,7 @@
     "villager.s.walk0.3": {
       "sheet": "entities",
       "x": 144,
-      "y": 208,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
@@ -1606,7 +3006,7 @@
     "villager.s.walk0.4": {
       "sheet": "entities",
       "x": 160,
-      "y": 208,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
@@ -1614,158 +3014,254 @@
     "villager.s.walk0.5": {
       "sheet": "entities",
       "x": 176,
-      "y": 208,
+      "y": 472,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk0.6": {
+      "sheet": "entities",
+      "x": 192,
+      "y": 472,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk0.7": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 472,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk0.8": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk1.0": {
       "sheet": "entities",
-      "x": 192,
-      "y": 208,
+      "x": 240,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk1.1": {
       "sheet": "entities",
-      "x": 208,
-      "y": 208,
+      "x": 0,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk1.2": {
       "sheet": "entities",
-      "x": 224,
-      "y": 208,
+      "x": 16,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk1.3": {
       "sheet": "entities",
-      "x": 240,
-      "y": 208,
+      "x": 32,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk1.4": {
       "sheet": "entities",
-      "x": 0,
-      "y": 232,
+      "x": 48,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk1.5": {
       "sheet": "entities",
-      "x": 16,
-      "y": 232,
+      "x": 64,
+      "y": 496,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk1.6": {
+      "sheet": "entities",
+      "x": 80,
+      "y": 496,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk1.7": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 496,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk1.8": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk2.0": {
       "sheet": "entities",
-      "x": 32,
-      "y": 232,
+      "x": 128,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk2.1": {
       "sheet": "entities",
-      "x": 48,
-      "y": 232,
+      "x": 144,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk2.2": {
       "sheet": "entities",
-      "x": 64,
-      "y": 232,
+      "x": 160,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk2.3": {
       "sheet": "entities",
-      "x": 80,
-      "y": 232,
+      "x": 176,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk2.4": {
       "sheet": "entities",
-      "x": 96,
-      "y": 232,
+      "x": 192,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk2.5": {
       "sheet": "entities",
-      "x": 112,
-      "y": 232,
+      "x": 208,
+      "y": 496,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk2.6": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 496,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk2.7": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 496,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk2.8": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 520,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk3.0": {
       "sheet": "entities",
-      "x": 128,
-      "y": 232,
+      "x": 16,
+      "y": 520,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk3.1": {
       "sheet": "entities",
-      "x": 144,
-      "y": 232,
+      "x": 32,
+      "y": 520,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk3.2": {
       "sheet": "entities",
-      "x": 160,
-      "y": 232,
+      "x": 48,
+      "y": 520,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk3.3": {
       "sheet": "entities",
-      "x": 176,
-      "y": 232,
+      "x": 64,
+      "y": 520,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk3.4": {
       "sheet": "entities",
-      "x": 192,
-      "y": 232,
+      "x": 80,
+      "y": 520,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk3.5": {
       "sheet": "entities",
-      "x": 208,
-      "y": 232,
+      "x": 96,
+      "y": 520,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk3.6": {
+      "sheet": "entities",
+      "x": 112,
+      "y": 520,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk3.7": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 520,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk3.8": {
+      "sheet": "entities",
+      "x": 144,
+      "y": 520,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "well": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 64,
       "w": 16,
       "h": 32,
@@ -1773,29 +3269,29 @@
     },
     "wheat.0": {
       "sheet": "entities",
-      "x": 176,
-      "y": 256,
+      "x": 112,
+      "y": 544,
       "w": 16,
       "h": 16
     },
     "wheat.1": {
       "sheet": "entities",
-      "x": 192,
-      "y": 256,
+      "x": 128,
+      "y": 544,
       "w": 16,
       "h": 16
     },
     "wheat.2": {
       "sheet": "entities",
-      "x": 208,
-      "y": 256,
+      "x": 144,
+      "y": 544,
       "w": 16,
       "h": 16
     },
     "wheat.3": {
       "sheet": "entities",
-      "x": 224,
-      "y": 256,
+      "x": 160,
+      "y": 544,
       "w": 16,
       "h": 16,
       "frames": 2

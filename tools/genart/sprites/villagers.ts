@@ -13,6 +13,9 @@ export const VILLAGER_DYES = [
   P.wheat,
   P.vegDark,
   P.terraDark,
+  P.vegMid,
+  P.seaDeep,
+  P.terraLight,
 ] as const;
 
 type Pal = Record<string, string | null>;
@@ -43,7 +46,58 @@ const BODY: Pal = {
 
 type Facing = 'n' | 'e' | 's';
 
-function villagerPose(facing: Facing, walkFrame: number | 'idle' | 'lie'): SpriteGrid {
+/**
+ * Burlap sack held by a hauling villager, plus the arms that grip it. Painted over
+ * the torso, so it replaces the default arms rather than adding to them. The sack
+ * reuses the body palette's sand keys — no new colors enter the sprite.
+ */
+function paintCarry(facing: Facing, set: (x: number, y: number, k: string) => void): void {
+  if (facing === 's') {
+    // Sack held against the belly; dye stays visible at the chest (y 8..9) and hem (y 14).
+    for (let x = 5; x <= 10; x += 1) set(x, 10, 'c');
+    for (let y = 11; y <= 12; y += 1) {
+      for (let x = 4; x <= 11; x += 1) set(x, y, 'k');
+    }
+    for (let x = 5; x <= 10; x += 1) set(x, 13, 'k');
+    // Weave texture so the sack does not read as a flat block.
+    set(6, 12, 'c');
+    set(9, 11, 'c');
+    // Arms wrapped around the load.
+    set(3, 11, 's');
+    set(3, 12, 's');
+    set(12, 11, 's');
+    set(12, 12, 's');
+    return;
+  }
+
+  if (facing === 'e') {
+    // Sack carried out front, clear of the silhouette.
+    for (let x = 12; x <= 14; x += 1) set(x, 9, 'c');
+    for (let y = 10; y <= 12; y += 1) {
+      for (let x = 11; x <= 15; x += 1) set(x, y, 'k');
+    }
+    for (let x = 12; x <= 14; x += 1) set(x, 13, 'k');
+    set(13, 11, 'c');
+    set(11, 9, 's');
+    return;
+  }
+
+  // North — the sack is occluded by the body, so carrying reads from the shoulder
+  // strap across the back and the sack bulging out at either side.
+  for (let x = 5; x <= 10; x += 1) set(x, 9, 'c');
+  set(4, 10, 'c');
+  set(11, 10, 'c');
+  for (let y = 11; y <= 12; y += 1) {
+    set(4, y, 'k');
+    set(11, y, 'k');
+  }
+}
+
+function villagerPose(
+  facing: Facing,
+  walkFrame: number | 'idle' | 'lie',
+  carry = false,
+): SpriteGrid {
   if (walkFrame === 'lie') {
     return grid(16, 24, BODY, (set) => {
       // Lying on side
@@ -96,8 +150,10 @@ function villagerPose(facing: Facing, walkFrame: number | 'idle' | 'lie'): Sprit
       }
     }
 
-    // Arms
-    if (facing === 'e') {
+    // Arms — a carried load occupies both hands, so it supplies its own.
+    if (carry) {
+      paintCarry(facing, set);
+    } else if (facing === 'e') {
       set(11, 9, 's');
       set(12, 10, 's');
       set(12, 11, 's');
@@ -149,10 +205,13 @@ export const VILLAGER_POSES: Record<string, SpriteGrid> = {};
 
 for (const facing of ['n', 'e', 's'] as const) {
   VILLAGER_POSES[`${facing}.idle`] = villagerPose(facing, 'idle');
+  VILLAGER_POSES[`${facing}.carry.idle`] = villagerPose(facing, 'idle', true);
   for (let f = 0; f < 4; f += 1) {
     VILLAGER_POSES[`${facing}.walk${f}`] = villagerPose(facing, f);
+    VILLAGER_POSES[`${facing}.carry.walk${f}`] = villagerPose(facing, f, true);
   }
 }
+// No carry variant for `lie`: nobody hauls in their sleep.
 VILLAGER_POSES.lie = villagerPose('s', 'lie');
 
 function bubble(paint: (set: (x: number, y: number, k: string) => void) => void): SpriteGrid {

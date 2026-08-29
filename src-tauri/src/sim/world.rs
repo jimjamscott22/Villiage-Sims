@@ -656,6 +656,7 @@ impl World {
                     x: v.pos.0,
                     y: v.pos.1,
                     state: v.state.as_u8(),
+                    carrying: v.carrying.is_some(),
                 })
                 .collect(),
             buildings: self.building_views(),

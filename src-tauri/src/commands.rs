@@ -257,7 +257,7 @@ mod tests {
     fn app_state_holds_catalog() {
         let (tx, _rx) = mpsc::channel();
         let state = AppState::new(Catalog::load_builtin().unwrap(), tx);
-        assert_eq!(state.catalog.buildings.len(), 6);
+        assert_eq!(state.catalog.buildings.len(), 10);
         assert_eq!(state.catalog.crops.len(), 1);
     }
 

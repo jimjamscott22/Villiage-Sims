@@ -91,5 +91,50 @@
     "unlock_conditions": {
       "min_population": 4
     }
+  },
+  {
+    "id": "fence",
+    "name": "Fence",
+    "footprint": [1, 1],
+    "cost": { "wood": 2 },
+    "build_ticks": 4,
+    "category": "decor",
+    "valid_terrain": ["grass", "sand", "rock"],
+    "jobs": []
+  },
+  {
+    "id": "gate",
+    "name": "Gate",
+    "footprint": [1, 1],
+    "cost": { "wood": 4 },
+    "build_ticks": 6,
+    "category": "decor",
+    "valid_terrain": ["grass", "sand", "rock"],
+    "jobs": []
+  },
+  {
+    "id": "signpost",
+    "name": "Signpost",
+    "footprint": [1, 1],
+    "cost": { "wood": 3 },
+    "build_ticks": 5,
+    "category": "decor",
+    "valid_terrain": ["grass", "sand", "rock"],
+    "jobs": []
+  },
+  {
+    "id": "storehouse",
+    "name": "Storehouse",
+    "footprint": [2, 2],
+    "cost": { "wood": 40, "stone": 10 },
+    "build_ticks": 60,
+    "category": "storage",
+    "stores": ["wood", "stone"],
+    "capacity": 400,
+    "valid_terrain": ["grass", "sand"],
+    "jobs": [{ "kind": "haul", "slots": 1 }],
+    "unlock_conditions": {
+      "min_population": 5
+    }
   }
 ]
