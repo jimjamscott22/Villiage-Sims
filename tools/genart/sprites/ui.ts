@@ -115,7 +115,7 @@ export const FONT_GLYPH_ORDER =
 function glyphGrid(char: string): SpriteGrid {
   const pattern = GLYPHS[char];
   if (!pattern) throw new Error(`Missing glyph for ${char}`);
-  const palette: Pal = { i: P.ink };
+  const palette: Pal = { i: P.whitewash };
   return {
     size: [6, 7],
     palette: { '.': null, ...palette },
@@ -145,7 +145,7 @@ export function makeFontStrip(): SpriteGrid {
   });
   return {
     size: [width, height],
-    palette: { '.': null, i: P.ink },
+    palette: { '.': null, i: P.whitewash },
     rows: cells.map((row) => row.join('')),
   };
 }

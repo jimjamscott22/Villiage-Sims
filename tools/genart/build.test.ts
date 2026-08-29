@@ -66,9 +66,11 @@ describe('buildAtlas', () => {
     expect(atlas.manifest.cells['bubble.tool']).toBeDefined();
   });
 
-  it('marks animated buildings with frame counts', () => {
+  it('marks animated buildings and VFX with frame counts', () => {
     expect(atlas.manifest.cells.mill.frames).toBe(4);
-    expect(atlas.manifest.cells.bakery.frames).toBe(3);
+    expect(atlas.manifest.cells.bakery.frames).toBeUndefined();
+    expect(atlas.manifest.cells['vfx.smoke'].frames).toBe(3);
+    expect(atlas.manifest.cells['vfx.dust'].frames).toBe(3);
     expect(atlas.manifest.cells['wheat.3'].frames).toBe(2);
   });
 

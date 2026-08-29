@@ -29,11 +29,13 @@ export function ClockBar({ clock, onSetSpeed }: ClockBarProps) {
 
   return (
     <div className="flex items-center gap-3 text-xs text-white/80">
-      <span className="pixel-icon" style={uiIconStyle(seasonIcon)} title={season} />
-      <PixelText text={clockText} />
-      <span className="text-white/55" title="Weather">
-        <PixelText text={weather.toUpperCase()} />
-      </span>
+      <div className="pixel-chip flex items-center gap-2 px-2 py-1">
+        <span className="pixel-icon" style={uiIconStyle(seasonIcon)} title={season} />
+        <PixelText text={clockText} />
+        <span title="Weather">
+          <PixelText text={weather.toUpperCase()} />
+        </span>
+      </div>
       <div className="flex gap-1">
         {SPEEDS.map((entry) => {
           const active = clock?.speed === entry.value;

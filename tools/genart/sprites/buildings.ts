@@ -223,7 +223,7 @@ function millFrame(sailOffset: number): SpriteGrid {
 
 export const MILL_FRAMES: SpriteGrid[] = [0, 1, 2, 3].map(millFrame);
 
-function bakeryFrame(smoke: number): SpriteGrid {
+function bakeryFrame(_smoke: number): SpriteGrid {
   return grid(32, 48, {
     t: P.terraMid,
     d: P.terraDark,
@@ -232,20 +232,8 @@ function bakeryFrame(smoke: number): SpriteGrid {
     u: P.shutter,
     i: P.ink,
     c: P.sandShadow,
-    o: P.stoneLight,
-    p: P.stonePale,
   }, (set) => {
-    const sy = 6 - smoke * 2;
-    for (let y = sy; y <= sy + 3; y += 1) {
-      for (let x = 20; x <= 23; x += 1) set(x, y, y === sy || y === sy + 3 ? 'o' : 'p');
-    }
-    if (smoke > 0) {
-      for (let y = sy - 3; y <= sy; y += 1) {
-        set(21, y, 'o');
-        set(22, y, 'o');
-      }
-    }
-    // Chimney
+    // Chimney — smoke is a separate vfx.smoke overlay in the renderer.
     for (let y = 8; y <= 18; y += 1) {
       for (let x = 20; x <= 23; x += 1) {
         set(x, y, x === 20 || x === 23 || y === 8 ? 'i' : 's');
@@ -273,7 +261,7 @@ function bakeryFrame(smoke: number): SpriteGrid {
   });
 }
 
-export const BAKERY_FRAMES: SpriteGrid[] = [0, 1, 2].map(bakeryFrame);
+export const BAKERY: SpriteGrid = bakeryFrame(0);
 
 /** 1×1 well — stone drum, timber frame, shingled cap. 16×32, anchorY 16. */
 export const WELL: SpriteGrid = grid(16, 32, {
@@ -356,7 +344,7 @@ export const BUILDING_SPRITES: Record<string, BuildingSprite> = {
   'farm.field': { grid: FARM_FIELD, anchorY: 0 },
   granary: { grid: GRANARY, anchorY: 16 },
   mill: { grid: MILL_FRAMES[0], anchorY: 32, frames: MILL_FRAMES },
-  bakery: { grid: BAKERY_FRAMES[0], anchorY: 16, frames: BAKERY_FRAMES },
+  bakery: { grid: BAKERY, anchorY: 16 },
   well: { grid: WELL, anchorY: 16 },
   'scaffold.1': { grid: SCAFFOLD_1, anchorY: 8 },
   'scaffold.2': { grid: SCAFFOLD_2, anchorY: 8 },

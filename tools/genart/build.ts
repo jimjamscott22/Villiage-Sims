@@ -6,6 +6,7 @@ import { Raster } from './raster';
 import { BUILDING_SPRITES } from './sprites/buildings';
 import { CROP_SPRITES } from './sprites/crops';
 import { PROP_SPRITES } from './sprites/props';
+import { VFX_SPRITES } from './sprites/vfx';
 import {
   BASE_TERRAINS,
   EDGES,
@@ -104,6 +105,9 @@ function entitySources(): Source[] {
     sources.push(fromSprite(key, entry));
   }
   for (const [key, entry] of Object.entries(PROP_SPRITES)) {
+    sources.push(fromSprite(key, entry));
+  }
+  for (const [key, entry] of Object.entries(VFX_SPRITES)) {
     sources.push(fromSprite(key, entry));
   }
 

@@ -39,6 +39,7 @@ export function SegmentedBar({ label, value, segments = 10 }: SegmentedBarProps)
               height: NOTCH_H,
               backgroundImage: 'url(/art/ui.png)',
               backgroundPosition: index < filled ? 'var(--bar-fill)' : 'var(--bar-empty)',
+              backgroundSize: 'var(--bar-size)',
               imageRendering: 'pixelated',
             }}
           />

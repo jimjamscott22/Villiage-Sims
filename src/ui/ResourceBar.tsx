@@ -20,17 +20,17 @@ const ENTRIES: Array<{ key: keyof ResourceTotals; label: string; icon: string }>
 export function ResourceBar({ resources, population, housingCapacity }: ResourceBarProps) {
   return (
     <div
-      className="pixel-panel flex shrink-0 items-center gap-4 px-4 py-2 text-xs text-white/80"
+      className="pixel-panel flex shrink-0 items-center gap-2 px-4 py-2 text-xs text-white/80"
       data-testid="resource-bar"
     >
       {population != null && housingCapacity != null && (
-        <div className="flex items-center gap-2 border-r border-white/10 pr-3">
-          <span className="text-white/45 text-[11px]">Pop</span>
+        <div className="pixel-chip flex items-center gap-2 px-2 py-1">
+          <span className="text-white/60 text-[11px]">Pop</span>
           <PixelText text={`${population}/${housingCapacity}`} />
         </div>
       )}
       {ENTRIES.map(({ key, label, icon }) => (
-        <div key={key} className="flex items-center gap-1.5" title={label}>
+        <div key={key} className="pixel-chip flex items-center gap-1.5 px-2 py-1" title={label}>
           <span className="pixel-icon" style={uiIconStyle(icon)} />
           <PixelText text={resources?.[key] != null ? String(resources[key]) : '-'} />
         </div>

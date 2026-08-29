@@ -35,6 +35,24 @@ const buildings: BuildingDef[] = [
     category: 'production',
     validTerrain: ['grass'],
   },
+  {
+    id: 'mill',
+    name: 'Mill',
+    footprint: [2, 2],
+    cost: {},
+    buildTicks: 1,
+    category: 'production',
+    validTerrain: ['grass'],
+  },
+  {
+    id: 'bakery',
+    name: 'Bakery',
+    footprint: [2, 1],
+    cost: {},
+    buildTicks: 1,
+    category: 'production',
+    validTerrain: ['grass'],
+  },
 ];
 
 const crops: CropDef[] = [
@@ -232,6 +250,76 @@ describe('buildDrawList', () => {
       atlas,
     });
     expect(list.find((e) => e.id === 'p:4,4')?.key).toBe('prop.cypress');
+  });
+
+  it('anchors animated VFX on completed mill and bakery buildings', () => {
+    const list = buildDrawList({
+      snapshot: snapshot({
+        buildings: [
+          { id: 10, kind: 2, x: 4, y: 4, rot: 0, state: 2, progress: 100 },
+          { id: 11, kind: 3, x: 8, y: 4, rot: 0, state: 2, progress: 100 },
+        ],
+      }),
+      catalog: { buildings, crops },
+      props: [],
+      tileSize: 32,
+      tick: 16,
+      reduceMotion: false,
+      selectedBuildingId: null,
+      selectedVillagerId: null,
+      lastFacing,
+      atlas,
+    });
+    expect(list.find((e) => e.id === 'vfx:10')?.key).toBe('vfx.dust');
+    expect(list.find((e) => e.id === 'vfx:11')?.key).toBe('vfx.smoke');
+  });
+
+  it('skips building VFX while under construction', () => {
+    const list = buildDrawList({
+      snapshot: snapshot({
+        buildings: [{ id: 12, kind: 3, x: 2, y: 2, rot: 0, state: 1, progress: 20 }],
+      }),
+      catalog: { buildings, crops },
+      props: [],
+      tileSize: 32,
+      tick: 0,
+      reduceMotion: false,
+      selectedBuildingId: null,
+      selectedVillagerId: null,
+      lastFacing,
+      atlas,
+    });
+    expect(list.find((e) => e.id === 'vfx:12')).toBeUndefined();
+  });
+
+  it('hides seasonal decor outside its season', () => {
+    const summer = buildDrawList({
+      snapshot: snapshot({ clock: { minute: 0, day: 1, season: 1, year: 1, speed: 1, weather: 0 } }),
+      catalog: { buildings, crops },
+      props: [{ x: 5, y: 5, key: 'prop.flowers', decor: true, season: 0 }],
+      tileSize: 32,
+      tick: 0,
+      reduceMotion: false,
+      selectedBuildingId: null,
+      selectedVillagerId: null,
+      lastFacing,
+      atlas,
+    });
+    expect(summer.find((e) => e.id === 'p:5,5')).toBeUndefined();
+
+    const spring = buildDrawList({
+      snapshot: snapshot({ clock: { minute: 0, day: 1, season: 0, year: 1, speed: 1, weather: 0 } }),
+      catalog: { buildings, crops },
+      props: [{ x: 5, y: 5, key: 'prop.flowers', decor: true, season: 0 }],
+      tileSize: 32,
+      tick: 0,
+      reduceMotion: false,
+      selectedBuildingId: null,
+      selectedVillagerId: null,
+      lastFacing,
+      atlas,
+    });
+    expect(spring.find((e) => e.id === 'p:5,5')?.key).toBe('prop.flowers');
   });
 
   it('hides decor scatter under a building footprint but keeps it elsewhere', () => {

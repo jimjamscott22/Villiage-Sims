@@ -5,7 +5,7 @@ import {
   glyphBackgroundPosition,
   normalizePixelText,
 } from './font';
-import { fontStripOrigin, UI_SHEET_URL } from './pixelUi';
+import { fontStripOrigin, sheetBgSize, UI_SHEET_URL } from './pixelUi';
 
 interface PixelTextProps {
   text: string;
@@ -15,6 +15,7 @@ interface PixelTextProps {
 export function PixelText({ text, className = '' }: PixelTextProps) {
   const normalized = normalizePixelText(text);
   const origin = fontStripOrigin();
+  const backgroundSize = sheetBgSize('ui', FONT_SCALE);
 
   return (
     <span
@@ -36,6 +37,7 @@ export function PixelText({ text, className = '' }: PixelTextProps) {
               height: GLYPH_HEIGHT * FONT_SCALE,
               backgroundImage: `url(${UI_SHEET_URL})`,
               backgroundPosition: `${bgX}px ${bgY}px`,
+              backgroundSize,
               imageRendering: 'pixelated',
             }}
           />

@@ -140,6 +140,128 @@ function reeds(sway: number): SpriteGrid {
 export const REEDS_SWAY: SpriteGrid[] = [reeds(0), reeds(1)];
 
 /** Coastal palm. 16×32, anchorY 16. */
+/** Spring wildflower patch. 16×16, anchorY 0 — wheat + terra accents on pale grass. */
+export const FLOWERS: SpriteGrid = grid(16, 16, {
+  g: P.vegPale,
+  v: P.vegLight,
+  m: P.vegMid,
+  w: P.wheat,
+  t: P.terraMid,
+  d: P.terraDark,
+  i: P.ink,
+}, (set) => {
+  for (let y = 10; y <= 13; y += 1) {
+    for (let x = 4; x <= 11; x += 1) set(x, y, y === 13 ? 'm' : 'v');
+  }
+  for (const [fx, fy, c] of [[5, 8, 'w'], [8, 7, 't'], [10, 9, 'd'], [6, 10, 'g'], [11, 8, 'w']]) {
+    set(fx, fy, c);
+    set(fx, fy - 1, 'v');
+  }
+  set(7, 6, 'g');
+  set(9, 5, 'g');
+  for (let x = 5; x <= 10; x += 1) set(x, 14, 'i');
+});
+
+/** Tree stump on a forest edge. 16×16, anchorY 0. */
+export const STUMP: SpriteGrid = grid(16, 16, {
+  b: P.vegDarkest,
+  v: P.vegDark,
+  r: P.stoneMid,
+  l: P.stoneLight,
+  i: P.ink,
+}, (set) => {
+  for (let y = 8; y <= 12; y += 1) {
+    const half = y < 10 ? 2 : 3;
+    for (let x = 8 - half; x <= 7 + half; x += 1) {
+      set(x, y, x === 8 - half || x === 7 + half ? 'b' : 'v');
+    }
+  }
+  for (let y = 6; y <= 7; y += 1) {
+    for (let x = 5; x <= 10; x += 1) set(x, y, y === 6 && (x === 6 || x === 9) ? 'l' : 'r');
+  }
+  for (let x = 4; x <= 11; x += 1) set(x, 13, 'i');
+});
+
+/** Fallen log segment beside forest. 16×16, anchorY 0. */
+export const DEADFALL: SpriteGrid = grid(16, 16, {
+  d: P.vegDarkest,
+  v: P.vegDark,
+  m: P.vegMid,
+  l: P.vegLight,
+  i: P.ink,
+}, (set) => {
+  for (let x = 2; x <= 13; x += 1) {
+    const bulge = x >= 4 && x <= 11 ? 1 : 0;
+    set(x, 10 - bulge, 'l');
+    set(x, 11, x % 3 === 0 ? 'm' : 'v');
+    set(x, 12, 'd');
+    if (x === 3 || x === 12) set(x, 9, 'm');
+  }
+  for (let x = 3; x <= 12; x += 1) set(x, 13, 'i');
+});
+
+/** Small mushroom cluster at forest margins. 16×16, anchorY 0. */
+export const MUSHROOM: SpriteGrid = grid(16, 16, {
+  s: P.whitewash,
+  t: P.terraMid,
+  d: P.terraDark,
+  v: P.vegMid,
+  i: P.ink,
+}, (set) => {
+  for (const [cx, cap] of [[6, 3], [10, 2]]) {
+    for (let x = cx - cap; x <= cx + cap; x += 1) {
+      const edge = x === cx - cap || x === cx + cap;
+      set(x, 11 - cap, edge ? 'd' : 't');
+    }
+    set(cx, 12, 's');
+    set(cx, 13, 's');
+  }
+  for (let x = 4; x <= 11; x += 1) set(x, 14, 'v');
+  for (let x = 5; x <= 10; x += 1) set(x, 15, 'i');
+});
+
+/** Wet shoreline rock on sand. 16×16, anchorY 0. */
+export const SHORE_ROCK: SpriteGrid = grid(16, 16, {
+  s: P.stoneShadow,
+  m: P.stoneMid,
+  l: P.stoneLight,
+  w: P.seaMid,
+  i: P.ink,
+}, (set) => {
+  for (let y = 6; y <= 11; y += 1) {
+    const half = Math.floor(2 + ((y - 6) / 5) * 3);
+    for (let x = 8 - half; x <= 7 + half; x += 1) {
+      const wet = y >= 10;
+      const edge = x === 8 - half || x === 7 + half;
+      if (wet) set(x, y, edge ? 'w' : 's');
+      else if (edge) set(x, y, 's');
+      else set(x, y, y <= 8 ? 'l' : 'm');
+    }
+  }
+  set(6, 10, 'w');
+  set(11, 10, 'w');
+  for (let x = 4; x <= 11; x += 1) set(x, 12, 'i');
+});
+
+/** Sun-bleached driftwood on the beach. 16×16, anchorY 0. */
+export const DRIFTWOOD: SpriteGrid = grid(16, 16, {
+  p: P.sandPale,
+  l: P.sandLight,
+  m: P.sandMid,
+  s: P.sandShadow,
+  i: P.ink,
+}, (set) => {
+  for (let x = 1; x <= 14; x += 1) {
+    const arc = Math.floor(Math.sin((x / 14) * Math.PI) * 2);
+    set(x, 10 - arc, 'p');
+    set(x, 11 - arc, x % 4 === 0 ? 'm' : 'l');
+    if (x === 2 || x === 13) set(x, 9 - arc, 's');
+  }
+  set(7, 8, 'm');
+  set(8, 8, 's');
+  for (let x = 3; x <= 12; x += 1) set(x, 13, 'i');
+});
+
 export const PALM: SpriteGrid = grid(16, 32, {
   t: P.sandMid,
   b: P.sandShadow,
@@ -192,4 +314,10 @@ export const PROP_SPRITES: Record<string, PropSprite> = {
   'prop.bush': { grid: BUSH, anchorY: 0 },
   'prop.reeds': { grid: REEDS_SWAY[0], anchorY: 0, frames: REEDS_SWAY },
   'prop.palm': { grid: PALM, anchorY: 16 },
+  'prop.flowers': { grid: FLOWERS, anchorY: 0 },
+  'prop.stump': { grid: STUMP, anchorY: 0 },
+  'prop.deadfall': { grid: DEADFALL, anchorY: 0 },
+  'prop.mushroom': { grid: MUSHROOM, anchorY: 0 },
+  'prop.shoreRock': { grid: SHORE_ROCK, anchorY: 0 },
+  'prop.driftwood': { grid: DRIFTWOOD, anchorY: 0 },
 };
