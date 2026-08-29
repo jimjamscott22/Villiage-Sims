@@ -1,5 +1,6 @@
 import type { AtlasCell } from '../render/atlas';
 import { getAtlasManifest } from './atlasManifest';
+import { sheetBgSize } from './pixelUi';
 
 const ENTITIES_URL = '/art/entities.png';
 
@@ -27,6 +28,7 @@ export function AtlasThumb({ cellKey, scale = 2, className = '', desaturate = fa
         height: h,
         backgroundImage: `url(${ENTITIES_URL})`,
         backgroundPosition: `${-cell.x * scale}px ${-(cell.y + (cell.anchorY ?? 0)) * scale}px`,
+        backgroundSize: sheetBgSize('entities', scale),
         imageRendering: 'pixelated',
       }}
     />
