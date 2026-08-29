@@ -241,7 +241,7 @@ describe('terrainProps', () => {
   });
 
   it('places forest-edge debris beside cypress tiles', () => {
-    const rows = Array.from({ length: 8 }, (_, y) =>
+    const rows = Array.from({ length: 8 }, () =>
       Array.from({ length: 16 }, (_, x) => (x === 0 ? FOREST : GRASS)),
     );
     const edgeKeys = terrainProps(grid(rows))

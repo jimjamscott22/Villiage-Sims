@@ -153,7 +153,16 @@ export const FLOWERS: SpriteGrid = grid(16, 16, {
   for (let y = 10; y <= 13; y += 1) {
     for (let x = 4; x <= 11; x += 1) set(x, y, y === 13 ? 'm' : 'v');
   }
-  for (const [fx, fy, c] of [[5, 8, 'w'], [8, 7, 't'], [10, 9, 'd'], [6, 10, 'g'], [11, 8, 'w']]) {
+  // Tuple-typed: a bare literal widens to (string | number)[][] and loses the
+  // x/y/key positions, which `set` needs kept apart.
+  const blooms: Array<[number, number, string]> = [
+    [5, 8, 'w'],
+    [8, 7, 't'],
+    [10, 9, 'd'],
+    [6, 10, 'g'],
+    [11, 8, 'w'],
+  ];
+  for (const [fx, fy, c] of blooms) {
     set(fx, fy, c);
     set(fx, fy - 1, 'v');
   }

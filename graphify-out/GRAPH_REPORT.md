@@ -1,16 +1,16 @@
 # Graph Report - Villiage-Sims  (2026-08-29)
 
 ## Corpus Check
-- 137 files · ~160,931 words
+- 137 files · ~160,960 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1854 nodes · 3661 edges · 149 communities (128 shown, 21 thin omitted)
+- 1854 nodes · 3661 edges · 150 communities (129 shown, 21 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 162 edges (avg confidence: 0.84)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `864d6b1a`
+- Built from commit: `ffad3541`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -160,6 +160,7 @@
 - .listenToTicks
 - PlacementValidity
 - app-icon.test.ts
+- Option
 
 ## God Nodes (most connected - your core abstractions)
 1. `World` - 133 edges
@@ -218,10 +219,10 @@
 - **Needs → score → pick with hysteresis** — docs_images_utility_ai_needs_panel, docs_images_utility_ai_utility_scoring, docs_images_utility_ai_pick_highest, docs_images_utility_ai_hysteresis_rule [EXTRACTED 1.00]
 - **VillageSim terrain tile palette** — public_art_tiles_water_autotiles, public_art_tiles_grass_autotiles, public_art_tiles_sand_autotiles [EXTRACTED 1.00]
 
-## Communities (149 total, 21 thin omitted)
+## Communities (150 total, 21 thin omitted)
 
 ### Community 0 - "World"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (7): MovePurpose, ResourceNode, Fn, wander_tile(), BuildingView, Vec, World
 
 ### Community 1 - "Clock"
@@ -250,7 +251,7 @@ Nodes (45): Milestone 1 Design, Browser-Demo Transport, Snapshot Interpolation, 
 
 ### Community 7 - "world.rs"
 Cohesion: 0.12
-Nodes (36): autonomous_jobs_run_farm_to_bakery_chain(), autosave_disabled_without_directory(), autosave_rotates_through_three_slots(), clear_day_leaves_crops_dry_after_rollover(), construction_completes_after_build_ticks(), day_rollover_clears_water_and_paused_skips_advance(), demolish_farm_removes_crops(), derived_totals_ignore_farm_buffer_and_include_granary() (+28 more)
+Nodes (37): autonomous_jobs_run_farm_to_bakery_chain(), autosave_disabled_without_directory(), autosave_rotates_through_three_slots(), clear_day_leaves_crops_dry_after_rollover(), construction_completes_after_build_ticks(), day_rollover_clears_water_and_paused_skips_advance(), demolish_farm_removes_crops(), derived_totals_ignore_farm_buffer_and_include_granary() (+29 more)
 
 ### Community 8 - "DemoWorld"
 Cohesion: 0.10
@@ -294,15 +295,15 @@ Nodes (31): BAR_NOTCH, BAR_NOTCH_EMPTY, BRACKET_BL, BRACKET_BR, BRACKET_TL, BRAC
 
 ### Community 19 - ".generate"
 Cohesion: 0.13
-Nodes (14): chronicle_death_entry_carries_the_name(), chronicle_records_building_completion(), chronicle_records_season_turn(), generated_world_has_expected_dimensions(), mill_is_locked_in_a_fresh_world(), BTreeSet, Self, TerrainSnapshot (+6 more)
+Nodes (13): chronicle_death_entry_carries_the_name(), chronicle_records_building_completion(), chronicle_records_season_turn(), generated_world_has_expected_dimensions(), mill_is_locked_in_a_fresh_world(), BTreeSet, Self, TerrainSnapshot (+5 more)
 
 ### Community 20 - "compilerOptions"
 Cohesion: 0.07
 Nodes (26): DOM, DOM.Iterable, src, vite/client, vite.config.ts, compilerOptions, allowImportingTsExtensions, jsx (+18 more)
 
 ### Community 21 - "economy.rs"
-Cohesion: 0.12
-Nodes (24): HaulEndpoint, HaulTask, CarryStack, derive_totals(), derive_totals_ignores_production_buffers(), HaulEndpoint, HaulTask, inventory_add() (+16 more)
+Cohesion: 0.26
+Nodes (17): CarryStack, derive_totals(), derive_totals_ignores_production_buffers(), HaulEndpoint, HaulTask, inventory_add(), inventory_get(), inventory_take() (+9 more)
 
 ### Community 22 - "chronicle.ts"
 Cohesion: 0.22
@@ -716,6 +717,10 @@ Nodes (5): demoStormDamageIndex(), demoWeatherFor(), mixU64(), nearestVillagerId
 Cohesion: 0.24
 Nodes (6): Building, BuildState, PlacementResult, PlacementValidity, BTreeMap, String
 
+### Community 149 - "Option"
+Cohesion: 0.13
+Nodes (7): HaulEndpoint, HaulTask, BuildingDef, storage_accepts(), ActionKind, Option, PathBuf
+
 ## Knowledge Gaps
 - **361 isolated node(s):** `name`, `private`, `version`, `type`, `dev` (+356 more)
   These have ≤1 connection - possible missing edges or undocumented components.
@@ -728,13 +733,13 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.057) - this node is a cross-community bridge._
 - **Why does `entitySources()` connect `rasterizeGrid` to `grid.ts`, `build.ts`?**
   _High betweenness centrality (0.056) - this node is a cross-community bridge._
-- **Why does `World` connect `World` to `Clock`, `utility.rs`, `world.rs`, `persist.rs`, `chronicle.rs`, `.maybe_decide`, `Villager`, `crops.rs`, `buildings.rs`, `.generate`, `economy.rs`, `.place_building`, `weather.rs`?**
+- **Why does `World` connect `World` to `Clock`, `utility.rs`, `world.rs`, `persist.rs`, `chronicle.rs`, `.maybe_decide`, `Villager`, `crops.rs`, `buildings.rs`, `.generate`, `Option`, `economy.rs`, `.place_building`, `weather.rs`?**
   _High betweenness centrality (0.052) - this node is a cross-community bridge._
 - **Are the 8 inferred relationships involving `Canvas()` (e.g. with `.recordFrame()` and `.setDrawStats()`) actually correct?**
   _`Canvas()` has 8 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `name`, `private`, `version` to the rest of the system?**
   _361 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `World` be split into smaller, more focused modules?**
-  _Cohesion score 0.08591466978375219 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09506531204644413 - nodes in this community are weakly interconnected._
 - **Should `utility.rs` be split into smaller, more focused modules?**
   _Cohesion score 0.05734767025089606 - nodes in this community are weakly interconnected._

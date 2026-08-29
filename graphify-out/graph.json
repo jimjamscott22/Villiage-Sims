@@ -3634,8 +3634,8 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "src_tauri_src_sim_economy_storage_accepts",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": "storage_accepts()"
     },
     {
@@ -3645,8 +3645,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_tauri_src_sim_economy_rs_buildingdef",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": "buildingdef"
     },
     {
@@ -5592,8 +5592,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_rs_option",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": "option"
     },
     {
@@ -5636,8 +5636,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_rs_pathbuf",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": "pathbuf"
     },
     {
@@ -5669,8 +5669,8 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_spawn_starting_villagers",
-      "community": 0,
-      "community_name": "World",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".spawn_starting_villagers()"
     },
     {
@@ -5680,8 +5680,8 @@
       "source_location": "L153",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_find_spawn_tile",
-      "community": 0,
-      "community_name": "World",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".find_spawn_tile()"
     },
     {
@@ -5746,8 +5746,8 @@
       "source_location": "L281",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_set_autosave_dir",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".set_autosave_dir()"
     },
     {
@@ -5922,8 +5922,8 @@
       "source_location": "L473",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_populate_for_test",
-      "community": 0,
-      "community_name": "World",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".populate_for_test()"
     },
     {
@@ -6142,8 +6142,8 @@
       "source_location": "L855",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_withdraw",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".withdraw()"
     },
     {
@@ -6197,8 +6197,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "haulendpoint",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": "haulendpoint"
     },
     {
@@ -6219,8 +6219,8 @@
       "source_location": "L963",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_building_stand_tile",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".building_stand_tile()"
     },
     {
@@ -6230,8 +6230,8 @@
       "source_location": "L975",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_stockpile_stand",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".stockpile_stand()"
     },
     {
@@ -6241,8 +6241,8 @@
       "source_location": "L979",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_endpoint_stand_tile",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".endpoint_stand_tile()"
     },
     {
@@ -6252,8 +6252,8 @@
       "source_location": "L986",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_stockpile_accepts",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".stockpile_accepts()"
     },
     {
@@ -6263,8 +6263,8 @@
       "source_location": "L990",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_nearest_storage_for",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".nearest_storage_for()"
     },
     {
@@ -6274,8 +6274,8 @@
       "source_location": "L1019",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_find_haul_task",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".find_haul_task()"
     },
     {
@@ -6285,8 +6285,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "haultask",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": "haultask"
     },
     {
@@ -6329,8 +6329,8 @@
       "source_location": "L1252",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_begin_action",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".begin_action()"
     },
     {
@@ -6340,8 +6340,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_rs_actionkind",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": "actionkind"
     },
     {
@@ -6351,8 +6351,8 @@
       "source_location": "L1266",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_begin_eat",
-      "community": 21,
-      "community_name": "economy.rs",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".begin_eat()"
     },
     {
@@ -6637,8 +6637,8 @@
       "source_location": "L1844",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_find_walkable_near",
-      "community": 0,
-      "community_name": "World",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".find_walkable_near()"
     },
     {
@@ -6648,8 +6648,8 @@
       "source_location": "L1887",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_is_spawn_candidate",
-      "community": 0,
-      "community_name": "World",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".is_spawn_candidate()"
     },
     {
@@ -6659,8 +6659,8 @@
       "source_location": "L1899",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_world_openness_score",
-      "community": 0,
-      "community_name": "World",
+      "community": 149,
+      "community_name": "Option",
       "norm_label": ".openness_score()"
     },
     {
@@ -7253,8 +7253,8 @@
       "source_location": "L3076",
       "_origin": "ast",
       "id": "src_tauri_src_sim_world_two_villagers_can_claim_farm_slots",
-      "community": 19,
-      "community_name": ".generate",
+      "community": 7,
+      "community_name": "world.rs",
       "norm_label": "two_villagers_can_claim_farm_slots()"
     },
     {
@@ -15120,7 +15120,7 @@
       "label": "STUMP",
       "file_type": "code",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L166",
+      "source_location": "L175",
       "_origin": "ast",
       "id": "tools_genart_sprites_props_stump",
       "community": 140,
@@ -15131,7 +15131,7 @@
       "label": "DEADFALL",
       "file_type": "code",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L186",
+      "source_location": "L195",
       "_origin": "ast",
       "id": "tools_genart_sprites_props_deadfall",
       "community": 140,
@@ -15142,7 +15142,7 @@
       "label": "MUSHROOM",
       "file_type": "code",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L204",
+      "source_location": "L213",
       "_origin": "ast",
       "id": "tools_genart_sprites_props_mushroom",
       "community": 140,
@@ -15153,7 +15153,7 @@
       "label": "SHORE_ROCK",
       "file_type": "code",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L224",
+      "source_location": "L233",
       "_origin": "ast",
       "id": "tools_genart_sprites_props_shore_rock",
       "community": 140,
@@ -15164,7 +15164,7 @@
       "label": "DRIFTWOOD",
       "file_type": "code",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L247",
+      "source_location": "L256",
       "_origin": "ast",
       "id": "tools_genart_sprites_props_driftwood",
       "community": 140,
@@ -15175,7 +15175,7 @@
       "label": "PALM",
       "file_type": "code",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L265",
+      "source_location": "L274",
       "_origin": "ast",
       "id": "tools_genart_sprites_props_palm",
       "community": 140,
@@ -15186,7 +15186,7 @@
       "label": "PropSprite",
       "file_type": "code",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L304",
+      "source_location": "L313",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
@@ -15199,7 +15199,7 @@
       "label": "PROP_SPRITES",
       "file_type": "code",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L310",
+      "source_location": "L319",
       "_origin": "ast",
       "id": "tools_genart_sprites_props_prop_sprites",
       "community": 140,
@@ -57239,7 +57239,7 @@
       "context": "field",
       "confidence": "EXTRACTED",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L305",
+      "source_location": "L314",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tools_genart_sprites_props_propsprite",
@@ -58846,7 +58846,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L186",
+      "source_location": "L195",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tools_genart_sprites_props",
@@ -58857,7 +58857,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L247",
+      "source_location": "L256",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tools_genart_sprites_props",
@@ -58890,7 +58890,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L204",
+      "source_location": "L213",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tools_genart_sprites_props",
@@ -58912,7 +58912,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L265",
+      "source_location": "L274",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tools_genart_sprites_props",
@@ -58934,7 +58934,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L310",
+      "source_location": "L319",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tools_genart_sprites_props",
@@ -58945,7 +58945,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L304",
+      "source_location": "L313",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tools_genart_sprites_props",
@@ -58978,7 +58978,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L224",
+      "source_location": "L233",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tools_genart_sprites_props",
@@ -58989,7 +58989,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "tools/genart/sprites/props.ts",
-      "source_location": "L166",
+      "source_location": "L175",
       "weight": 1.0,
       "_origin": "ast",
       "source": "tools_genart_sprites_props",
@@ -65904,5 +65904,5 @@
       "source_file": "public/art/tiles.png"
     }
   ],
-  "built_at_commit": "864d6b1af7a3e13731406b6588a6829c1c44f72a"
+  "built_at_commit": "ffad35418a7c4c37e8c0d11a5078b05ff6624bbb"
 }
