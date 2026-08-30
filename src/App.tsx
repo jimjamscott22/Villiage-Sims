@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Canvas } from './render/Canvas';
+import { formatEntry } from './state/chronicle';
 import { transport } from './state/transport';
 import type {
   Catalog,
@@ -14,6 +15,9 @@ import { ChronicleDrawer } from './ui/ChronicleDrawer';
 import { ClockBar } from './ui/ClockBar';
 import { PixelText } from './ui/PixelText';
 import { ResourceBar } from './ui/ResourceBar';
+import { FloatingText, type Floater } from './ui/FloatingText';
+import { ObjectivesPanel } from './ui/ObjectivesPanel';
+import { ToastStack, type Toast } from './ui/ToastStack';
 
 const DETAIL_POLL_MS = 250;
 
@@ -83,14 +87,45 @@ export default function App() {
   const [focusTile, setFocusTile] = useState<{ tile: [number, number]; nonce: number } | null>(
     null,
   );
+  const pushFloater = (text: string, color: string) => {
+    const id = ++floaterIdRef.current;
+    setFloaters((prev) => [...prev, { id, text, color }]);
+  };
   const [unlocked, setUnlocked] = useState<string[]>([]);
+  const [winterWarning, setWinterWarning] = useState(false);
+  const [completedObjectives, setCompletedObjectives] = useState<string[]>([]);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastSeqRef = useRef(-1);
+  const [floaters, setFloaters] = useState<Floater[]>([]);
+  const floaterIdRef = useRef(0);
+  const lastResourcesRef = useRef<ResourceTotals | null>(null);
 
   const onSnapshot = (snapshot: TickSnapshot) => {
+    const previous = lastResourcesRef.current;
+    if (previous) {
+      const deltas = [
+        { key: 'wood', label: 'wood', value: snapshot.resources.wood - previous.wood, color: '#d4a85a' },
+        { key: 'stone', label: 'stone', value: snapshot.resources.stone - previous.stone, color: '#a8b0b5' },
+        { key: 'grain', label: 'grain', value: snapshot.resources.grain - previous.grain, color: '#e6c84a' },
+        { key: 'flour', label: 'flour', value: snapshot.resources.flour - previous.flour, color: '#f4e8d0' },
+        { key: 'food', label: 'food', value: snapshot.resources.food - previous.food, color: '#b6f28a' },
+        { key: 'gold', label: 'gold', value: snapshot.resources.gold - previous.gold, color: '#ffd700' },
+      ] as const;
+      for (const delta of deltas) {
+        if (delta.value > 0) {
+          pushFloater(`+${delta.value} ${delta.label}`, delta.color);
+        }
+      }
+    }
+    lastResourcesRef.current = snapshot.resources;
+
     setResources(snapshot.resources);
     setClock(snapshot.clock);
     setPopulation(snapshot.villagers.length);
     setHousingCapacity(snapshot.housingCapacity ?? 0);
     setUnlocked(snapshot.unlocked ?? []);
+    setWinterWarning(snapshot.winterWarning ?? false);
+    setCompletedObjectives(snapshot.completedObjectives ?? []);
     setSelectedVillagerId((current) => {
       if (current == null) return current;
       return snapshot.villagers.some((villager) => villager.id === current) ? current : null;
@@ -105,6 +140,42 @@ export default function App() {
         .then((entries) => {
           if (chronicleRequestRef.current !== requestId) return; // superseded by a newer fetch
           chronicleSeqRef.current = snapshot.chronicleSeq;
+
+          // Toast new important chronicle entries. The first fetch after a
+          // load/new world seeds toastSeqRef so we don't replay history.
+          const newEntries = entries.filter((entry) => entry.seq > toastSeqRef.current);
+          if (toastSeqRef.current !== -1) {
+            const toastable = newEntries.filter(
+              (entry) =>
+                entry.body.kind === 'villagerBorn' ||
+                entry.body.kind === 'villagerDied' ||
+                entry.body.kind === 'buildingComplete',
+            );
+            if (toastable.length > 0) {
+              setToasts((prev) => [
+                ...prev,
+                ...toastable.map((entry) => ({
+                  id: entry.seq,
+                  kind: entry.body.kind,
+                  message: formatEntry(entry, catalog),
+                  tile: entry.focus,
+                })),
+              ]);
+            }
+
+            for (const entry of newEntries) {
+              if (entry.body.kind === 'buildingComplete') {
+                pushFloater('Building complete!', '#f4c95d');
+              } else if (entry.body.kind === 'harvestReady') {
+                pushFloater(`${entry.body.count} crop${entry.body.count === 1 ? '' : 's'} ready`, '#b6f28a');
+              }
+            }
+          }
+          toastSeqRef.current = Math.max(
+            toastSeqRef.current,
+            ...entries.map((entry) => entry.seq),
+          );
+
           setChronicle(entries);
         })
         .catch(() => {
@@ -157,7 +228,13 @@ export default function App() {
       setVillagerDetail(null);
       setRotation(0);
       setChronicle([]);
+      setToasts([]);
+      setFloaters([]);
+      setWinterWarning(false);
+      setCompletedObjectives([]);
       chronicleSeqRef.current = -1;
+      toastSeqRef.current = -1;
+      lastResourcesRef.current = null;
       chronicleRequestRef.current += 1; // invalidate any in-flight fetch from the old world
       setWorldKey((key) => key + 1);
       setPersistenceStatus('Slot 1 · Loaded');
@@ -175,7 +252,11 @@ export default function App() {
         <h1 className="text-base border-r border-white/10 pr-4">
           <PixelText text="VILLAGESIM" />
         </h1>
-        <ClockBar clock={clock} onSetSpeed={(speed) => { void onSetSpeed(speed); }} />
+        <ClockBar
+          clock={clock}
+          onSetSpeed={(speed) => { void onSetSpeed(speed); }}
+          winterWarning={winterWarning}
+        />
         <span className="ml-auto border-l border-white/10 pl-4 text-xs text-white/60">
           {transport.mode === 'tauri' ? 'Simulation connected' : 'Browser demo'}
         </span>
@@ -187,54 +268,70 @@ export default function App() {
         </p>
       )}
       <div className="flex min-h-0 flex-1">
-        <Canvas
-          key={worldKey}
-          catalog={catalog}
-          selectedKind={selectedKind}
-          selectedCrop={selectedCrop}
-          rotation={rotation}
-          selectedBuildingId={selectedBuildingId}
-          selectedVillagerId={selectedVillagerId}
-          onRotationChange={setRotation}
-          onCancelBuild={() => {
-            setSelectedKind(null);
-            setSelectedCrop(null);
-          }}
-          onSelectBuilding={setSelectedBuildingId}
-          onSelectVillager={setSelectedVillagerId}
-          onSnapshot={onSnapshot}
-          focusTile={focusTile}
-        />
-        <BuildMenu
-          catalog={catalog}
-          selectedKind={selectedKind}
-          selectedCrop={selectedCrop}
-          selectedBuildingId={selectedBuildingId}
-          villagerDetail={villagerDetail}
-          unlocked={unlocked}
-          persistenceStatus={persistenceStatus}
-          persistenceBusy={persistenceBusy}
-          onSelectKind={(kind) => {
-            setSelectedKind(kind);
-            setSelectedCrop(null);
-            setSelectedBuildingId(null);
-            setRotation(0);
-          }}
-          onSelectCrop={(kind) => {
-            setSelectedCrop(kind);
-            setSelectedKind(null);
-            setSelectedBuildingId(null);
-          }}
-          onDemolish={() => {
-            void onDemolish();
-          }}
-          onSave={() => {
-            void onSave();
-          }}
-          onLoad={() => {
-            void onLoad();
-          }}
-        />
+        <div className="relative min-h-0 flex-1">
+          <Canvas
+            key={worldKey}
+            catalog={catalog}
+            selectedKind={selectedKind}
+            selectedCrop={selectedCrop}
+            rotation={rotation}
+            selectedBuildingId={selectedBuildingId}
+            selectedVillagerId={selectedVillagerId}
+            onRotationChange={setRotation}
+            onCancelBuild={() => {
+              setSelectedKind(null);
+              setSelectedCrop(null);
+            }}
+            onSelectBuilding={setSelectedBuildingId}
+            onSelectVillager={setSelectedVillagerId}
+            onSnapshot={onSnapshot}
+            focusTile={focusTile}
+          />
+          <ToastStack
+            toasts={toasts}
+            onDismiss={(id) => setToasts((prev) => prev.filter((toast) => toast.id !== id))}
+            onFocus={(tile) =>
+              setFocusTile((previous) => ({ tile, nonce: (previous?.nonce ?? 0) + 1 }))
+            }
+          />
+          <FloatingText
+            floaters={floaters}
+            onDismiss={(id) => setFloaters((prev) => prev.filter((f) => f.id !== id))}
+          />
+        </div>
+        <div className="flex min-h-0 shrink-0 flex-col gap-2">
+          <BuildMenu
+            catalog={catalog}
+            selectedKind={selectedKind}
+            selectedCrop={selectedCrop}
+            selectedBuildingId={selectedBuildingId}
+            villagerDetail={villagerDetail}
+            unlocked={unlocked}
+            persistenceStatus={persistenceStatus}
+            persistenceBusy={persistenceBusy}
+            onSelectKind={(kind) => {
+              setSelectedKind(kind);
+              setSelectedCrop(null);
+              setSelectedBuildingId(null);
+              setRotation(0);
+            }}
+            onSelectCrop={(kind) => {
+              setSelectedCrop(kind);
+              setSelectedKind(null);
+              setSelectedBuildingId(null);
+            }}
+            onDemolish={() => {
+              void onDemolish();
+            }}
+            onSave={() => {
+              void onSave();
+            }}
+            onLoad={() => {
+              void onLoad();
+            }}
+          />
+          <ObjectivesPanel catalog={catalog} completed={completedObjectives} />
+        </div>
       </div>
       <ChronicleDrawer
         entries={chronicle}

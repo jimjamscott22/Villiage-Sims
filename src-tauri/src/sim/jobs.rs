@@ -22,6 +22,16 @@ impl JobKind {
         }
     }
 
+    /// Thought-bubble text when a villager starts this kind of job.
+    pub fn thought(self) -> &'static str {
+        match self {
+            Self::TendCrops => "Tending crops...",
+            Self::Gather => "Gathering...",
+            Self::Haul => "Hauling goods...",
+            Self::Produce => "Crafting...",
+        }
+    }
+
     pub fn from_catalog(kind: &str) -> Option<Self> {
         match kind {
             "tend_crops" => Some(Self::TendCrops),

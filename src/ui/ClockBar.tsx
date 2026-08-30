@@ -6,6 +6,7 @@ import { uiIconStyle } from './pixelUi';
 interface ClockBarProps {
   clock: ClockView | null;
   onSetSpeed: (speed: number) => void;
+  winterWarning?: boolean;
 }
 
 const SPEEDS: Array<{ value: number; icon: string; label: string }> = [
@@ -17,7 +18,7 @@ const SPEEDS: Array<{ value: number; icon: string; label: string }> = [
 
 const SEASON_ICONS = ['ui.icon.spring', 'ui.icon.summer', 'ui.icon.autumn', 'ui.icon.winter'] as const;
 
-export function ClockBar({ clock, onSetSpeed }: ClockBarProps) {
+export function ClockBar({ clock, onSetSpeed, winterWarning }: ClockBarProps) {
   const season = clock ? (SEASON_NAMES[clock.season] ?? 'Spring') : '—';
   const seasonIcon = clock != null ? SEASON_ICONS[clock.season] ?? SEASON_ICONS[0] : SEASON_ICONS[0];
   const weather =
@@ -35,6 +36,14 @@ export function ClockBar({ clock, onSetSpeed }: ClockBarProps) {
         <span title="Weather">
           <PixelText text={weather.toUpperCase()} />
         </span>
+        {winterWarning && (
+          <span
+            title="Food stores are low for winter — gather or produce more!"
+            className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-900/80 text-[10px] font-bold text-rose-200 ring-1 ring-rose-500/60"
+          >
+            !
+          </span>
+        )}
       </div>
       <div className="flex gap-1">
         {SPEEDS.map((entry) => {

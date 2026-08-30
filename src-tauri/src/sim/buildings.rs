@@ -44,6 +44,33 @@ pub struct Building {
     pub recipe_ticks: u32,
 }
 
+/// Why a production building is currently idle, or whether it is active.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BuildingStatus {
+    Working = 0,
+    IdleNoInput = 1,
+    IdleNoWorker = 2,
+    IdleOutputFull = 3,
+    UnderConstruction = 4,
+}
+
+impl BuildingStatus {
+    pub fn as_u8(self) -> u8 {
+        self as u8
+    }
+
+    #[allow(dead_code)]
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Working => "Working",
+            Self::IdleNoInput => "Waiting for inputs",
+            Self::IdleNoWorker => "Waiting for worker",
+            Self::IdleOutputFull => "Output full",
+            Self::UnderConstruction => "Under construction",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlacementValidity {

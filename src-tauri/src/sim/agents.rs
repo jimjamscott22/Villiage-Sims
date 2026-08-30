@@ -107,6 +107,12 @@ pub struct Villager {
     pub traits: Vec<String>,
     /// Ticks with hunger == 0.0.
     pub starvation_ticks: u32,
+    /// Transient thought bubble shown above the villager. Not persisted in saves.
+    #[serde(skip)]
+    pub thought: Option<String>,
+    /// Ticks remaining before the thought bubble disappears.
+    #[serde(skip)]
+    pub thought_ttl: u8,
 }
 
 impl Villager {
@@ -124,12 +130,33 @@ impl Villager {
             carrying: None,
             traits: Vec::new(),
             starvation_ticks: 0,
+            thought: None,
+            thought_ttl: 0,
         }
     }
 
     pub fn with_traits(mut self, traits: Vec<String>) -> Self {
         self.traits = traits;
         self
+    }
+
+    /// Set a transient thought bubble that will display above the villager.
+    pub fn set_thought(&mut self, thought: impl Into<String>, ttl: u8) {
+        self.thought = Some(thought.into());
+        self.thought_ttl = ttl;
+    }
+
+    /// Decrement the thought bubble TTL; returns true if a thought remains active.
+    pub fn tick_thought(&mut self) -> bool {
+        if self.thought_ttl > 0 {
+            self.thought_ttl -= 1;
+        }
+        if self.thought_ttl == 0 {
+            self.thought = None;
+            false
+        } else {
+            true
+        }
     }
 
     pub fn clear_path_to_idle(&mut self) {

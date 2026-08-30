@@ -25,6 +25,8 @@ export interface VillagerView {
   dy?: number;
   /** True while holding a haul stack — selects the carry pose. */
   carrying?: boolean;
+  /** Transient thought bubble text, if any. */
+  thought?: string;
 }
 
 export interface VillagerDetail {
@@ -39,6 +41,8 @@ export interface VillagerDetail {
   jobKind: string | null;
   jobSite: number | null;
   traits: string[];
+  /** Current thought bubble text, if any. */
+  thought?: string;
 }
 
 export interface BuildingView {
@@ -49,6 +53,8 @@ export interface BuildingView {
   rot: number;
   state: number;
   progress: number;
+  /** 0 Working, 1 IdleNoInput, 2 IdleNoWorker, 3 IdleOutputFull, 4 UnderConstruction. */
+  status?: number;
 }
 
 export interface CropView {
@@ -107,6 +113,8 @@ export interface TickSnapshot {
   chronicleSeq: number;
   unlocked: string[];
   lastAutosaveSlot?: number | null;
+  winterWarning?: boolean;
+  completedObjectives?: string[];
 }
 
 export interface RecipeDef {
@@ -157,10 +165,24 @@ export interface TraitDef {
   description: string;
 }
 
+export type ObjectiveCondition =
+  | { buildingCount: { id: string; count: number } }
+  | { population: { count: number } }
+  | { resource: { id: string; count: number } }
+  | { buildingUnlocked: { id: string } };
+
+export interface ObjectiveDef {
+  id: string;
+  title: string;
+  description: string;
+  condition: ObjectiveCondition;
+}
+
 export interface Catalog {
   buildings: BuildingDef[];
   crops: CropDef[];
   traits?: TraitDef[];
+  objectives?: ObjectiveDef[];
 }
 
 export interface PlacementValidity {

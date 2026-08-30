@@ -40,6 +40,8 @@ export class SnapshotBuffer {
       clock: this.current.clock,
       chronicleSeq: this.current.chronicleSeq,
       unlocked: this.current.unlocked,
+      winterWarning: this.current.winterWarning,
+      completedObjectives: this.current.completedObjectives,
     };
   }
 }

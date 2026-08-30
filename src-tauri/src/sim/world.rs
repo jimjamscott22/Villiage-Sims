@@ -12,12 +12,12 @@ use super::agents::{
     REPATH_COOLDOWN_TICKS, STARTING_VILLAGER_NAMES, Villager, WORK_CYCLE_TICKS,
 };
 use super::buildings::{
-    BuildState, Building, PlacementResult, PlacementValidity, footprint_tiles, rotated_footprint,
-    terrain_allowed,
+    BuildState, Building, BuildingStatus, PlacementResult, PlacementValidity, footprint_tiles,
+    rotated_footprint, terrain_allowed,
 };
-use super::catalog::Catalog;
+use super::catalog::{BuildingDef, Catalog, ObjectiveCondition};
 use super::chronicle::{Chronicle, ChronicleBody};
-use super::clock::Clock;
+use super::clock::{Clock, Season, DAYS_PER_SEASON};
 use super::commands::SimCommand;
 use super::crops::{Crop, tick_crop};
 use super::economy::{
@@ -74,6 +74,7 @@ pub struct World {
     job_board: JobBoard,
     chronicle: Chronicle,
     unlocked: BTreeSet<String>,
+    completed_objectives: BTreeSet<String>,
     #[serde(skip)]
     viewport: Viewport,
     /// When set, day rollover writes a rotating autosave into this directory.
@@ -111,6 +112,7 @@ impl World {
             job_board: JobBoard::new(),
             chronicle: Chronicle::new(),
             unlocked: BTreeSet::new(),
+            completed_objectives: BTreeSet::new(),
             viewport: Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -318,6 +320,7 @@ impl World {
         }
         self.check_population_dynamics();
         self.check_unlocks();
+        self.check_objectives();
     }
 
     pub fn housing_capacity(&self) -> u32 {
@@ -329,6 +332,28 @@ impl World {
             .filter_map(|b| self.catalog.get(b.kind_index).and_then(|def| def.houses))
             .sum();
         base + building_houses
+    }
+
+    /// True when autumn is ending and stored food is below a comfortable
+    /// winter buffer. Counts grain, flour, and food as potential calories.
+    fn winter_warning(&self) -> bool {
+        if self.clock.season != Season::Autumn || self.clock.day < 22 {
+            return false;
+        }
+        let population = self.villagers.len() as u32;
+        if population == 0 {
+            return false;
+        }
+        const RATIONS_PER_DAY: u32 = 1;
+        let required = population
+            .saturating_mul(DAYS_PER_SEASON)
+            .saturating_mul(RATIONS_PER_DAY);
+        let stored = self
+            .resources
+            .food
+            .saturating_add(self.resources.grain)
+            .saturating_add(self.resources.flour);
+        stored < required
     }
 
     /// Every building id whose unlock conditions are currently met.
@@ -375,6 +400,48 @@ impl World {
             self.chronicle.push(&self.clock, None, body);
         }
         self.unlocked.extend(satisfied);
+    }
+
+    fn objective_satisfied(&self, condition: &ObjectiveCondition) -> bool {
+        match condition {
+            ObjectiveCondition::BuildingCount { id, count } => {
+                self.buildings
+                    .iter()
+                    .filter(|b| b.state == BuildState::Complete)
+                    .filter_map(|b| self.catalog.get(b.kind_index).map(|def| def.id.as_str()))
+                    .filter(|def_id| def_id == id)
+                    .count() as u32
+                    >= *count
+            }
+            ObjectiveCondition::Population { count } => self.villagers.len() as u32 >= *count,
+            ObjectiveCondition::Resource { id, count } => {
+                let have = match id.as_str() {
+                    "wood" => self.resources.wood,
+                    "stone" => self.resources.stone,
+                    "grain" => self.resources.grain,
+                    "flour" => self.resources.flour,
+                    "food" => self.resources.food,
+                    "gold" => self.resources.gold,
+                    _ => 0,
+                };
+                have >= *count
+            }
+            ObjectiveCondition::BuildingUnlocked { id } => self.unlocked.contains(id),
+        }
+    }
+
+    /// Objectives are monotonic: once met they stay completed even if the
+    /// underlying condition later lapses (e.g. a building is demolished).
+    fn check_objectives(&mut self) {
+        let newly: Vec<String> = self
+            .catalog
+            .objectives
+            .iter()
+            .filter(|obj| !self.completed_objectives.contains(&obj.id))
+            .filter(|obj| self.objective_satisfied(&obj.condition))
+            .map(|obj| obj.id.clone())
+            .collect();
+        self.completed_objectives.extend(newly);
     }
 
     fn check_population_dynamics(&mut self) {
@@ -657,6 +724,7 @@ impl World {
                     y: v.pos.1,
                     state: v.state.as_u8(),
                     carrying: v.carrying.is_some(),
+                    thought: v.thought.clone(),
                 })
                 .collect(),
             buildings: self.building_views(),
@@ -667,6 +735,8 @@ impl World {
             chronicle_seq: self.chronicle().seq(),
             unlocked: self.unlocked().iter().cloned().collect(),
             last_autosave_slot: self.last_autosave_slot,
+            winter_warning: self.winter_warning(),
+            completed_objectives: self.completed_objectives.iter().cloned().collect(),
         }
     }
 
@@ -693,6 +763,7 @@ impl World {
             job_kind,
             job_site,
             traits: villager.traits.clone(),
+            thought: villager.thought.clone(),
         })
     }
 
@@ -740,6 +811,7 @@ impl World {
             self.villagers[index].path = Some(path);
             self.villagers[index].repath_cooldown = 0;
             self.villagers[index].current_action = None;
+            self.villagers[index].set_thought("On it!", 40);
             return Ok(());
         }
         Err(last_err)
@@ -1128,6 +1200,7 @@ impl World {
         if self.villagers[index].repath_cooldown > 0 {
             self.villagers[index].repath_cooldown -= 1;
         }
+        self.villagers[index].tick_thought();
 
         if let Some(job_id) = self.villagers[index].current_job {
             if self.job_board.get(job_id).is_none() {
@@ -1254,12 +1327,17 @@ impl World {
             ActionKind::Eat => self.begin_eat(index),
             ActionKind::Sleep => {
                 self.villagers[index].begin_sleeping();
+                self.villagers[index].set_thought(kind.thought(), 40);
             }
             ActionKind::Socialize => {
                 self.villagers[index].begin_socializing();
+                self.villagers[index].set_thought(kind.thought(), 40);
             }
             ActionKind::Work => self.begin_work(index, job_id),
-            ActionKind::Wander => self.begin_wander(index),
+            ActionKind::Wander => {
+                self.begin_wander(index);
+                self.villagers[index].set_thought(kind.thought(), 40);
+            }
         }
     }
 
@@ -1268,6 +1346,7 @@ impl World {
             return;
         }
         self.villagers[index].begin_eating();
+        self.villagers[index].set_thought(ActionKind::Eat.thought(), 40);
     }
 
     fn begin_work(&mut self, index: usize, job_id: Option<u32>) {
@@ -1322,12 +1401,9 @@ impl World {
 
         self.villagers[index].current_job = Some(job_id);
         self.villagers[index].current_action = Some(ActionKind::Work);
-        let tile = self
-            .job_board
-            .get(job_id)
-            .map(|job| job.tile)
-            .expect("claimed job");
-        self.begin_move_to_job(index, tile, job_id);
+        let job = self.job_board.get(job_id).expect("claimed job");
+        self.villagers[index].set_thought(job.kind.thought(), 40);
+        self.begin_move_to_job(index, job.tile, job_id);
     }
 
     fn job_actionable(&self, job: &crate::sim::jobs::Job, villager_index: usize) -> bool {
@@ -1908,6 +1984,36 @@ impl World {
         score
     }
 
+    fn building_status(&self, building: &Building, def: &BuildingDef) -> BuildingStatus {
+        match building.state {
+            BuildState::UnderConstruction { .. } => BuildingStatus::UnderConstruction,
+            BuildState::Complete => {
+                let any_claimed = self
+                    .job_board
+                    .jobs()
+                    .iter()
+                    .any(|job| job.site == building.id && job.claimed_by.is_some());
+                if any_claimed {
+                    return BuildingStatus::Working;
+                }
+                if let Some(recipe) = &def.recipe {
+                    if production_free_capacity(&building.inventory) == 0 {
+                        return BuildingStatus::IdleOutputFull;
+                    }
+                    let has_inputs = recipe
+                        .inputs
+                        .iter()
+                        .all(|(resource, amount)| inventory_get(&building.inventory, resource) >= *amount);
+                    if !has_inputs {
+                        return BuildingStatus::IdleNoInput;
+                    }
+                    return BuildingStatus::IdleNoWorker;
+                }
+                BuildingStatus::Working
+            }
+        }
+    }
+
     fn building_views(&self) -> Vec<BuildingView> {
         let tile = self.tile_size as f32;
         let margin = VIEWPORT_MARGIN_TILES * tile;
@@ -1936,6 +2042,7 @@ impl World {
                     rot: building.rotation % 4,
                     state: building.state.as_u8(),
                     progress: building.state.progress_byte(def.build_ticks),
+                    status: self.building_status(building, def).as_u8(),
                 })
             })
             .collect()

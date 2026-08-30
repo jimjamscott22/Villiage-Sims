@@ -26,6 +26,17 @@ impl ActionKind {
             Self::Wander => 4,
         }
     }
+
+    /// Short thought-bubble text shown when a villager switches to this action.
+    pub fn thought(self) -> &'static str {
+        match self {
+            Self::Eat => "Hungry!",
+            Self::Sleep => "Tired...",
+            Self::Work => "Time to work!",
+            Self::Socialize => "Let's chat!",
+            Self::Wander => "Wandering...",
+        }
+    }
 }
 
 /// New action must beat the current action's score by this margin.

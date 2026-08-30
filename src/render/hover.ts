@@ -9,6 +9,14 @@ const VILLAGER_STATE_LABELS = [
   'Socializing',
 ] as const;
 
+const BUILDING_STATUS_LABELS = [
+  'Working',
+  'Waiting for inputs',
+  'Waiting for worker',
+  'Output full',
+  'Under construction',
+] as const;
+
 export interface HoverTarget {
   kind: 'villager' | 'building' | 'crop';
   id: number;
@@ -82,11 +90,15 @@ export function hoverTargetAt({
   });
   if (building) {
     const definition = catalog.buildings[building.kind];
+    const statusLabel = BUILDING_STATUS_LABELS[building.status ?? 0] ?? 'Working';
+    const detail = building.state === 2
+      ? statusLabel
+      : `Building · ${building.progress}%`;
     return {
       kind: 'building',
       id: building.id,
       title: definition?.name ?? `Building #${building.id}`,
-      detail: building.state === 2 ? 'Complete' : `Building · ${building.progress}%`,
+      detail,
     };
   }
 

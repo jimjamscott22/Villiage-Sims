@@ -3,6 +3,46 @@ import type { BuildingView, CropView, VillagerView } from '../state/types';
 const BUILDING_COLORS = ['#c4a574', '#8fbc5a', '#b08968'];
 const CROP_STAGE_COLORS = ['#6b8f3c', '#7fa84a', '#c4b44a', '#d4a017'];
 
+/** Draw a small pixel-style speech bubble above a villager. */
+function drawThoughtBubble(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  text: string,
+  zoom: number,
+): void {
+  const fontSize = Math.max(8, 10 / Math.max(zoom, 0.01));
+  const pad = Math.max(3, 4 / Math.max(zoom, 0.01));
+  const lineHeight = fontSize * 1.2;
+  ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+  const metrics = ctx.measureText(text);
+  const boxW = metrics.width + pad * 2;
+  const boxH = lineHeight + pad;
+  const bx = x - boxW / 2;
+  const by = y - fontSize - boxH - 6 / Math.max(zoom, 0.01);
+
+  ctx.save();
+  ctx.fillStyle = '#1a1510';
+  ctx.strokeStyle = '#f4c95d';
+  ctx.lineWidth = Math.max(1, 1.5 / Math.max(zoom, 0.01));
+  ctx.fillRect(bx, by, boxW, boxH);
+  ctx.strokeRect(bx, by, boxW, boxH);
+  // tiny pointer
+  const pointerSize = Math.max(3, 4 / Math.max(zoom, 0.01));
+  ctx.beginPath();
+  ctx.moveTo(x - pointerSize / 2, by + boxH);
+  ctx.lineTo(x, by + boxH + pointerSize);
+  ctx.lineTo(x + pointerSize / 2, by + boxH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#f4c95d';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(text, bx + pad, by + boxH - pad / 2);
+  ctx.restore();
+}
+
 /** Draw villagers with a roughly constant on-screen size across zoom levels. */
 export function drawVillagers(
   ctx: CanvasRenderingContext2D,
@@ -21,6 +61,9 @@ export function drawVillagers(
     ctx.lineWidth = selected ? lineWidth * 1.4 : lineWidth;
     ctx.strokeStyle = selected ? '#fff6d5' : '#352f25';
     ctx.stroke();
+    if (villager.thought) {
+      drawThoughtBubble(ctx, villager.x, villager.y - radius, villager.thought, zoom);
+    }
   }
 }
 

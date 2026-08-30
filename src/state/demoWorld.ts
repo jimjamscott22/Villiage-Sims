@@ -8,6 +8,7 @@ import type {
   ClockView,
   CropDef,
   CropView,
+  ObjectiveCondition,
   PlacementResult,
   PlacementValidity,
   ResourceTotals,
@@ -177,6 +178,14 @@ export const DEMO_CATALOG: Catalog = {
     { id: 'green_thumb', name: 'Green Thumb', description: 'Tends crops with extraordinary skill.' },
     { id: 'strong_back', name: 'Strong Back', description: 'Can carry more goods when hauling.' },
   ],
+  objectives: [
+    { id: 'first_hut', title: 'Shelter', description: 'Build a hut to house more villagers.', condition: { buildingCount: { id: 'hut', count: 1 } } },
+    { id: 'first_farm', title: 'Fields', description: 'Build a farm plot to grow wheat.', condition: { buildingCount: { id: 'farm', count: 1 } } },
+    { id: 'population_10', title: 'Growing village', description: 'Reach a population of 10 villagers.', condition: { population: { count: 10 } } },
+    { id: 'unlock_mill', title: 'Miller', description: 'Unlock the mill by building a granary and reaching 6 villagers.', condition: { buildingUnlocked: { id: 'mill' } } },
+    { id: 'feed_village', title: 'Food security', description: 'Stockpile 50 food.', condition: { resource: { id: 'food', count: 50 } } },
+    { id: 'harvest_wheat', title: 'First harvest', description: 'Have 20 grain ready for milling.', condition: { resource: { id: 'grain', count: 20 } } },
+  ],
 };
 
 /** Matches Rust Terrain enum byte order. */
@@ -262,6 +271,25 @@ type ActionKind = 'eat' | 'sleep' | 'work' | 'socialize' | 'wander';
 type MovePurpose = 'player' | 'work' | 'wander';
 type AgentStateName = 'idle' | 'moving' | 'working' | 'eating' | 'sleeping' | 'socializing';
 type DemoJobKind = 'tend_crops' | 'gather' | 'haul' | 'produce';
+
+function actionThought(kind: ActionKind): string {
+  switch (kind) {
+    case 'eat': return 'Hungry!';
+    case 'sleep': return 'Tired...';
+    case 'work': return 'Time to work!';
+    case 'socialize': return "Let's chat!";
+    case 'wander': return 'Wandering...';
+  }
+}
+
+function jobThought(kind: DemoJobKind): string {
+  switch (kind) {
+    case 'tend_crops': return 'Tending crops...';
+    case 'gather': return 'Gathering...';
+    case 'haul': return 'Hauling goods...';
+    case 'produce': return 'Crafting...';
+  }
+}
 type HaulEndpoint = 'stockpile' | number;
 
 interface CarryStack {
@@ -495,6 +523,8 @@ interface DemoVillager {
   currentAction: ActionKind | null;
   carrying: CarryStack | null;
   traits: string[];
+  thought: string | null;
+  thoughtTtl: number;
 }
 
 interface DemoClock {
@@ -600,6 +630,7 @@ export class DemoWorld {
   private chronicleEntries: ChronicleEntry[] = [];
   private chronicleNextSeq = 0;
   private unlocked: string[] = [];
+  private completedObjectives: string[] = [];
   private readonly CHRONICLE_CAP = 200;
   private readonly seed = DEMO_SEED;
   private lastAutosaveSlot: number | null = null;
@@ -698,6 +729,33 @@ export class DemoWorld {
     }
   }
 
+  private objectiveSatisfied(condition: ObjectiveCondition): boolean {
+    if ('buildingCount' in condition) {
+      const { id, count } = condition.buildingCount;
+      return this.buildings.filter((b) => b.complete && DEMO_CATALOG.buildings[b.kindIndex].id === id).length >= count;
+    }
+    if ('population' in condition) {
+      return this.villagers.length >= condition.population.count;
+    }
+    if ('resource' in condition) {
+      const { id, count } = condition.resource;
+      return (this.resources[id as keyof ResourceTotals] as number ?? 0) >= count;
+    }
+    if ('buildingUnlocked' in condition) {
+      return this.unlocked.includes(condition.buildingUnlocked.id);
+    }
+    return false;
+  }
+
+  private checkObjectives(): void {
+    for (const obj of DEMO_CATALOG.objectives ?? []) {
+      if (this.completedObjectives.includes(obj.id)) continue;
+      if (this.objectiveSatisfied(obj.condition)) {
+        this.completedObjectives.push(obj.id);
+      }
+    }
+  }
+
   private spawnStartingVillagers(): void {
     const cx = Math.floor(this.terrain.width / 2);
     const cy = Math.floor(this.terrain.height / 2);
@@ -726,6 +784,8 @@ export class DemoWorld {
         currentAction: null,
         carrying: null,
         traits: i === 0 ? ['fast_walker'] : i === 1 ? ['green_thumb'] : ['strong_back'],
+        thought: null,
+        thoughtTtl: 0,
       });
     }
   }
@@ -890,6 +950,7 @@ export class DemoWorld {
       this.tickVillagerAt(i);
     }
     this.checkUnlocks();
+    this.checkObjectives();
     return this.snapshot();
   }
 
@@ -903,6 +964,17 @@ export class DemoWorld {
       }
     }
     return base + extra;
+  }
+
+  private winterWarning(): boolean {
+    if (this.clock.season !== 2 || this.clock.day < 22) return false;
+    const population = this.villagers.length;
+    if (population === 0) return false;
+    const rationsPerDay = 1;
+    const daysPerSeason = 28;
+    const required = population * daysPerSeason * rationsPerDay;
+    const stored = this.resources.food + this.resources.grain + this.resources.flour;
+    return stored < required;
   }
 
   snapshot(): TickSnapshot {
@@ -930,6 +1002,7 @@ export class DemoWorld {
         y: v.y,
         state: stateByte(v),
         carrying: v.carrying != null,
+        thought: v.thought ?? undefined,
       })),
       buildings: this.buildingViews(),
       crops,
@@ -939,6 +1012,8 @@ export class DemoWorld {
       chronicleSeq: this.chronicleNextSeq,
       unlocked: [...this.unlocked],
       lastAutosaveSlot: this.lastAutosaveSlot,
+      winterWarning: this.winterWarning(),
+      completedObjectives: [...this.completedObjectives],
     };
   }
 
@@ -960,6 +1035,7 @@ export class DemoWorld {
       jobKind: job?.kind ?? null,
       jobSite: job?.site ?? null,
       traits: villager.traits ?? [],
+      thought: villager.thought ?? undefined,
     };
   }
 
@@ -1087,6 +1163,8 @@ export class DemoWorld {
       villager.path = path;
       villager.repathCooldown = 0;
       villager.currentAction = null;
+      villager.thought = 'On it!';
+      villager.thoughtTtl = 40;
       return;
     }
     throw new Error(lastError);
@@ -1348,6 +1426,10 @@ export class DemoWorld {
   private tickVillagerAt(index: number): void {
     const villager = this.villagers[index];
     if (villager.repathCooldown > 0) villager.repathCooldown -= 1;
+    if (villager.thoughtTtl > 0) {
+      villager.thoughtTtl -= 1;
+      if (villager.thoughtTtl === 0) villager.thought = null;
+    }
 
     if (villager.currentJob != null && !this.jobs.some((job) => job.id === villager.currentJob)) {
       villager.currentJob = null;
@@ -1493,6 +1575,12 @@ export class DemoWorld {
     }
   }
 
+  private setThought(index: number, thought: string, ttl = 40): void {
+    const villager = this.villagers[index];
+    villager.thought = thought;
+    villager.thoughtTtl = ttl;
+  }
+
   private beginEat(index: number): void {
     if (this.withdraw('food', 1) === 0) return;
     const villager = this.villagers[index];
@@ -1502,6 +1590,7 @@ export class DemoWorld {
     villager.state = 'eating';
     villager.activityTicks = EAT_TICKS;
     villager.currentAction = 'eat';
+    this.setThought(index, actionThought('eat'));
   }
 
   private beginSleep(index: number): void {
@@ -1512,6 +1601,7 @@ export class DemoWorld {
     villager.state = 'sleeping';
     villager.activityTicks = SLEEP_TICKS;
     villager.currentAction = 'sleep';
+    this.setThought(index, actionThought('sleep'));
   }
 
   private beginSocialize(index: number): void {
@@ -1522,6 +1612,7 @@ export class DemoWorld {
     villager.state = 'socializing';
     villager.activityTicks = SOCIALIZE_TICKS;
     villager.currentAction = 'socialize';
+    this.setThought(index, actionThought('socialize'));
   }
 
   private beginWork(index: number, jobId: number | null): void {
@@ -1561,6 +1652,7 @@ export class DemoWorld {
     villager.currentJob = claimed;
     villager.currentAction = 'work';
     const job = this.jobs.find((entry) => entry.id === claimed)!;
+    this.setThought(index, jobThought(job.kind));
     this.beginMoveToJob(index, job.tile, claimed);
   }
 
@@ -1623,6 +1715,7 @@ export class DemoWorld {
     );
     if (!target) {
       villager.currentAction = 'wander';
+      this.setThought(index, actionThought('wander'));
       return;
     }
     const path = this.computePath(from, target);
@@ -1632,9 +1725,11 @@ export class DemoWorld {
       villager.target = target;
       villager.path = path;
       villager.currentAction = 'wander';
+      this.setThought(index, actionThought('wander'));
     } else {
       villager.currentAction = 'wander';
       villager.repathCooldown = REPATH_COOLDOWN_TICKS;
+      this.setThought(index, actionThought('wander'));
     }
   }
 
@@ -2469,6 +2564,24 @@ export class DemoWorld {
     return score;
   }
 
+  private buildingStatus(building: DemoBuilding): number {
+    const def = DEMO_CATALOG.buildings[building.kindIndex];
+    if (!building.complete) return 4; // UnderConstruction
+    const anyClaimed = this.jobs.some(
+      (job) => job.site === building.id && job.claimedBy != null,
+    );
+    if (anyClaimed) return 0; // Working
+    if (def.recipe) {
+      if (productionFreeCapacity(building.inventory) === 0) return 3; // IdleOutputFull
+      const hasInputs = Object.entries(def.recipe.inputs).every(
+        ([resource, amount]) => inventoryGet(building.inventory, resource) >= amount,
+      );
+      if (!hasInputs) return 1; // IdleNoInput
+      return 2; // IdleNoWorker
+    }
+    return 0; // Working
+  }
+
   private buildingViews(): BuildingView[] {
     return this.buildings.map((building) => {
       const def = DEMO_CATALOG.buildings[building.kindIndex];
@@ -2483,6 +2596,7 @@ export class DemoWorld {
         rot: building.rot,
         state: building.complete ? 2 : 1,
         progress,
+        status: this.buildingStatus(building),
       };
     });
   }

@@ -8,6 +8,7 @@ use super::terrain::Terrain;
 const BUILDINGS_JSON: &str = include_str!("../../data/buildings.json");
 const CROPS_JSON: &str = include_str!("../../data/crops.json");
 const TRAITS_JSON: &str = include_str!("../../data/traits.json");
+const OBJECTIVES_JSON: &str = include_str!("../../data/objectives.json");
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,6 +69,24 @@ pub struct JobDef {
     pub slots: u32,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ObjectiveCondition {
+    BuildingCount { id: String, count: u32 },
+    Population { count: u32 },
+    Resource { id: String, count: u32 },
+    BuildingUnlocked { id: String },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectiveDef {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub condition: ObjectiveCondition,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Catalog {
@@ -76,6 +95,7 @@ pub struct Catalog {
     pub crops: Vec<CropDef>,
     #[serde(default)]
     pub traits: Vec<TraitDef>,
+    pub objectives: Vec<ObjectiveDef>,
 }
 
 impl Catalog {
@@ -86,10 +106,13 @@ impl Catalog {
             .map_err(|error| format!("invalid crops.json: {error}"))?;
         let traits: Vec<TraitDef> = serde_json::from_str(TRAITS_JSON)
             .map_err(|error| format!("invalid traits.json: {error}"))?;
+        let objectives: Vec<ObjectiveDef> = serde_json::from_str(OBJECTIVES_JSON)
+            .map_err(|error| format!("invalid objectives.json: {error}"))?;
         let catalog = Self {
             buildings,
             crops,
             traits,
+            objectives,
         };
         catalog.validate()?;
         Ok(catalog)

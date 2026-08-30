@@ -19,6 +19,9 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
           <div>
             <div className="font-medium text-white/90">{detail.name}</div>
             <div className="text-[11px] text-white/55">{detail.stateLabel}</div>
+            {detail.thought && (
+              <div className="mt-1 text-[11px] text-amber-300/90">"{detail.thought}"</div>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
             <SegmentedBar label="Hunger" value={detail.hunger} />

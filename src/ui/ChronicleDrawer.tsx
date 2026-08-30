@@ -46,6 +46,29 @@ export function ChronicleDrawer({
         </span>
       </button>
 
+      {entries.length > 0 && (
+        <div className="flex gap-1 overflow-x-auto border-t border-white/10 px-3 py-1.5">
+          {entries.slice(-5).map((entry) => {
+            const text = formatEntry(entry, catalog);
+            return (
+              <button
+                key={entry.seq}
+                type="button"
+                disabled={entry.focus == null}
+                onClick={() => entry.focus && onFocus(entry.focus as [number, number])}
+                title={text}
+                className={[
+                  'pixel-focus shrink-0 truncate rounded px-1.5 py-0.5 text-[10px]',
+                  entry.focus ? 'hover:bg-white/10' : 'cursor-default opacity-50',
+                ].join(' ')}
+              >
+                {text.length > 24 ? `${text.slice(0, 24)}…` : text}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {!collapsed && (
         <div
           ref={scrollRef}

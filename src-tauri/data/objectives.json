@@ -1,0 +1,38 @@
+[
+  {
+    "id": "first_hut",
+    "title": "Shelter",
+    "description": "Build a hut to house more villagers.",
+    "condition": { "buildingCount": { "id": "hut", "count": 1 } }
+  },
+  {
+    "id": "first_farm",
+    "title": "Fields",
+    "description": "Build a farm plot to grow wheat.",
+    "condition": { "buildingCount": { "id": "farm", "count": 1 } }
+  },
+  {
+    "id": "population_10",
+    "title": "Growing village",
+    "description": "Reach a population of 10 villagers.",
+    "condition": { "population": { "count": 10 } }
+  },
+  {
+    "id": "unlock_mill",
+    "title": "Miller",
+    "description": "Unlock the mill by building a granary and reaching 6 villagers.",
+    "condition": { "buildingUnlocked": { "id": "mill" } }
+  },
+  {
+    "id": "feed_village",
+    "title": "Food security",
+    "description": "Stockpile 50 food.",
+    "condition": { "resource": { "id": "food", "count": 50 } }
+  },
+  {
+    "id": "harvest_wheat",
+    "title": "First harvest",
+    "description": "Have 20 grain ready for milling.",
+    "condition": { "resource": { "id": "grain", "count": 20 } }
+  }
+]

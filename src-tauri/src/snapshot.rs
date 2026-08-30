@@ -40,9 +40,14 @@ pub struct TickSnapshot {
     pub unlocked: Vec<String>,
     /// Last rotating autosave slot written this session (`1..=3`), if any.
     pub last_autosave_slot: Option<u8>,
+    /// True when autumn is ending and stored food is too low for winter.
+    pub winter_warning: bool,
+    /// Objective ids that have been completed.
+    pub completed_objectives: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VillagerView {
     pub id: u32,
     pub x: f32,
@@ -53,9 +58,13 @@ pub struct VillagerView {
     /// True while the villager holds a haul stack, so the renderer can pick the carry pose.
     #[serde(default)]
     pub carrying: bool,
+    /// Transient thought bubble text, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thought: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BuildingView {
     pub id: u32,
     pub kind: u8,
@@ -64,6 +73,8 @@ pub struct BuildingView {
     pub rot: u8,
     pub state: u8,
     pub progress: u8,
+    #[serde(default)]
+    pub status: u8,
 }
 
 /// On-demand villager detail for the panel (never in tick payload).
@@ -81,4 +92,7 @@ pub struct VillagerDetail {
     pub job_kind: Option<String>,
     pub job_site: Option<u32>,
     pub traits: Vec<String>,
+    /// Current thought bubble text, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thought: Option<String>,
 }

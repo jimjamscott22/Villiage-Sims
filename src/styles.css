@@ -53,6 +53,21 @@ button, canvas { touch-action: none; }
   outline-offset: 2px;
 }
 
+@keyframes float-up {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+}
+
+.animate-float-up {
+  animation: float-up 1.5s ease-out forwards;
+}
+
 .pixel-icon {
   display: inline-block;
   flex-shrink: 0;

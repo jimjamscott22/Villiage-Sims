@@ -7,7 +7,7 @@ use crate::sim::world::World;
 const SAVE_MAGIC: [u8; 8] = *b"VILSAVE\0";
 const HEADER_LEN: usize = SAVE_MAGIC.len() + size_of::<u32>() + size_of::<u64>();
 const MAX_SAVE_BYTES: u64 = 64 * 1024 * 1024;
-pub const SAVE_VERSION: u32 = 2;
+pub const SAVE_VERSION: u32 = 3;
 
 fn config() -> impl bincode::config::Config {
     bincode::config::standard().with_limit::<{ MAX_SAVE_BYTES as usize }>()
@@ -187,7 +187,7 @@ mod tests {
         bytes[SAVE_MAGIC.len()..SAVE_MAGIC.len() + size_of::<u32>()]
             .copy_from_slice(&1u32.to_le_bytes());
         let error = decode_world(&bytes).expect_err("version must be rejected");
-        assert_eq!(error, "unsupported save version 1 (expected 2)");
+        assert_eq!(error, "unsupported save version 1 (expected 3)");
     }
 
     #[test]
