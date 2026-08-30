@@ -21,10 +21,9 @@ export class SnapshotBuffer {
       const previous = previousById.get(current.id);
       if (!previous) return current;
       return {
-        id: current.id,
+        ...current,
         x: previous.x + (current.x - previous.x) * alpha,
         y: previous.y + (current.y - previous.y) * alpha,
-        state: current.state,
         dx: current.x - previous.x,
         dy: current.y - previous.y,
       };

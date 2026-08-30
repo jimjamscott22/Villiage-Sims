@@ -51,4 +51,20 @@ describe('Raster', () => {
     expect(target.get(0, 0)).toEqual(RED);
     expect(target.get(1, 0)).toEqual(BLUE);
   });
+
+  it('upscales with nearest-neighbour and keeps empty pixels transparent', () => {
+    const source = new Raster(2, 1);
+    source.set(1, 0, BLUE);
+    const scaled = source.scale(2);
+    expect(scaled.width).toBe(4);
+    expect(scaled.height).toBe(2);
+    expect(scaled.get(0, 0)).toEqual([0, 0, 0, 0]);
+    expect(scaled.get(1, 1)).toEqual([0, 0, 0, 0]);
+    expect(scaled.get(2, 0)).toEqual(BLUE);
+    expect(scaled.get(3, 1)).toEqual(BLUE);
+  });
+
+  it('rejects a non-integer scale factor', () => {
+    expect(() => new Raster(1, 1).scale(1.5)).toThrow(/positive integer/);
+  });
 });

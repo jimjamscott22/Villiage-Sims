@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Catalog, ObjectiveDef } from '../state/types';
 import { PixelText } from './PixelText';
 
@@ -25,49 +25,74 @@ function conditionText(def: ObjectiveDef): string {
 }
 
 export function ObjectivesPanel({ catalog, completed }: ObjectivesPanelProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const completedSet = new Set(completed);
   const objectives = catalog?.objectives ?? [];
   const active = objectives.filter((obj) => !completedSet.has(obj.id));
   const done = objectives.filter((obj) => completedSet.has(obj.id));
+  const current = active[0] ?? null;
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   return (
-    <section className="pixel-panel shrink-0 text-xs text-white/80">
+    <div ref={rootRef} className="relative">
       <button
         type="button"
-        onClick={() => setCollapsed((value) => !value)}
-        className="pixel-focus flex h-8 w-full items-center gap-2 px-4 text-left hover:bg-white/5"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        data-testid="objectives-menu"
+        onClick={() => setOpen((value) => !value)}
+        title={current?.title ?? 'Objectives'}
+        className="pixel-btn pixel-focus flex items-center gap-2 px-2 py-1"
       >
-        <span className="text-white/45">{collapsed ? '▸' : '▾'}</span>
-        <span className="text-white/45">
-          <PixelText text="OBJECTIVES" />
-        </span>
-        <span className="ml-auto text-white/55">
+        <PixelText text="OBJECTIVES" />
+        <span className="text-[11px] text-[#f7f4e9]">
           {completed.length}/{objectives.length}
         </span>
       </button>
 
-      {!collapsed && (
-        <div className="max-h-48 overflow-y-auto border-t border-white/10 px-4 py-2">
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Objectives"
+          className="pixel-panel absolute right-0 top-full z-30 mt-1 w-72 p-3 text-xs"
+        >
           {objectives.length === 0 && (
-            <p className="text-white/45">No objectives available.</p>
+            <p className="text-[#d4cfc0]">No objectives available.</p>
           )}
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto">
             {active.map((obj) => (
               <li key={obj.id} className="flex flex-col gap-0.5">
-                <div className="font-medium text-white/90">{obj.title}</div>
-                <div className="text-[11px] text-white/55">{obj.description}</div>
-                <div className="text-[10px] text-amber-300/70">{conditionText(obj)}</div>
+                <div className="font-medium text-[#f7f4e9]">{obj.title}</div>
+                <div className="text-[11px] leading-snug text-[#d4cfc0]">{obj.description}</div>
+                <div className="text-[10px] text-amber-200">{conditionText(obj)}</div>
               </li>
             ))}
             {done.length > 0 && (
-              <li className="mt-1 border-t border-white/10 pt-1 text-[10px] text-white/40">
+              <li className="mt-1 border-t border-white/10 pt-2 text-[10px] text-[#c5c0a8]">
                 Completed: {done.map((obj) => obj.title).join(', ')}
               </li>
             )}
           </ul>
         </div>
       )}
-    </section>
+    </div>
   );
 }

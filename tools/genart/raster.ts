@@ -41,4 +41,24 @@ export class Raster {
       }
     }
   }
+
+  /** Integer nearest-neighbour upscale. Transparent pixels stay empty. */
+  scale(factor: number): Raster {
+    if (!Number.isInteger(factor) || factor < 1) {
+      throw new Error(`Raster.scale: factor must be a positive integer, got ${factor}`);
+    }
+    const out = new Raster(this.width * factor, this.height * factor);
+    for (let y = 0; y < this.height; y += 1) {
+      for (let x = 0; x < this.width; x += 1) {
+        const pixel = this.get(x, y);
+        if (pixel[3] === 0) continue;
+        for (let dy = 0; dy < factor; dy += 1) {
+          for (let dx = 0; dx < factor; dx += 1) {
+            out.set(x * factor + dx, y * factor + dy, pixel);
+          }
+        }
+      }
+    }
+    return out;
+  }
 }

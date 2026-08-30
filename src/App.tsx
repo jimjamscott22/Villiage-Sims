@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Canvas } from './render/Canvas';
 import { formatEntry } from './state/chronicle';
 import { transport } from './state/transport';
@@ -99,6 +99,13 @@ export default function App() {
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const floaterIdRef = useRef(0);
   const lastResourcesRef = useRef<ResourceTotals | null>(null);
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+  const dismissFloater = useCallback((id: number) => {
+    setFloaters((prev) => prev.filter((f) => f.id !== id));
+  }, []);
 
   const onSnapshot = (snapshot: TickSnapshot) => {
     const previous = lastResourcesRef.current;
@@ -248,7 +255,7 @@ export default function App() {
 
   return (
     <main className="flex h-full flex-col bg-[#17211b] text-[#f7f4e9]">
-      <header className="pixel-panel flex h-12 shrink-0 items-center gap-4 px-4">
+      <header className="pixel-panel relative z-20 flex h-12 shrink-0 items-center gap-3 px-4">
         <h1 className="text-base border-r border-white/10 pr-4">
           <PixelText text="VILLAGESIM" />
         </h1>
@@ -257,9 +264,36 @@ export default function App() {
           onSetSpeed={(speed) => { void onSetSpeed(speed); }}
           winterWarning={winterWarning}
         />
-        <span className="ml-auto border-l border-white/10 pl-4 text-xs text-white/60">
-          {transport.mode === 'tauri' ? 'Simulation connected' : 'Browser demo'}
-        </span>
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          <ObjectivesPanel catalog={catalog} completed={completedObjectives} />
+          <button
+            type="button"
+            data-testid="save-game"
+            disabled={persistenceBusy}
+            title={persistenceStatus}
+            onClick={() => {
+              void onSave();
+            }}
+            className="pixel-btn pixel-focus px-2 py-1 disabled:cursor-wait disabled:opacity-40"
+          >
+            <PixelText text="SAVE" />
+          </button>
+          <button
+            type="button"
+            data-testid="load-game"
+            disabled={persistenceBusy}
+            title={persistenceStatus}
+            onClick={() => {
+              void onLoad();
+            }}
+            className="pixel-btn pixel-focus px-2 py-1 disabled:cursor-wait disabled:opacity-40"
+          >
+            <PixelText text="LOAD" />
+          </button>
+          <span className="border-l border-white/10 pl-3 text-xs text-white/60">
+            {transport.mode === 'tauri' ? 'Simulation connected' : 'Browser demo'}
+          </span>
+        </div>
       </header>
       <ResourceBar resources={resources} population={population} housingCapacity={housingCapacity} />
       {error && (
@@ -268,7 +302,7 @@ export default function App() {
         </p>
       )}
       <div className="flex min-h-0 flex-1">
-        <div className="relative min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
           <Canvas
             key={worldKey}
             catalog={catalog}
@@ -289,17 +323,14 @@ export default function App() {
           />
           <ToastStack
             toasts={toasts}
-            onDismiss={(id) => setToasts((prev) => prev.filter((toast) => toast.id !== id))}
+            onDismiss={dismissToast}
             onFocus={(tile) =>
               setFocusTile((previous) => ({ tile, nonce: (previous?.nonce ?? 0) + 1 }))
             }
           />
-          <FloatingText
-            floaters={floaters}
-            onDismiss={(id) => setFloaters((prev) => prev.filter((f) => f.id !== id))}
-          />
+          <FloatingText floaters={floaters} onDismiss={dismissFloater} />
         </div>
-        <div className="flex min-h-0 shrink-0 flex-col gap-2">
+        <div className="flex min-h-0 w-56 shrink-0 flex-col">
           <BuildMenu
             catalog={catalog}
             selectedKind={selectedKind}
@@ -307,8 +338,6 @@ export default function App() {
             selectedBuildingId={selectedBuildingId}
             villagerDetail={villagerDetail}
             unlocked={unlocked}
-            persistenceStatus={persistenceStatus}
-            persistenceBusy={persistenceBusy}
             onSelectKind={(kind) => {
               setSelectedKind(kind);
               setSelectedCrop(null);
@@ -323,14 +352,7 @@ export default function App() {
             onDemolish={() => {
               void onDemolish();
             }}
-            onSave={() => {
-              void onSave();
-            }}
-            onLoad={() => {
-              void onLoad();
-            }}
           />
-          <ObjectivesPanel catalog={catalog} completed={completedObjectives} />
         </div>
       </div>
       <ChronicleDrawer

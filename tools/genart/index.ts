@@ -1,8 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { DESKTOP_PNGS, rasterForIconSize, renderAppIcon } from './app-icon';
 import { buildAtlas } from './build';
 import { rasterizeGrid } from './grid';
-import { ART_DIR } from './paths';
+import { APP_ICON_PATH, ART_DIR, ICONS_DIR } from './paths';
 import { encodePng } from './png';
 import { PANEL } from './sprites/ui';
 
@@ -23,6 +24,17 @@ function main(): void {
 
   writeFileSync(join(ART_DIR, 'atlas.json'), `${JSON.stringify(atlas.manifest, null, 2)}\n`);
   console.log(`atlas.json  ${Object.keys(atlas.manifest.cells).length} cells`);
+
+  const icon = renderAppIcon();
+  writeFileSync(APP_ICON_PATH, encodePng(icon.width, icon.height, icon.rgba));
+  console.log(`app-icon.png  ${icon.width}x${icon.height}`);
+
+  mkdirSync(ICONS_DIR, { recursive: true });
+  for (const { file, size } of DESKTOP_PNGS) {
+    const raster = rasterForIconSize(size);
+    writeFileSync(join(ICONS_DIR, file), encodePng(raster.width, raster.height, raster.rgba));
+    console.log(`${file}  ${raster.width}x${raster.height}`);
+  }
 }
 
 main();
