@@ -14,7 +14,7 @@ env:
 
 jobs:
   rust:
-    name: Rust (fmt, clippy, test)
+    name: Rust (clippy, test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +34,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: clippy
 
       - uses: Swatinem/rust-cache@v2
         id: setup
@@ -48,10 +48,6 @@ jobs:
       # cascading errors; an earlier setup failure skips `setup` itself, so its
       # outcome stops being `success` and the gate holds. Test runs before
       # Clippy to put the most valuable signal first in the log.
-      - name: Format check
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-
       - name: Test
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib

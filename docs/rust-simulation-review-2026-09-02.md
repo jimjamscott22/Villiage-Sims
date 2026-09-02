@@ -171,4 +171,4 @@ A separate probe resumed a worker carrying grain to the stockpile after a needs 
 3. Address R5/R6 with conservation and completed-tick autosave checks, then extend replay coverage across seasons and representative player commands.
 4. Decide which traits and home/food/social routines to implement. Add explanations of villager decisions before tuning utility curves blindly.
 
-The PR changes only the two critical behaviors, their browser counterparts, regression coverage, and this review document. All deferred findings remain open.
+The simulation changes are limited to the two critical behaviors and their browser counterparts, with regression coverage and this review document. The CI workflow also removes the Rust formatting check; Rust unit tests and Clippy remain enabled. All deferred findings remain open.
