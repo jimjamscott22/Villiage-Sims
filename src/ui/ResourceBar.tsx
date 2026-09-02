@@ -26,15 +26,24 @@ export function ResourceBar({ resources, population, housingCapacity }: Resource
       {population != null && housingCapacity != null && (
         <div className="pixel-chip flex items-center gap-2 px-2 py-1">
           <span className="text-white/60 text-[11px]">Pop</span>
-          <PixelText text={`${population}/${housingCapacity}`} />
+          {/* Keying on the value itself remounts this span whenever it changes,
+              which replays the pulse animation with no extra state/timers. */}
+          <span key={`${population}/${housingCapacity}`} className="animate-resource-pulse">
+            <PixelText text={`${population}/${housingCapacity}`} />
+          </span>
         </div>
       )}
-      {ENTRIES.map(({ key, label, icon }) => (
-        <div key={key} className="pixel-chip flex items-center gap-1.5 px-2 py-1" title={label}>
-          <span className="pixel-icon" style={uiIconStyle(icon)} />
-          <PixelText text={resources?.[key] != null ? String(resources[key]) : '-'} />
-        </div>
-      ))}
+      {ENTRIES.map(({ key, label, icon }) => {
+        const value = resources?.[key];
+        return (
+          <div key={key} className="pixel-chip flex items-center gap-1.5 px-2 py-1" title={label}>
+            <span className="pixel-icon" style={uiIconStyle(icon)} />
+            <span key={value ?? 'empty'} className="animate-resource-pulse">
+              <PixelText text={value != null ? String(value) : '-'} />
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

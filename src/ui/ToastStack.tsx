@@ -62,7 +62,7 @@ function ToastItem({ toast, onDismiss, onFocus }: ToastItemProps) {
         onDismiss(toast.id);
       }}
       className={[
-        'pointer-events-auto flex items-center gap-2 rounded border px-2.5 py-1.5 text-left text-xs shadow-lg backdrop-blur-sm transition-opacity',
+        'animate-toast-in pointer-events-auto flex items-center gap-2 border-2 px-2.5 py-1.5 text-left text-xs transition-opacity',
         style,
         clickable ? 'cursor-pointer hover:opacity-90' : 'cursor-default',
       ].join(' ')}

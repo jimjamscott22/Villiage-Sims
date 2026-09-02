@@ -29,10 +29,18 @@ button, canvas { touch-action: none; }
   border-image: url(/art/panel.png) 6 fill repeat;
   image-rendering: pixelated;
   background-color: #26454f;
+  /* Declared here (not left to Tailwind's per-element `transition` utility)
+     so every pixel-btn gets the same hover fade and press squash whether or
+     not its className happens to include `transition`. */
+  transition: background-color 120ms ease-out, transform 80ms ease-out;
 }
 
 .pixel-btn:hover:not(:disabled) {
   background-color: #2f5562;
+}
+
+.pixel-btn:active:not(:disabled) {
+  transform: scale(0.94);
 }
 
 .pixel-btn-active {
@@ -67,6 +75,37 @@ button, canvas { touch-action: none; }
 
 .animate-float-up {
   animation: float-up 1.5s ease-out forwards;
+}
+
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 220ms ease-out;
+}
+
+/* Applied to a span keyed on the resource's value, so React remounts it
+   (and the animation replays) every time the number actually changes. */
+@keyframes resource-pulse {
+  0% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-resource-pulse {
+  display: inline-flex;
+  animation: resource-pulse 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .pixel-icon {
