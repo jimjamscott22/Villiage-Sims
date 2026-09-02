@@ -77,6 +77,38 @@ export class Camera {
     );
   }
 
+  /**
+   * Keep the visible viewport from drifting far past the world edge. Beyond
+   * the generated terrain there's nothing drawn — just the canvas clear
+   * color — so unclamped panning reads as falling off the edge of the
+   * world instead of "you've left the map." `overscrollPx` (screen pixels,
+   * so it feels consistent at any zoom) is how far past the coastline the
+   * viewport may still drift.
+   */
+  clampToWorld(
+    worldWidth: number,
+    worldHeight: number,
+    viewWidth: number,
+    viewHeight: number,
+    overscrollPx = 0,
+  ): void {
+    const overscroll = overscrollPx / this.zoom;
+    const viewW = viewWidth / this.zoom;
+    const viewH = viewHeight / this.zoom;
+
+    if (viewW >= worldWidth) {
+      this.x = (worldWidth - viewW) / 2;
+    } else {
+      this.x = Math.min(worldWidth - viewW + overscroll, Math.max(-overscroll, this.x));
+    }
+
+    if (viewH >= worldHeight) {
+      this.y = (worldHeight - viewH) / 2;
+    } else {
+      this.y = Math.min(worldHeight - viewH + overscroll, Math.max(-overscroll, this.y));
+    }
+  }
+
   /** World-space viewport rectangle currently visible. */
   visibleWorldRect(viewWidth: number, viewHeight: number): { x: number; y: number; w: number; h: number } {
     return {

@@ -27,6 +27,7 @@ const VIEWPORT_DEBOUNCE_MS = 100;
 const EDGE_SCROLL_MARGIN = 24;
 const EDGE_SCROLL_SPEED = 6;
 const CLICK_DRAG_THRESHOLD = 6;
+const CAMERA_OVERSCROLL_PX = 120;
 
 interface CanvasProps {
   catalog: Catalog | null;
@@ -363,6 +364,7 @@ export function Canvas({
         else if (pointerY > viewHeight - EDGE_SCROLL_MARGIN) dy = -EDGE_SCROLL_SPEED;
         if (dx !== 0 || dy !== 0) {
           camera.panBy(dx, dy);
+          camera.clampToWorld(worldWidth, worldHeight, viewWidth, viewHeight, CAMERA_OVERSCROLL_PX);
           scheduleViewportSync();
           void refreshGhost();
         }
@@ -661,6 +663,7 @@ export function Canvas({
         lastPointerX = event.clientX;
         lastPointerY = event.clientY;
         camera.panBy(dx, dy);
+        camera.clampToWorld(worldWidth, worldHeight, viewWidth, viewHeight, CAMERA_OVERSCROLL_PX);
         scheduleViewportSync();
       }
     };
@@ -747,6 +750,7 @@ export function Canvas({
       const sy = event.clientY - bounds.top;
       const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
       camera.zoomAt(sx, sy, camera.zoom * factor);
+      camera.clampToWorld(worldWidth, worldHeight, viewWidth, viewHeight, CAMERA_OVERSCROLL_PX);
       scheduleViewportSync();
       void refreshGhost();
     };
