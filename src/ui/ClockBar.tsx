@@ -39,7 +39,7 @@ export function ClockBar({ clock, onSetSpeed, winterWarning }: ClockBarProps) {
         {winterWarning && (
           <span
             title="Food stores are low for winter — gather or produce more!"
-            className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-900/80 text-[10px] font-bold text-rose-200 ring-1 ring-rose-500/60"
+            className="ml-1 flex h-4 w-4 items-center justify-center border-2 border-rose-500/70 bg-rose-900/80 text-[10px] font-bold text-rose-200"
           >
             !
           </span>

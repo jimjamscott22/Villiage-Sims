@@ -13,7 +13,7 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
         <PixelText text="VILLAGER" />
       </h2>
       {!detail ? (
-        <p className="mt-2 text-[11px] text-white/45">No villager selected.</p>
+        <p className="mt-2 text-[11px] text-white/60">No villager selected.</p>
       ) : (
         <div className="mt-2 flex flex-col gap-2">
           <div>
@@ -34,7 +34,7 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
               {detail.traits.map((t) => (
                 <span
                   key={t}
-                  className="rounded bg-emerald-950/80 px-1.5 py-0.5 text-[10px] text-emerald-300 border border-emerald-800/40"
+                  className="bg-emerald-950/80 px-1.5 py-0.5 text-[10px] text-emerald-300 border-2 border-emerald-800/60"
                 >
                   {t.replace(/_/g, ' ')}
                 </span>

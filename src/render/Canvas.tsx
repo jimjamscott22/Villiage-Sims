@@ -811,7 +811,7 @@ export function Canvas({
           role="tooltip"
           data-testid="entity-tooltip"
           data-entity={`${hovered.kind}:${hovered.id}`}
-          className="pixel-panel pointer-events-none absolute z-10 min-w-32 max-w-56 px-2 py-1.5 text-xs drop-shadow-lg"
+          className="pixel-panel pointer-events-none absolute z-10 min-w-32 max-w-56 px-2 py-1.5 text-xs"
           style={{
             left: hovered.x + (hovered.placeLeft ? -12 : 12),
             top: hovered.y + (hovered.placeAbove ? -12 : 12),

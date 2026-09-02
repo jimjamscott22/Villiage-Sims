@@ -39,8 +39,8 @@ export function ChronicleDrawer({
         aria-expanded={!collapsed}
         className="pixel-focus flex h-8 w-full items-center gap-2 px-4 text-left hover:bg-white/5"
       >
-        <span className="text-white/45">{collapsed ? '▸' : '▾'}</span>
-        <span className="text-white/45">Chronicle</span>
+        <span className="text-white/60">{collapsed ? '▸' : '▾'}</span>
+        <span className="text-white/60">Chronicle</span>
         <span className="truncate text-white/80">
           {newest ? formatEntry(newest, catalog) : CHRONICLE_EMPTY_MESSAGE}
         </span>
@@ -58,7 +58,7 @@ export function ChronicleDrawer({
                 onClick={() => entry.focus && onFocus(entry.focus as [number, number])}
                 title={text}
                 className={[
-                  'pixel-focus shrink-0 truncate rounded px-1.5 py-0.5 text-[10px]',
+                  'pixel-focus shrink-0 truncate px-1.5 py-0.5 text-[10px]',
                   entry.focus ? 'hover:bg-white/10' : 'cursor-default opacity-50',
                 ].join(' ')}
               >
@@ -79,7 +79,7 @@ export function ChronicleDrawer({
           }}
           className="max-h-48 overflow-y-auto border-t border-white/10 px-4 py-2"
         >
-          {entries.length === 0 && <p className="text-white/45">{CHRONICLE_EMPTY_MESSAGE}</p>}
+          {entries.length === 0 && <p className="text-white/60">{CHRONICLE_EMPTY_MESSAGE}</p>}
           <ul className="flex flex-col gap-0.5">
             {entries.map((entry, index) => {
               const previous = index === 0 ? null : entries[index - 1];
@@ -93,7 +93,7 @@ export function ChronicleDrawer({
                     // never applied.
                     <li
                       aria-hidden
-                      className="mt-2 border-b border-white/10 pb-1 text-[10px] uppercase tracking-wide text-white/35 first:mt-0"
+                      className="mt-2 border-b border-white/10 pb-1 text-[10px] uppercase tracking-wide text-white/60 first:mt-0"
                     >
                       {formatDivider(entry)}
                     </li>
@@ -103,7 +103,7 @@ export function ChronicleDrawer({
                       <button
                         type="button"
                         onClick={() => onFocus(entry.focus as [number, number])}
-                        className="pixel-focus w-full rounded px-1 py-0.5 text-left hover:bg-white/10"
+                        className="pixel-focus w-full px-1 py-0.5 text-left hover:bg-white/10"
                       >
                         {text}
                       </button>

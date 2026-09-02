@@ -255,16 +255,18 @@ export default function App() {
 
   return (
     <main className="flex h-full flex-col bg-[#17211b] text-[#f7f4e9]">
-      <header className="pixel-panel relative z-20 flex h-12 shrink-0 items-center gap-3 px-4">
+      <header className="pixel-panel relative z-20 grid h-12 shrink-0 grid-cols-[auto_1fr_auto] items-center gap-3 px-4">
         <h1 className="text-base border-r border-white/10 pr-4">
           <PixelText text="VILLAGESIM" />
         </h1>
-        <ClockBar
-          clock={clock}
-          onSetSpeed={(speed) => { void onSetSpeed(speed); }}
-          winterWarning={winterWarning}
-        />
-        <div className="ml-auto flex min-w-0 items-center gap-2">
+        <div className="flex justify-center overflow-hidden">
+          <ClockBar
+            clock={clock}
+            onSetSpeed={(speed) => { void onSetSpeed(speed); }}
+            winterWarning={winterWarning}
+          />
+        </div>
+        <div className="flex min-w-0 items-center gap-2 justify-self-end">
           <ObjectivesPanel catalog={catalog} completed={completedObjectives} />
           <button
             type="button"
@@ -297,7 +299,7 @@ export default function App() {
       </header>
       <ResourceBar resources={resources} population={population} housingCapacity={housingCapacity} />
       {error && (
-        <p role="alert" className="bg-red-950/90 px-4 py-2 text-sm text-red-100">
+        <p role="alert" className="border-y-2 border-red-500/50 bg-red-950/90 px-4 py-2 text-sm text-red-100">
           {error}
         </p>
       )}
