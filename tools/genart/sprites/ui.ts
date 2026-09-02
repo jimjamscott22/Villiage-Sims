@@ -157,15 +157,25 @@ function icon16(
   return grid(16, 16, palette, paint);
 }
 
-export const ICON_WOOD = icon16({ b: P.terraDark, l: P.terraLight, i: P.ink, h: P.wheat }, (set) => {
-  for (let y = 4; y <= 13; y += 1) {
-    for (let x = 5; x <= 10; x += 1) {
-      set(x, y, y < 6 ? 'l' : 'b');
+/** Pile of three cut log-ends — timber tones, kept clear of the terracotta
+ * family used by food/autumn so the resource bar doesn't read as one blur
+ * of orange squares. */
+export const ICON_WOOD = icon16({ m: P.stoneMid, l: P.sandMid, i: P.ink }, (set) => {
+  const logs: Array<[number, number]> = [
+    [5, 10],
+    [11, 10],
+    [8, 6],
+  ];
+  for (const [cx, cy] of logs) {
+    for (let y = cy - 3; y <= cy + 3; y += 1) {
+      for (let x = cx - 3; x <= cx + 3; x += 1) {
+        const dist = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+        if (dist > 9) continue;
+        set(x, y, dist > 6 ? 'i' : 'm');
+      }
     }
+    set(cx, cy, 'l');
   }
-  for (let x = 4; x <= 11; x += 1) set(x, 3, 'i');
-  set(7, 2, 'h');
-  set(8, 2, 'h');
 });
 
 export const ICON_STONE = icon16( { m: P.stoneMid, l: P.stoneLight, d: P.stoneShadow, i: P.ink }, (set) => {
@@ -218,15 +228,21 @@ export const ICON_FOOD = icon16( { c: P.terraLight, d: P.terraDark, i: P.ink, w:
   set(9, 5, 'w');
 });
 
-export const ICON_GOLD = icon16( { g: P.wheat, d: P.terraDark, l: P.sandPale, i: P.ink }, (set) => {
-  for (let y = 6; y <= 11; y += 1) {
-    for (let x = 5; x <= 10; x += 1) {
-      const edge = y === 6 || y === 11 || x === 5 || x === 10;
-      set(x, y, edge ? 'i' : 'g');
+/** A round coin, not a framed square — reads as currency at a glance. */
+export const ICON_GOLD = icon16({ g: P.wheat, l: P.sandPale, i: P.ink }, (set) => {
+  const cx = 8;
+  const cy = 8;
+  const r = 5;
+  for (let y = cy - r; y <= cy + r; y += 1) {
+    for (let x = cx - r; x <= cx + r; x += 1) {
+      const dist = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+      if (dist > r * r) continue;
+      set(x, y, dist > 20 ? 'i' : 'g');
     }
   }
-  set(7, 8, 'l');
-  set(8, 8, 'l');
+  set(6, 5, 'l');
+  set(6, 6, 'l');
+  set(7, 5, 'l');
 });
 
 export const ICON_SPRING = icon16( { p: P.vegPale, g: P.vegLight, s: P.shutter, i: P.ink }, (set) => {
@@ -260,15 +276,31 @@ export const ICON_SUMMER = icon16( { y: P.wheat, o: P.terraLight, i: P.ink }, (s
   }
 });
 
-export const ICON_AUTUMN = icon16( { r: P.terraMid, o: P.terraLight, i: P.ink, b: P.terraDark }, (set) => {
-  set(7, 4, 'b');
-  set(6, 5, 'o');
-  set(8, 5, 'r');
-  set(5, 6, 'r');
-  set(9, 6, 'o');
-  set(6, 7, 'r');
-  set(8, 7, 'o');
-  set(7, 8, 'i');
+/** A single falling leaf, sized to match the other season icons — the old
+ * mark was an 8-pixel blob that read as a gem, not foliage. */
+const AUTUMN_LEAF = [
+  '......ii........',
+  '.....irri.......',
+  '....irrrri......',
+  '....irrrri......',
+  '...irrrrrri.....',
+  '...ioorrrri.....',
+  '...iooorroi.....',
+  '....ioorroi.....',
+  '.....iorroi.....',
+  '......iorio.....',
+  '.......iri......',
+  '.......iri......',
+  '........i.......',
+];
+
+export const ICON_AUTUMN = icon16({ r: P.terraDark, o: P.terraLight, i: P.ink }, (set) => {
+  AUTUMN_LEAF.forEach((row, y) => {
+    for (let x = 0; x < 16; x += 1) {
+      const c = row[x];
+      if (c === 'i' || c === 'r' || c === 'o') set(x, y, c);
+    }
+  });
 });
 
 export const ICON_WINTER = icon16( { w: P.whitewash, b: P.shutter, i: P.ink }, (set) => {
@@ -299,13 +331,19 @@ export const ICON_PAUSE = icon16( { f: P.whitewash, i: P.ink }, (set) => {
   }
 });
 
+/** Right-pointing »-chevrons, thick and outline-free — reads as playback
+ * speed at a glance. The old version drew two thin diagonal strokes that
+ * never converged to a point, which rendered as a scatter of dots. */
 function speedIcon(chevrons: number): SpriteGrid {
-  return icon16({ c: P.whitewash, i: P.ink }, (set) => {
+  return icon16({ c: P.whitewash }, (set) => {
+    const size = 5;
     for (let n = 0; n < chevrons; n += 1) {
-      const ox = 4 + n * 3;
-      for (let i = 0; i < 5; i += 1) {
-        set(ox + i, 5 + i, 'c');
-        set(ox + i, 10 - i, 'c');
+      const ox = 3 + n * 3;
+      for (let i = 0; i < size; i += 1) {
+        for (let t = 0; t < 2; t += 1) {
+          set(ox + i, 3 + i + t, 'c');
+          set(ox + i, 12 - i - t, 'c');
+        }
       }
     }
   });
