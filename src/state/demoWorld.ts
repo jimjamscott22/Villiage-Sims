@@ -1444,6 +1444,11 @@ export class DemoWorld {
       }
     }
 
+    // Match Rust: starvation can interrupt travel, retaining the work claim and cargo.
+    if (villager.needs.hunger === 0 && villager.state !== 'eating' && this.deriveTotals().food > 0) {
+      this.beginEat(index);
+    }
+
     switch (villager.state) {
       case 'eating':
         this.tickEating(index);
@@ -1664,7 +1669,8 @@ export class DemoWorld {
         return job.gatherTile != null
           && this.nodes.some((node) => this.sameTile(node.tile, job.gatherTile!) && node.amount > 0);
       case 'haul':
-        return this.villagers[villagerIndex].carrying != null || this.findHaulTask() != null;
+        return this.villagers[villagerIndex].carrying != null
+          || this.findHaulTask(this.posToTile(this.villagers[villagerIndex].x, this.villagers[villagerIndex].y)) != null;
       case 'produce': {
         const building = this.buildings.find((entry) => entry.id === job.site);
         if (!building || !building.complete) return false;
@@ -2197,7 +2203,7 @@ export class DemoWorld {
       const free = storageFreeCapacity(def, building.inventory);
       if (free === 0) continue;
       const stand = this.buildingStandTile(building.id);
-      if (!stand) continue;
+      if (!stand || !this.computePath(from, stand)) continue;
       const dist = Math.abs(stand[0] - from[0]) + Math.abs(stand[1] - from[1]);
       if (!best || dist < best.dist || (dist === best.dist && building.id < best.id)) {
         best = { id: building.id, free, dist };
@@ -2206,13 +2212,13 @@ export class DemoWorld {
     return best ? { id: best.id, free: best.free } : null;
   }
 
-  private findHaulTask(): HaulTask | null {
+  private findHaulTask(workerTile: [number, number]): HaulTask | null {
     for (const source of this.buildings) {
       if (!source.complete) continue;
       const def = DEMO_CATALOG.buildings[source.kindIndex];
       if (def.category !== 'production') continue;
       const sourceStand = this.buildingStandTile(source.id);
-      if (!sourceStand) continue;
+      if (!sourceStand || !this.computePath(workerTile, sourceStand)) continue;
       for (const [resource, available] of Object.entries(source.inventory)) {
         if (available <= 0) continue;
         if (def.recipe && !(resource in def.recipe.outputs)) continue;
@@ -2225,7 +2231,8 @@ export class DemoWorld {
             to: storage.id,
           };
         }
-        if (stockpileAccepts(resource)) {
+        const stockpile = this.stockpileStand();
+        if (stockpileAccepts(resource) && stockpile && this.computePath(sourceStand, stockpile)) {
           return {
             resource,
             amount: Math.min(available, CARRY_STACK_MAX),
@@ -2242,14 +2249,17 @@ export class DemoWorld {
       const recipe = def.recipe;
       if (!recipe) continue;
       const room = productionFreeCapacity(dest.inventory);
-      if (room === 0 || !this.buildingStandTile(dest.id)) continue;
+      const destStand = this.buildingStandTile(dest.id);
+      if (room === 0 || !destStand) continue;
       for (const [resource, required] of Object.entries(recipe.inputs)) {
         const have = inventoryGet(dest.inventory, resource);
         if (have >= required) continue;
         const needed = required - have;
         if (stockpileAccepts(resource)) {
           const available = resourceGet(this.resources, resource);
-          if (available > 0 && this.stockpileStand()) {
+          const stockpile = this.stockpileStand();
+          if (available > 0 && stockpile
+            && this.computePath(workerTile, stockpile) && this.computePath(stockpile, destStand)) {
             return {
               resource,
               amount: Math.min(available, needed, room, CARRY_STACK_MAX),
@@ -2263,7 +2273,9 @@ export class DemoWorld {
           const available = inventoryGet(source.inventory, resource);
           if (available === 0) continue;
           const sourceDef = DEMO_CATALOG.buildings[source.kindIndex];
-          if (!storageAccepts(sourceDef, resource) || !this.buildingStandTile(source.id)) continue;
+          const sourceStand = this.buildingStandTile(source.id);
+          if (!storageAccepts(sourceDef, resource) || !sourceStand
+            || !this.computePath(workerTile, sourceStand) || !this.computePath(sourceStand, destStand)) continue;
           return {
             resource,
             amount: Math.min(available, needed, room, CARRY_STACK_MAX),
@@ -2333,7 +2345,7 @@ export class DemoWorld {
       return;
     }
 
-    const task = this.findHaulTask();
+    const task = this.findHaulTask(from);
     if (!task) return;
     const sourceStand = this.endpointStandTile(task.from);
     if (!sourceStand) return;

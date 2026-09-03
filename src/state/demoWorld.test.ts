@@ -320,12 +320,12 @@ describe('DemoWorld pathfinding', () => {
     const granaryId = completeBuilding(world, 'granary', 4, 0);
     inventoryAdd(world.buildings.find((entry) => entry.id === farmId)!.inventory, 'grain', 6);
     const internals = world as unknown as {
-      findHaulTask(): { resource: string; amount: number; from: number | 'stockpile'; to: number | 'stockpile' } | null;
+      findHaulTask(from: [number, number]): { resource: string; amount: number; from: number | 'stockpile'; to: number | 'stockpile' } | null;
       takeFromEndpoint(endpoint: number | 'stockpile', resource: string, amount: number): number;
       depositToStorage(endpoint: number | 'stockpile', resource: string, amount: number): number;
     };
 
-    const task = internals.findHaulTask();
+    const task = internals.findHaulTask([3, 3]);
     expect(task).toEqual({ resource: 'grain', amount: 5, from: farmId, to: granaryId });
     const taken = internals.takeFromEndpoint(task!.from, task!.resource, task!.amount);
     const deposited = internals.depositToStorage(task!.to, task!.resource, taken);
@@ -636,5 +636,85 @@ describe('DemoWorld pathfinding', () => {
     const world = new DemoWorld(grassTerrain());
     expect(() => world.moveVillagerTo(6, 6, 9999)).not.toThrow();
     expect(world.snapshot().villagers.some((entry) => entry.state === 1)).toBe(true);
+  });
+});
+
+
+describe('simulation review regressions', () => {
+  it('interrupts a starving worker trip to eat while keeping the job claim', () => {
+    const world = new DemoWorld(grassTerrain(64, 64));
+    const internals = world as unknown as {
+      villagers: Array<{ id: number; x: number; y: number; needs: { hunger: number }; currentJob: number | null; state: string }>;
+      jobs: Array<{ id: number; claimedBy: number | null }>;
+    };
+    internals.villagers.splice(1);
+    Object.assign(internals.villagers[0], { x: 16, y: 16 });
+    internals.villagers[0].needs.hunger = 0.001;
+    world.resources.food = 0;
+    world.nodes = [{ tile: [60, 0], resource: 'wood', amount: 5, max: 5, regenAcc: 0 }];
+    world.advance();
+    const job = internals.villagers[0].currentJob;
+    expect(job).not.toBeNull();
+    expect(internals.villagers[0].state).toBe('moving');
+    world.resources.food = 10;
+
+    for (let i = 0; i < 80; i += 1) world.advance();
+
+    expect(internals.villagers[0].needs.hunger).toBeGreaterThan(0.99);
+    expect(world.resources.food).toBe(9);
+    expect(internals.villagers[0].currentJob).toBe(job);
+    expect(internals.jobs.find((j) => j.id === job)?.claimedBy).toBe(internals.villagers[0].id);
+  });
+
+  it('supplies an accessible bakery despite an enclosed farm pickup', () => {
+    const terrain = grassTerrain(24, 24);
+    const world = new DemoWorld(terrain);
+    world.resources.wood = 1000;
+    world.resources.stone = 1000;
+    world.resources.grain = 0;
+    world.resources.flour = 10;
+    world.resources.food = 0;
+    const farm = completeBuilding(world, 'farm', 3, 3);
+    completeBuilding(world, 'granary', 10, 5);
+    const bakery = completeBuilding(world, 'bakery', 14, 9);
+    inventoryAdd(world.buildings.find((b) => b.id === farm)!.inventory, 'grain', 5);
+    for (let y = 1; y <= 7; y += 1) {
+      for (let x = 1; x <= 7; x += 1) {
+        if (x === 1 || x === 7 || y === 1 || y === 7) terrain.tiles[y * 24 + x] = 5; // rock
+      }
+    }
+    const internals = world as unknown as {
+      findHaulTask(from: [number, number]): { from: number | 'stockpile'; to: number | 'stockpile'; resource: string };
+    };
+    expect(internals.findHaulTask([0, 0])).toMatchObject({ from: 'stockpile', to: bakery, resource: 'flour' });
+    for (let i = 0; i < 1500; i += 1) world.advance();
+    expect(world.snapshot().resources.food).toBeGreaterThan(0);
+    expect(world.buildings.find((b) => b.id === farm)!.inventory.grain).toBe(5);
+  });
+
+  it('skips unreachable delivery destinations and storage sources', () => {
+    const terrain = grassTerrain(24, 24);
+    const world = new DemoWorld(terrain);
+    world.resources.wood = 1000;
+    world.resources.stone = 1000;
+    const blocked = completeBuilding(world, 'granary', 3, 3);
+    const reachable = completeBuilding(world, 'granary', 14, 3);
+    const bakery = completeBuilding(world, 'bakery', 14, 9);
+    inventoryAdd(world.buildings.find((b) => b.id === blocked)!.inventory, 'flour', 4);
+    inventoryAdd(world.buildings.find((b) => b.id === reachable)!.inventory, 'flour', 3);
+    for (let y = 1; y <= 6; y += 1) {
+      for (let x = 1; x <= 6; x += 1) {
+        if (x === 1 || x === 6 || y === 1 || y === 6) terrain.tiles[y * 24 + x] = 5; // rock
+      }
+    }
+    const internals = world as unknown as {
+      findHaulTask(from: [number, number]): { from: number | 'stockpile'; to: number | 'stockpile'; resource: string };
+    };
+    expect(internals.findHaulTask([0, 0])).toMatchObject({ from: reachable, to: bakery, resource: 'flour' });
+    world.buildings.find((b) => b.id === reachable)!.inventory = {};
+    world.buildings.find((b) => b.id === blocked)!.inventory = {};
+    const farm = completeBuilding(world, 'farm', 8, 2);
+    inventoryAdd(world.buildings.find((b) => b.id === farm)!.inventory, 'grain', 5);
+    expect(internals.findHaulTask([8, 0])).toMatchObject({ from: farm, to: reachable, resource: 'grain' });
   });
 });

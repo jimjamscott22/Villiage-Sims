@@ -445,10 +445,11 @@ impl World {
     }
 
     fn check_population_dynamics(&mut self) {
-        // Starvation checks
+        // An Eating villager has already consumed a ration. Let that activity
+        // finish restoring hunger, even if food arrived just before starvation.
         let mut dead_ids = Vec::new();
         for v in &mut self.villagers {
-            if v.needs.hunger == 0.0 {
+            if v.needs.hunger == 0.0 && !matches!(v.state, AgentState::Eating { .. }) {
                 v.starvation_ticks += 1;
                 if v.starvation_ticks >= 300 {
                     dead_ids.push((v.id, v.name.clone()));
@@ -1078,6 +1079,9 @@ impl World {
             let Some(stand) = self.building_stand_tile(building.id) else {
                 continue;
             };
+            if self.compute_path(from, stand).is_none() {
+                continue;
+            }
             let dist = (stand.0 - from.0).abs() + (stand.1 - from.1).abs();
             match best {
                 Some((best_dist, best_id, _))
@@ -1088,7 +1092,8 @@ impl World {
         best.map(|(_, id, free)| (id, free))
     }
 
-    fn find_haul_task(&self) -> Option<HaulTask> {
+    /// Skip unavailable routes so one isolated pickup cannot block other deliveries.
+    fn find_haul_task(&self, worker_tile: (i32, i32)) -> Option<HaulTask> {
         for source in &self.buildings {
             if source.state != BuildState::Complete {
                 continue;
@@ -1102,6 +1107,9 @@ impl World {
             let Some(source_stand) = self.building_stand_tile(source.id) else {
                 continue;
             };
+            if self.compute_path(worker_tile, source_stand).is_none() {
+                continue;
+            }
             for (resource, available) in &source.inventory {
                 if *available == 0 {
                     continue;
@@ -1121,7 +1129,11 @@ impl World {
                         to: HaulEndpoint::Building(storage_id),
                     });
                 }
-                if Self::stockpile_accepts(resource) {
+                if Self::stockpile_accepts(resource)
+                    && self.stockpile_stand().is_some_and(|stand| {
+                        self.compute_path(source_stand, stand).is_some()
+                    })
+                {
                     return Some(HaulTask {
                         resource: resource.clone(),
                         amount: (*available).min(CARRY_STACK_MAX),
@@ -1146,9 +1158,9 @@ impl World {
             if room == 0 {
                 continue;
             }
-            if self.building_stand_tile(dest.id).is_none() {
+            let Some(dest_stand) = self.building_stand_tile(dest.id) else {
                 continue;
-            }
+            };
             for (resource, required) in &recipe.inputs {
                 let have = inventory_get(&dest.inventory, resource);
                 if have >= *required {
@@ -1157,7 +1169,12 @@ impl World {
                 let needed = required - have;
                 if Self::stockpile_accepts(resource) {
                     let available = self.resources.get(resource);
-                    if available > 0 && self.stockpile_stand().is_some() {
+                    if available > 0
+                        && self.stockpile_stand().is_some_and(|stand| {
+                            self.compute_path(worker_tile, stand).is_some()
+                                && self.compute_path(stand, dest_stand).is_some()
+                        })
+                    {
                         return Some(HaulTask {
                             resource: resource.clone(),
                             amount: available.min(needed).min(room).min(CARRY_STACK_MAX),
@@ -1180,7 +1197,12 @@ impl World {
                     if !storage_accepts(source_def, resource) {
                         continue;
                     }
-                    if self.building_stand_tile(source.id).is_none() {
+                    let Some(source_stand) = self.building_stand_tile(source.id) else {
+                        continue;
+                    };
+                    if self.compute_path(worker_tile, source_stand).is_none()
+                        || self.compute_path(source_stand, dest_stand).is_none()
+                    {
                         continue;
                     }
                     return Some(HaulTask {
@@ -1221,6 +1243,15 @@ impl World {
                     }
                 }
             }
+        }
+
+        // Survival must interrupt even a long walk or a player move order. Work
+        // claims and cargo stay with the villager so they can resume after eating.
+        if self.villagers[index].needs.hunger == 0.0
+            && !matches!(self.villagers[index].state, AgentState::Eating { .. })
+            && self.available_food() > 0
+        {
+            self.begin_eat(index);
         }
 
         let state = self.villagers[index].state.clone();
@@ -1415,7 +1446,10 @@ impl World {
                     .any(|node| node.tile == tile && node.amount > 0)
             }),
             JobKind::Haul => {
-                self.villagers[villager_index].carrying.is_some() || self.find_haul_task().is_some()
+                self.villagers[villager_index].carrying.is_some()
+                    || self
+                        .find_haul_task(self.pos_to_tile(self.villagers[villager_index].pos))
+                        .is_some()
             }
             JobKind::Produce => {
                 let Some(building) = self
@@ -1776,7 +1810,7 @@ impl World {
             return;
         }
 
-        let Some(task) = self.find_haul_task() else {
+        let Some(task) = self.find_haul_task(from) else {
             return;
         };
         let Some(source_stand) = self.endpoint_stand_tile(task.from) else {
@@ -3295,7 +3329,7 @@ mod tests {
             6,
         );
 
-        let task = world.find_haul_task().expect("haul task");
+        let task = world.find_haul_task((3, 3)).expect("haul task");
         assert_eq!(task.from, HaulEndpoint::Building(farm_id));
         assert_eq!(task.to, HaulEndpoint::Building(granary_id));
         assert_eq!(task.resource, "grain");
@@ -3950,3 +3984,7 @@ mod tests {
         assert_eq!(world.tick_snapshot().last_autosave_slot, None);
     }
 }
+
+#[cfg(test)]
+#[path = "world_review_tests.rs"]
+mod review_tests;
