@@ -36,3 +36,4 @@ graphify-out/.graphify_*
 # Dated snapshot copies written by `graphify update` (e.g. graphify-out/2026-08-29/)
 graphify-out/[0-9]*/
 .cursor/hooks/state/continual-learning.json
+/.idea
