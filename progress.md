@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-08-10 (M10 complete: hover inspection and 50-villager persistence verified).
+Last updated: 2026-09-13 (M11 socializing and purposeful movement implemented; tests deferred by request).
 
 ## Status
 
@@ -16,18 +16,21 @@ Last updated: 2026-08-10 (M10 complete: hover inspection and 50-villager persist
 | M8 — Economy and production chains | Complete on `main` | [#12](https://github.com/jimjamscott22/Villiage-Sims/pull/12) |
 | **M9 — Population and progression** | **Complete** | — |
 | **M10 — Persistence and polish** | **Complete** | — |
+| **M11 — Socializing and purposeful movement** | **Implemented** | — |
 | Art — Phase 1 (pipeline + terrain) | Complete | [#21](https://github.com/jimjamscott22/Villiage-Sims/pull/21) |
 | Art — Phase 2 (entities + y-sort) | Complete | — |
 | **Art — Phase 3 (pixel HUD)** | **Complete** | — |
 
 Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 
-## What works today (M1–M10)
+## What works today (M1–M11)
 
 - Tauri 2 + React Canvas; Rust owns a 20 Hz sim thread; frontend interpolates at RAF.
 - Seeded `128×128` island terrain (`noise`), pan/zoom camera, offscreen terrain blit.
 - `buildings.json` catalog (hut/farm/granary/mill/bakery); BuildMenu; ghost preview; place/demolish with costs/refunds.
 - Five villagers with utility AI (Eat/Sleep/Work/Socialize/Wander) + hysteresis; A* pathfinding.
+- Paired conversations: villagers reserve a reachable meeting tile, stop together, restore the existing Social satisfaction meter over six seconds, and cool down afterward. Urgent needs, player orders, death, blocked routes, and demolished destinations release both participants.
+- Purposeful leisure: free villagers visit reachable hut or well perimeters, pause briefly, and avoid immediately repeating the previous destination. Completed huts increase local social and leisure priority up to a five-hut cap; isolated villagers can still meet.
 - Needs decay; farms advertise `TendCrops`; mill/bakery `Produce`; granary/mill/bakery `Haul`; forest/rock `Gather`.
 - Population & Housing: base capacity + Hut capacity (+2/hut); automatic birth when under capacity; starvation death on zero hunger.
 - Character Traits: `traits.json` assigned to villagers and rendered in `VillagerPanel`.
@@ -39,7 +42,7 @@ Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 - Village Chronicle: a 200-entry capped log of births, deaths, building completions, unlocks,
   harvests and season turns, owned by the sim, saved with the world, shown in a collapsible drawer.
   Clicking an entry centres the camera on its subject.
-- Persistence: versioned bincode save/load (`SAVE_VERSION` 2); manual Slot 1 Save/Load; rotating
+- Persistence: versioned bincode save/load (`SAVE_VERSION` 4; version 3 saves migrate); manual Slot 1 Save/Load; rotating
   autosave through slots 1–3 every in-game day.
 - Weather: deterministic daily Clear/Rain/Storm from seed+date. Rain/Storm water outdoor crops;
   Storm knocks one building back to half-built. Shown in the ClockBar.
@@ -72,9 +75,14 @@ npm run dev
 - Candidate future additions are catalogued in
   [`docs/props-and-assets-backlog.md`](docs/props-and-assets-backlog.md).
 
+## Verification status
+
+The focused social/leisure Rust scenarios passed during implementation. The full Rust and browser suites, frontend build, and browser interaction pass are intentionally deferred for a later run.
+
 ## Next up
 
-Milestone 10 is complete. The next engineering priority is reducing the Rust/browser-demo parity
+Milestone 11 is implemented. The next engineering priority is running the deferred full checks and
+reviewing Rust/browser-demo parity for the new encounter and leisure state. The next longer-term priority is reducing the Rust/browser-demo parity
 risk and adding the deterministic world-hash and long-running soak tests identified in
 `docs/state-of-the-game-review.html`. The Aug 10 follow-up also fixed seed planting, storm job
 stripping, cargo deposits on death/move, selected-villager move orders, and demo unlock

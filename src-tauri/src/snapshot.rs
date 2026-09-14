@@ -49,6 +49,13 @@ pub struct TickSnapshot {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VillagerView {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub activity: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partner_id: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination: Option<(i32, i32)>,
+    pub social: f32,
     pub id: u32,
     pub x: f32,
     pub y: f32,

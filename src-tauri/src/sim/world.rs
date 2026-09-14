@@ -31,10 +31,18 @@ use super::pathfind::{find_path, terrain_passable};
 use super::resources::ResourceTotals;
 use super::terrain::{Terrain, generate_terrain};
 use super::utility::{
-    ActionKind, SOCIAL_RANGE, SOCIAL_RESTORE, ScoreContext, chebyshev, night_from_clock,
+    ActionKind, ScoreContext, chebyshev, night_from_clock,
     pick_action, score_all, wander_tile,
 };
 use super::weather::{self, Weather, autosave_slot_for, weather_for_clock};
+
+#[path = "social.rs"]
+mod social;
+#[path = "leisure.rs"]
+mod leisure;
+#[path = "legacy_v3.rs"]
+pub(crate) mod legacy_v3;
+use social::{Encounter, Behavior};
 
 const VIEWPORT_MARGIN_TILES: f32 = 4.0;
 const TICKS_PER_SECOND: f32 = 20.0;
@@ -75,6 +83,10 @@ pub struct World {
     chronicle: Chronicle,
     unlocked: BTreeSet<String>,
     completed_objectives: BTreeSet<String>,
+    encounters: Vec<Encounter>,
+    behavior: BTreeMap<u32, Behavior>,
+    #[serde(skip)]
+    leisure_cache: leisure::LeisureCache,
     #[serde(skip)]
     viewport: Viewport,
     /// When set, day rollover writes a rotating autosave into this directory.
@@ -113,6 +125,9 @@ impl World {
             chronicle: Chronicle::new(),
             unlocked: BTreeSet::new(),
             completed_objectives: BTreeSet::new(),
+            encounters: Vec::new(),
+            behavior: BTreeMap::new(),
+            leisure_cache: Default::default(),
             viewport: Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -314,11 +329,14 @@ impl World {
         for villager in &mut self.villagers {
             villager.needs.tick_decay();
         }
+        self.prepare_behavior_tick();
         let count = self.villagers.len();
         for index in 0..count {
             self.tick_villager_at(index);
         }
+        self.tick_encounters();
         self.check_population_dynamics();
+        self.cancel_invalid_encounters();
         self.check_unlocks();
         self.check_objectives();
     }
@@ -699,6 +717,8 @@ impl World {
         self.job_board
             .validate_loaded(&villager_ids, &building_ids)?;
 
+        self.validate_behavior()?;
+        self.leisure_cache = Default::default();
         self.viewport = Viewport {
             x: 0.0,
             y: 0.0,
@@ -720,6 +740,10 @@ impl World {
                 .villagers
                 .iter()
                 .map(|v| VillagerView {
+                    activity: self.activity_kind(v),
+                    partner_id: self.encounter_for(v.id).map(|p| if p.a == v.id { p.b } else { p.a }),
+                    destination: self.behavior.get(&v.id).and_then(|b| b.destination),
+                    social: v.needs.social,
                     id: v.id,
                     x: v.pos.0,
                     y: v.pos.1,
@@ -756,7 +780,7 @@ impl World {
             id: villager.id,
             name: villager.name.clone(),
             state: villager.state.as_u8(),
-            state_label: villager.state.label().to_string(),
+            state_label: self.activity_label(villager),
             hunger: villager.needs.hunger,
             energy: villager.needs.energy,
             social: villager.needs.social,
@@ -804,6 +828,8 @@ impl World {
             if let Some(carrying) = self.villagers[index].carrying.take() {
                 self.deposit_to_stockpile(&carrying.resource, carrying.amount);
             }
+            self.cancel_encounter(self.villagers[index].id);
+            self.clear_leisure(index);
             self.release_job_at(index);
             self.villagers[index].state = AgentState::MovingTo {
                 target: (x, y),
@@ -1251,9 +1277,16 @@ impl World {
             && !matches!(self.villagers[index].state, AgentState::Eating { .. })
             && self.available_food() > 0
         {
+            self.cancel_encounter(self.villagers[index].id);
+            self.clear_leisure(index);
             self.begin_eat(index);
         }
 
+        if let Some(pair) = self.encounter_for(self.villagers[index].id) {
+            if pair.talking || pair.b == self.villagers[index].id { return; }
+        } else if self.is_leisure_activity(index) {
+            self.maybe_decide(index);
+        }
         let state = self.villagers[index].state.clone();
         match state {
             AgentState::Eating { ticks_remaining } => {
@@ -1262,9 +1295,7 @@ impl World {
             AgentState::Sleeping { ticks_remaining } => {
                 self.tick_sleeping(index, ticks_remaining);
             }
-            AgentState::Socializing { ticks_remaining } => {
-                self.tick_socializing(index, ticks_remaining);
-            }
+            AgentState::Socializing { .. } => {}
             AgentState::MovingTo { target, purpose } => {
                 self.tick_moving(index, target, purpose);
             }
@@ -1287,7 +1318,8 @@ impl World {
         {
             return;
         }
-        if !self.villagers[index].state.is_decidable() {
+        if self.encounter_for(self.villagers[index].id).is_some() { return; }
+        if !self.villagers[index].state.is_decidable() && !self.is_leisure_activity(index) {
             return;
         }
 
@@ -1303,7 +1335,8 @@ impl World {
         }
 
         let from = self.pos_to_tile(self.villagers[index].pos);
-        let partner_in_range = self.partner_in_range(index, from);
+        let partner_in_range = self.social_eligible(index) && self.villagers[index].needs.social < 0.85
+            && self.villagers.iter().enumerate().any(|(j, v)| j != index && self.social_eligible(j) && chebyshev(from, self.pos_to_tile(v.pos)) <= 8);
         let ctx = ScoreContext {
             hunger: self.villagers[index].needs.hunger,
             energy: self.villagers[index].needs.energy,
@@ -1316,7 +1349,25 @@ impl World {
             villager_id: self.villagers[index].id,
             current_job: self.villagers[index].current_job,
         };
-        let scored = score_all(&ctx);
+        let mut scored = score_all(&ctx);
+        // Advertised jobs may currently have no inputs or be disconnected. Such
+        // jobs must not win repeatedly and prevent useful leisure movement.
+        if self.villagers[index].current_job.is_none() {
+            let id = self.villagers[index].id;
+            let best = self.job_board.jobs().iter()
+                .filter(|j| j.claimed_by.is_none() || j.claimed_by == Some(id))
+                .filter(|j| self.leisure_connected(from, j.tile) && self.job_actionable(j, index))
+                .map(|j| (j.id, super::utility::score_work(j.priority, (from.0-j.tile.0).abs() + (from.1-j.tile.1).abs())))
+                .max_by(|a,b| a.1.total_cmp(&b.1).then_with(|| b.0.cmp(&a.0)));
+            if let Some(work) = scored.iter_mut().find(|a| a.kind == ActionKind::Work) {
+                work.job_id = best.map(|b| b.0);
+                work.score = best.map_or(0.0, |b| b.1);
+            }
+        }
+        let density = self.hut_density(from);
+        for action in &mut scored {
+            if action.kind == ActionKind::Socialize { action.score = (action.score * (1.0 + 0.1 * density as f32)).min(1.0); }
+        }
         let current = self.villagers[index].current_action;
         let picked = pick_action(&scored, current);
 
@@ -1343,17 +1394,12 @@ impl World {
             return;
         }
 
+        if picked.kind == ActionKind::Wander && self.has_leisure_intent(index) { return; }
         self.begin_action(index, picked.kind, picked.job_id);
     }
 
-    fn partner_in_range(&self, index: usize, from: (i32, i32)) -> bool {
-        let id = self.villagers[index].id;
-        self.villagers.iter().any(|other| {
-            other.id != id && chebyshev(from, self.pos_to_tile(other.pos)) <= SOCIAL_RANGE
-        })
-    }
-
     fn begin_action(&mut self, index: usize, kind: ActionKind, job_id: Option<u32>) {
+        if kind != ActionKind::Wander && kind != ActionKind::Socialize { self.clear_leisure(index); }
         match kind {
             ActionKind::Eat => self.begin_eat(index),
             ActionKind::Sleep => {
@@ -1361,8 +1407,7 @@ impl World {
                 self.villagers[index].set_thought(kind.thought(), 40);
             }
             ActionKind::Socialize => {
-                self.villagers[index].begin_socializing();
-                self.villagers[index].set_thought(kind.thought(), 40);
+                if !self.begin_encounter(index) { self.behavior.entry(self.villagers[index].id).or_default().cooldown = 100; }
             }
             ActionKind::Work => self.begin_work(index, job_id),
             ActionKind::Wander => {
@@ -1480,34 +1525,7 @@ impl World {
     }
 
     fn begin_wander(&mut self, index: usize) {
-        let from = self.pos_to_tile(self.villagers[index].pos);
-        let width = self.width as i32;
-        let height = self.height as i32;
-        let seed = self.seed;
-        let tick = self.clock.tick;
-        let villager_id = self.villagers[index].id;
-        let target = {
-            let passable = |x: i32, y: i32| self.is_passable(x, y);
-            wander_tile(from, seed, tick, villager_id, width, height, &passable)
-        };
-        let Some(target) = target else {
-            self.villagers[index].current_action = Some(ActionKind::Wander);
-            return;
-        };
-        match self.compute_path(from, target) {
-            Some(path) => {
-                self.villagers[index].state = AgentState::MovingTo {
-                    target,
-                    purpose: MovePurpose::Wander,
-                };
-                self.villagers[index].path = Some(path);
-                self.villagers[index].current_action = Some(ActionKind::Wander);
-            }
-            None => {
-                self.villagers[index].current_action = Some(ActionKind::Wander);
-                self.villagers[index].repath_cooldown = REPATH_COOLDOWN_TICKS;
-            }
-        }
+        self.begin_leisure(index);
     }
 
     fn tick_eating(&mut self, index: usize, ticks_remaining: u32) {
@@ -1531,25 +1549,6 @@ impl World {
             self.villagers[index].current_action = None;
         } else {
             self.villagers[index].state = AgentState::Sleeping {
-                ticks_remaining: ticks_remaining - 1,
-            };
-        }
-    }
-
-    fn tick_socializing(&mut self, index: usize, ticks_remaining: u32) {
-        let from = self.pos_to_tile(self.villagers[index].pos);
-        if !self.partner_in_range(index, from) {
-            self.villagers[index].state = AgentState::Idle;
-            self.villagers[index].current_action = None;
-            return;
-        }
-        if ticks_remaining <= 1 {
-            self.villagers[index].needs.add_social(SOCIAL_RESTORE);
-            self.villagers[index].state = AgentState::Idle;
-            self.villagers[index].path = None;
-            self.villagers[index].current_action = None;
-        } else {
-            self.villagers[index].state = AgentState::Socializing {
                 ticks_remaining: ticks_remaining - 1,
             };
         }
@@ -1638,7 +1637,11 @@ impl World {
     fn on_arrived(&mut self, index: usize, purpose: MovePurpose, _target: (i32, i32)) {
         self.villagers[index].path = None;
         match purpose {
-            MovePurpose::PlayerOrder | MovePurpose::Wander => {
+            MovePurpose::Wander => {
+                self.villagers[index].state = AgentState::Idle;
+                if self.encounter_for(self.villagers[index].id).is_none() { self.arrive_leisure(index); }
+            }
+            MovePurpose::PlayerOrder => {
                 self.villagers[index].state = AgentState::Idle;
             }
             MovePurpose::Work => {
@@ -3988,3 +3991,7 @@ mod tests {
 #[cfg(test)]
 #[path = "world_review_tests.rs"]
 mod review_tests;
+
+#[cfg(test)]
+#[path = "social_tests.rs"]
+mod social_tests;

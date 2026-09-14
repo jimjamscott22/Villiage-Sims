@@ -7,7 +7,7 @@ use crate::sim::world::World;
 const SAVE_MAGIC: [u8; 8] = *b"VILSAVE\0";
 const HEADER_LEN: usize = SAVE_MAGIC.len() + size_of::<u32>() + size_of::<u64>();
 const MAX_SAVE_BYTES: u64 = 64 * 1024 * 1024;
-pub const SAVE_VERSION: u32 = 3;
+pub const SAVE_VERSION: u32 = 4;
 
 fn config() -> impl bincode::config::Config {
     bincode::config::standard().with_limit::<{ MAX_SAVE_BYTES as usize }>()
@@ -54,7 +54,7 @@ pub(crate) fn decode_world(bytes: &[u8]) -> Result<World, String> {
             .try_into()
             .expect("fixed save version header"),
     );
-    if version != SAVE_VERSION {
+    if version != SAVE_VERSION && version != 3 {
         return Err(format!(
             "unsupported save version {version} (expected {SAVE_VERSION})"
         ));
@@ -66,9 +66,15 @@ pub(crate) fn decode_world(bytes: &[u8]) -> Result<World, String> {
             .expect("fixed save seed header"),
     );
     let payload = &bytes[payload_offset..];
-    let (mut world, consumed): (World, usize) =
+    let (mut world, consumed): (World, usize) = if version == 3 {
+        let (legacy, consumed): (crate::sim::world::legacy_v3::LegacyWorld, usize) =
+            bincode::serde::decode_from_slice(payload, config())
+                .map_err(|error| format!("could not decode legacy save: {error}"))?;
+        (legacy.into_world(), consumed)
+    } else {
         bincode::serde::decode_from_slice(payload, config())
-            .map_err(|error| format!("could not decode save: {error}"))?;
+            .map_err(|error| format!("could not decode save: {error}"))?
+    };
     if consumed != payload.len() {
         return Err("save contains trailing data".into());
     }
@@ -187,7 +193,7 @@ mod tests {
         bytes[SAVE_MAGIC.len()..SAVE_MAGIC.len() + size_of::<u32>()]
             .copy_from_slice(&1u32.to_le_bytes());
         let error = decode_world(&bytes).expect_err("version must be rejected");
-        assert_eq!(error, "unsupported save version 1 (expected 3)");
+        assert_eq!(error, "unsupported save version 1 (expected 4)");
     }
 
     #[test]

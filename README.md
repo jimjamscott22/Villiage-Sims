@@ -6,7 +6,7 @@
 
 The result is a small world that keeps running whether you're watching or not: wheat ripens across the seasons, hunger creeps up until someone breaks from the fields to eat, and the whole thing stays smooth at 60fps because the renderer interpolates between simulation ticks.
 
-> **Status:** built through **Milestone 10**. Versioned save/load, autosave rotation, weather,
+> **Status:** built through **Milestone 11**. Versioned save/load, autosave rotation, weather,
 > chronicle, selection highlights, and entity hover tooltips are complete — see the
 > [roadmap](#roadmap).
 
@@ -34,7 +34,9 @@ Villagers aren't scripted. Each one carries **needs** — hunger, energy, and so
 
 ![Utility AI diagram: a villager's needs bars feed five scored actions — Eat, Sleep, Work, Socialize, Wander — and the highest-scoring action (Eat) is chosen, gated by a hysteresis margin](docs/images/utility-ai.svg)
 
-Because the scoring curves are non-linear (`Eat` ramps as `(1 − hunger)²`, `Sleep` gets a night-time multiplier, `Work` falls off with distance), villagers naturally batch their behaviour — grinding through work until hunger spikes, then breaking to eat, then drifting back. Nobody tells them to.
+Because the scoring curves are non-linear (`Eat` ramps as `(1 − hunger)²`, `Sleep` gets a night-time multiplier, `Work` falls off with distance), villagers naturally batch their behaviour — grinding through work until hunger spikes, then breaking to eat, then drifting back. Socializing is a real paired encounter: one villager approaches a reachable adjacent tile, both stop, and both restore the existing Social satisfaction meter while talking. Completed hut clusters make nearby leisure destinations and conversations more attractive, while work, hunger, energy, and player orders retain priority.
+
+When free, a villager chooses a reachable perimeter tile around a completed hut or well, walks there, and takes a short break before reconsidering. The destination is committed during the trip, reservations prevent two leisure visits from claiming the same tile, and a recent destination is avoided when another route is available. No passive Social points or permanent friendship score are added.
 
 ### Rendering in layers
 

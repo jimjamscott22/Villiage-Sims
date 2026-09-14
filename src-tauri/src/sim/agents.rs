@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::economy::CarryStack;
 use super::needs::Needs;
 
-pub use super::utility::{ActionKind, EAT_TICKS, SLEEP_TICKS, SOCIALIZE_TICKS};
+pub use super::utility::{ActionKind, EAT_TICKS, SLEEP_TICKS};
 
 /// Why the villager is walking to a tile.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -180,11 +180,4 @@ impl Villager {
         self.current_action = Some(ActionKind::Sleep);
     }
 
-    pub fn begin_socializing(&mut self) {
-        self.path = None;
-        self.state = AgentState::Socializing {
-            ticks_remaining: SOCIALIZE_TICKS,
-        };
-        self.current_action = Some(ActionKind::Socialize);
-    }
 }

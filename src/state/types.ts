@@ -15,6 +15,10 @@ export interface WorldInit {
 }
 
 export interface VillagerView {
+  activity?: string;
+  partnerId?: number;
+  destination?: [number, number];
+  social?: number;
   id: number;
   x: number;
   y: number;

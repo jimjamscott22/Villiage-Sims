@@ -318,10 +318,12 @@ Scoring curves:
 - **Eat:** `(1.0 - hunger)^2` — ramps up sharply as hunger empties. Gate on food being available.
 - **Sleep:** `(1.0 - energy)^2`, multiplied by a night-time bonus.
 - **Work:** flat ~0.4 baseline, scaled by job priority and inversely by distance to the job site.
-- **Socialize:** `(1.0 - social)^1.5`, gated on another villager being within ~8 tiles.
-- **Wander:** constant 0.05 — the floor that prevents standing still.
+- **Socialize:** `(1.0 - social)^1.5`, gated on an available reachable partner within ~8 tiles and multiplied by a capped completed-hut neighborhood bonus. A paired encounter approaches a distinct adjacent tile, stops both villagers, and restores up to 0.30 Social over 120 ticks before applying a cooldown.
+- **Wander/leisure:** a low-priority fallback that chooses a reachable perimeter tile around a completed hut or well, pauses on arrival, and avoids immediately repeating the previous destination. If no destination is available, it uses a short deterministic local stroll.
 
 Distance factor for any action requiring travel: `1.0 / (1.0 + dist * 0.05)`.
+
+Completed hut density is counted within Chebyshev distance eight, capped at five huts. It increases social score by `1 + 0.10 * density` and leisure destination score by `1 + 0.15 * density`; it never grants passive Social satisfaction. Workers, urgent needs, sleeping, hauling, and explicit player movement are not recruited into conversations. Conversation reservations are released on interruption, death, invalid routes, or demolition.
 
 ### Pathfinding
 

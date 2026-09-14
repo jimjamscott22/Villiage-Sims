@@ -1,3 +1,5 @@
+import { DemoSocial, type Encounter } from './demoSocial';
+import type { Behavior } from './demoLeisure';
 import { findPath, terrainPassable } from './pathfind';
 import type {
   BuildingDef,
@@ -219,14 +221,11 @@ const WANDER_SCORE = 0.05;
 const NIGHT_BONUS = 1.5;
 const NIGHT_START_MINUTE = 20 * 60;
 const NIGHT_END_MINUTE = 6 * 60;
-const SOCIAL_RANGE = 8;
 const EAT_TICKS = 60;
 const SLEEP_TICKS = 100;
-const SOCIALIZE_TICKS = 40;
-const SOCIAL_RESTORE = 0.5;
 const WANDER_RADIUS = 6;
 const DEMO_SEED = 42;
-export const DEMO_SAVE_VERSION = 1;
+export const DEMO_SAVE_VERSION = 2;
 
 /** Match Rust `weather::mix` — unsigned 64-bit wrapping. */
 function mixU64(a: bigint | number, b: number, c: number, d: number): bigint {
@@ -422,10 +421,6 @@ function scoreWander(): number {
   return WANDER_SCORE;
 }
 
-function chebyshev(a: [number, number], b: [number, number]): number {
-  return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
-}
-
 function wrapU64(n: bigint): bigint {
   return n & 0xffff_ffff_ffff_ffffn;
 }
@@ -506,7 +501,7 @@ interface DemoNeeds {
   happiness: number;
 }
 
-interface DemoVillager {
+export interface DemoVillager {
   id: number;
   name: string;
   x: number;
@@ -538,6 +533,8 @@ interface DemoClock {
 }
 
 interface DemoSaveState {
+  encounters: Encounter[];
+  behavior: Record<number, Behavior>;
   version: number;
   seed: number;
   terrain: TerrainSnapshot;
@@ -626,6 +623,7 @@ export class DemoWorld {
   private nextJobId = 1;
   private nextVillagerId = 1;
   private villagers: DemoVillager[] = [];
+  private social: DemoSocial;
   private jobs: DemoJob[] = [];
   private chronicleEntries: ChronicleEntry[] = [];
   private chronicleNextSeq = 0;
@@ -648,6 +646,21 @@ export class DemoWorld {
   constructor(terrain: TerrainSnapshot) {
     this.terrain = terrain;
     this.occupancy = new Array(terrain.width * terrain.height).fill(null);
+    this.social = new DemoSocial({
+      villagers: () => this.villagers,
+      buildings: () => this.buildings.map(b => {
+        const def = DEMO_CATALOG.buildings[b.kindIndex];
+        const [w, h] = rotatedFootprint(def, b.rot);
+        return { id: b.id, kind: def.id, complete: b.complete, footprint: footprintTiles(b.x, b.y, w, h) };
+      }),
+      width: terrain.width, height: terrain.height, seed: this.seed,
+      tick: () => this.clock.tick,
+      tile: v => this.posToTile(v.x, v.y),
+      center: t => this.tileCenter(t[0], t[1]),
+      passable: t => this.isPassable(t[0], t[1]),
+      path: (from, to) => this.computePath(from, to),
+      wander: (from, tick, id) => wanderTile(from, this.seed, tick, id, terrain.width, terrain.height, (x, y) => this.isPassable(x, y)),
+    });
     this.nodes = this.generateNodes();
     this.spawnStartingVillagers();
     this.unlocked = this.satisfiedUnlocks();
@@ -836,6 +849,8 @@ export class DemoWorld {
   exportState(): string {
     const state: DemoSaveState = {
       version: DEMO_SAVE_VERSION,
+      encounters: this.social.encounters,
+      behavior: this.social.leisure.behavior,
       seed: this.seed,
       terrain: this.terrain,
       resources: this.resources,
@@ -862,7 +877,7 @@ export class DemoWorld {
       throw new Error(`could not decode save: ${cause instanceof Error ? cause.message : String(cause)}`);
     }
     if (state == null || typeof state !== 'object') throw new Error('could not decode save: invalid data');
-    if (state.version !== DEMO_SAVE_VERSION) {
+    if (state.version !== DEMO_SAVE_VERSION && state.version !== 1) {
       throw new Error(`unsupported save version ${String(state.version)} (expected ${DEMO_SAVE_VERSION})`);
     }
     if (state.seed !== DEMO_SEED) throw new Error('save header seed does not match the demo world');
@@ -892,6 +907,14 @@ export class DemoWorld {
     world.villagers = state.villagers;
     world.jobs = state.jobs;
     world.clock = state.clock;
+    if (state.version === 1) {
+      for (const v of world.villagers) if (v.state === 'socializing') { world.clearToIdle(v); v.currentAction = null; }
+    } else {
+      if (!Array.isArray(state.encounters) || !state.behavior || typeof state.behavior !== 'object') throw new Error('save contains invalid social data');
+      world.social.encounters = state.encounters;
+      world.social.leisure.behavior = state.behavior;
+      world.social.validate();
+    }
     world.chronicleEntries = [];
     world.chronicleNextSeq = 0;
     world.unlocked = world.satisfiedUnlocks();
@@ -946,9 +969,11 @@ export class DemoWorld {
     this.tickNodes();
     this.refreshGatherJobs();
     this.decayNeeds();
+    this.social.prepare();
     for (let i = 0; i < this.villagers.length; i += 1) {
       this.tickVillagerAt(i);
     }
+    this.social.tick();
     this.checkUnlocks();
     this.checkObjectives();
     return this.snapshot();
@@ -1003,6 +1028,10 @@ export class DemoWorld {
         state: stateByte(v),
         carrying: v.carrying != null,
         thought: v.thought ?? undefined,
+        activity: this.social.activity(v),
+        partnerId: this.social.pair(v.id) ? (this.social.pair(v.id)!.a === v.id ? this.social.pair(v.id)!.b : this.social.pair(v.id)!.a) : undefined,
+        destination: this.social.leisure.behavior[v.id]?.destination ?? undefined,
+        social: v.needs.social,
       })),
       buildings: this.buildingViews(),
       crops,
@@ -1027,7 +1056,7 @@ export class DemoWorld {
       id: villager.id,
       name: villager.name,
       state: stateByte(villager),
-      stateLabel: stateLabel(villager),
+      stateLabel: this.social.label(villager) ?? stateLabel(villager),
       hunger: villager.needs.hunger,
       energy: villager.needs.energy,
       social: villager.needs.social,
@@ -1156,6 +1185,8 @@ export class DemoWorld {
         this.depositToStockpile(villager.carrying.resource, villager.carrying.amount);
         villager.carrying = null;
       }
+      this.social.cancel(villager.id);
+      this.social.leisure.clear(villager);
       this.releaseJobAt(index);
       villager.state = 'moving';
       villager.purpose = 'player';
@@ -1446,9 +1477,15 @@ export class DemoWorld {
 
     // Match Rust: starvation can interrupt travel, retaining the work claim and cargo.
     if (villager.needs.hunger === 0 && villager.state !== 'eating' && this.deriveTotals().food > 0) {
+      this.social.cancel(villager.id);
+      this.social.leisure.clear(villager);
       this.beginEat(index);
     }
 
+    const pair = this.social.pair(villager.id);
+    if (pair) {
+      if (pair.talking || pair.b === villager.id) return;
+    } else if (this.social.leisure.active(villager)) this.maybeDecide(index);
     switch (villager.state) {
       case 'eating':
         this.tickEating(index);
@@ -1457,7 +1494,6 @@ export class DemoWorld {
         this.tickSleeping(index);
         return;
       case 'socializing':
-        this.tickSocializing(index);
         return;
       case 'moving':
         if (villager.target) {
@@ -1477,7 +1513,8 @@ export class DemoWorld {
   private maybeDecide(index: number): void {
     const villager = this.villagers[index];
     if (villager.repathCooldown > 0 && villager.state === 'idle') return;
-    if (villager.state !== 'idle' && villager.state !== 'working') return;
+    if (this.social.pair(villager.id)) return;
+    if (villager.state !== 'idle' && villager.state !== 'working' && !this.social.leisure.active(villager)) return;
 
     // Completed needs actions must not retain hysteresis while Idle — their
     // restored needs make the live score ~0, which traps Wander below 0.15.
@@ -1491,8 +1528,11 @@ export class DemoWorld {
     }
 
     const from = this.posToTile(villager.x, villager.y);
-    const partnerInRange = this.partnerInRange(index, from);
+    const partnerInRange = this.social.available(villager);
     const scored = this.scoreAll(index, from, partnerInRange);
+    for (const action of scored) if (action.kind === 'socialize') {
+      action.score = Math.min(1, action.score * (1 + 0.1 * this.social.leisure.density(from)));
+    }
     const picked = pickAction(scored, villager.currentAction);
 
     if (
@@ -1503,6 +1543,7 @@ export class DemoWorld {
       return;
     }
 
+    if (picked.kind === 'wander' && this.social.leisure.committed(villager)) return;
     this.beginAction(index, picked.kind, picked.jobId);
   }
 
@@ -1527,40 +1568,15 @@ export class DemoWorld {
         return { kind: 'work', score: scoreWork(job.priority, dist), jobId: job.id };
       }
     }
-    const best = this.peekBest(from);
-    if (best) {
-      const dist = Math.abs(best.tile[0] - from[0]) + Math.abs(best.tile[1] - from[1]);
-      return { kind: 'work', score: scoreWork(best.priority, dist), jobId: best.id };
-    }
-    return { kind: 'work', score: 0, jobId: null };
-  }
-
-  private peekBest(from: [number, number]): DemoJob | null {
-    let best: { job: DemoJob; distance: number } | null = null;
-    for (const job of this.jobs) {
-      if (job.claimedBy != null) continue;
-      const dist = Math.abs(job.tile[0] - from[0]) + Math.abs(job.tile[1] - from[1]);
-      if (
-        !best
-        || job.priority > best.job.priority
-        || (job.priority === best.job.priority && dist < best.distance)
-      ) {
-        best = { job, distance: dist };
-      }
-    }
-    return best?.job ?? null;
-  }
-
-  private partnerInRange(index: number, from: [number, number]): boolean {
-    const id = this.villagers[index].id;
-    return this.villagers.some((other) => {
-      if (other.id === id) return false;
-      const tile = this.posToTile(other.x, other.y);
-      return chebyshev(from, tile) <= SOCIAL_RANGE;
-    });
+    const best = this.jobs
+      .filter(job => job.claimedBy == null && this.social.leisure.connected(from, job.tile) && this.jobActionable(job, index))
+      .map(job => ({ job, score: scoreWork(job.priority, Math.abs(job.tile[0] - from[0]) + Math.abs(job.tile[1] - from[1])) }))
+      .sort((a, b) => b.score - a.score || a.job.id - b.job.id)[0];
+    return { kind: 'work', score: best?.score ?? 0, jobId: best?.job.id ?? null };
   }
 
   private beginAction(index: number, kind: ActionKind, jobId: number | null): void {
+    if (kind !== 'wander' && kind !== 'socialize') this.social.leisure.clear(this.villagers[index]);
     switch (kind) {
       case 'eat':
         this.beginEat(index);
@@ -1610,14 +1626,8 @@ export class DemoWorld {
   }
 
   private beginSocialize(index: number): void {
-    const villager = this.villagers[index];
-    villager.path = null;
-    villager.target = null;
-    villager.purpose = null;
-    villager.state = 'socializing';
-    villager.activityTicks = SOCIALIZE_TICKS;
-    villager.currentAction = 'socialize';
-    this.setThought(index, actionThought('socialize'));
+    const v = this.villagers[index];
+    if (!this.social.begin(v)) this.social.leisure.state(v.id).cooldown = 100;
   }
 
   private beginWork(index: number, jobId: number | null): void {
@@ -1708,35 +1718,8 @@ export class DemoWorld {
   }
 
   private beginWander(index: number): void {
-    const villager = this.villagers[index];
-    const from = this.posToTile(villager.x, villager.y);
-    const target = wanderTile(
-      from,
-      this.seed,
-      this.clock.tick,
-      villager.id,
-      this.terrain.width,
-      this.terrain.height,
-      (x, y) => this.isPassable(x, y),
-    );
-    if (!target) {
-      villager.currentAction = 'wander';
-      this.setThought(index, actionThought('wander'));
-      return;
-    }
-    const path = this.computePath(from, target);
-    if (path) {
-      villager.state = 'moving';
-      villager.purpose = 'wander';
-      villager.target = target;
-      villager.path = path;
-      villager.currentAction = 'wander';
-      this.setThought(index, actionThought('wander'));
-    } else {
-      villager.currentAction = 'wander';
-      villager.repathCooldown = REPATH_COOLDOWN_TICKS;
-      this.setThought(index, actionThought('wander'));
-    }
+    const v = this.villagers[index];
+    this.social.leisure.begin(v, t => this.social.reserved(t, v.id));
   }
 
   private tickEating(index: number): void {
@@ -1769,26 +1752,6 @@ export class DemoWorld {
     }
   }
 
-  private tickSocializing(index: number): void {
-    const villager = this.villagers[index];
-    const from = this.posToTile(villager.x, villager.y);
-    if (!this.partnerInRange(index, from)) {
-      villager.state = 'idle';
-      villager.currentAction = null;
-      return;
-    }
-    if (villager.activityTicks <= 1) {
-      villager.needs.social = Math.min(1, villager.needs.social + SOCIAL_RESTORE);
-      recomputeHappiness(villager.needs);
-      villager.state = 'idle';
-      villager.path = null;
-      villager.target = null;
-      villager.purpose = null;
-      villager.currentAction = null;
-    } else {
-      villager.activityTicks -= 1;
-    }
-  }
 
   private beginMoveToJob(index: number, tile: [number, number], jobId: number): void {
     const villager = this.villagers[index];
@@ -2418,6 +2381,7 @@ export class DemoWorld {
     const villager = this.villagers[index];
     villager.path = null;
     villager.target = null;
+    if (purpose === 'wander' && !this.social.pair(villager.id)) this.social.leisure.arrive(villager);
     if (purpose === 'player' || purpose === 'wander') {
       villager.purpose = null;
       villager.state = 'idle';

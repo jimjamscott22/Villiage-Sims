@@ -46,12 +46,9 @@ pub const WANDER_SCORE: f32 = 0.05;
 pub const NIGHT_BONUS: f32 = 1.5;
 pub const NIGHT_START_MINUTE: u32 = 20 * 60;
 pub const NIGHT_END_MINUTE: u32 = 6 * 60;
-pub const SOCIAL_RANGE: i32 = 8;
 
 pub const EAT_TICKS: u32 = 60;
 pub const SLEEP_TICKS: u32 = 100;
-pub const SOCIALIZE_TICKS: u32 = 40;
-pub const SOCIAL_RESTORE: f32 = 0.5;
 pub const WANDER_RADIUS: i32 = 6;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

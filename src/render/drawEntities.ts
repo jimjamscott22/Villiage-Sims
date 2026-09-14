@@ -61,8 +61,9 @@ export function drawVillagers(
     ctx.lineWidth = selected ? lineWidth * 1.4 : lineWidth;
     ctx.strokeStyle = selected ? '#fff6d5' : '#352f25';
     ctx.stroke();
-    if (villager.thought) {
-      drawThoughtBubble(ctx, villager.x, villager.y - radius, villager.thought, zoom);
+    const bubble = villager.activity === 'talking' ? '...' : villager.thought;
+    if (bubble) {
+      drawThoughtBubble(ctx, villager.x, villager.y - radius, bubble, zoom);
     }
   }
 }
