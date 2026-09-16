@@ -196,6 +196,9 @@ const FOREST_EDGE_CHANCE = 0.14;
 const MUSHROOM_CHANCE = 0.06;
 const SHORE_ROCK_CHANCE = 0.12;
 const DRIFTWOOD_CHANCE = 0.08;
+const CACTUS_CHANCE = 0.03;
+const CAMPFIRE_CHANCE = 0.015;
+const LILYPAD_CHANCE = 0.05;
 
 function neighbourTerrain(
   tiles: ArrayLike<number>,
@@ -239,9 +242,16 @@ function decorFor(tiles: ArrayLike<number>, width: number, height: number, x: nu
       if (edgeRoll < FOREST_EDGE_CHANCE + MUSHROOM_CHANCE) return { key: 'prop.mushroom' };
     }
     if (hash01(x, y, DECOR_SALT + 2) < FLOWER_CHANCE) return { key: 'prop.flowers', season: 0 };
+    if (!nearForest && hash01(x, y, DECOR_SALT + 4) < CAMPFIRE_CHANCE) return { key: 'prop.campfire' };
     return roll < BUSH_CHANCE ? { key: 'prop.bush' } : null;
   }
   if (t === 5) return roll < BOULDER_CHANCE ? { key: 'prop.boulder' } : null;
+  if (t === 1) {
+    // Calm open water only — the shoreline is already busy with reeds/rocks/driftwood.
+    const touchesLand = touchesTerrain(tiles, width, height, x, y, [2, 3, 4, 5, 6]);
+    if (touchesLand) return null;
+    return hash01(x, y, DECOR_SALT + 5) < LILYPAD_CHANCE ? { key: 'prop.lilypad' } : null;
+  }
   if (t !== 2) return null;
   const touchesDeep = touchesTerrain(tiles, width, height, x, y, [0]);
   const touchesWater = touchesTerrain(tiles, width, height, x, y, [0, 1]);
@@ -252,7 +262,8 @@ function decorFor(tiles: ArrayLike<number>, width: number, height: number, x: nu
     if (shoreRoll < SHORE_ROCK_CHANCE + DRIFTWOOD_CHANCE) return { key: 'prop.driftwood' };
     return null;
   }
-  return roll < PALM_CHANCE ? { key: 'prop.palm' } : null;
+  if (roll < PALM_CHANCE) return { key: 'prop.palm' };
+  return roll < PALM_CHANCE + CACTUS_CHANCE ? { key: 'prop.cactus' } : null;
 }
 
 /**
