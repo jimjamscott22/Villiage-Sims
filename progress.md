@@ -68,10 +68,15 @@ npm run dev
 
 ### Props & assets
 
-- Decor scatter: `prop.bush` (grass), `prop.boulder` (rock), `prop.palm` and `prop.reeds` (sand,
-  reeds only where the tile touches water). Placed deterministically by a tile hash in
-  `terrainProps()`; flagged `decor` so `buildDrawList` hides them under building footprints.
+- Decor scatter (all deterministic by tile hash in `terrainProps()`, flagged `decor` so
+  `buildDrawList` hides them under building footprints): `prop.bush`, `prop.flowers`
+  (spring-only), `prop.stump`/`prop.deadfall`/`prop.mushroom` (forest edge) on grass;
+  `prop.boulder` on rock; `prop.palm`, `prop.cactus` (inland), `prop.reeds`, `prop.shoreRock`,
+  `prop.driftwood` (shoreline) on sand; `prop.lilypad` on calm open shallow water;
+  `prop.campfire` (two-frame flame flicker) sparsely on open grass.
 - `well` — a 1×1 amenity building (15 stone / 5 wood), unlocked at population 4, no jobs.
+- `fence`, `gate`, `signpost` — 1×1 zero-job decorative buildings.
+- `storehouse` — 2×2 wood/stone counterpart to the grain-only granary, with the same `haul` job.
 - Candidate future additions are catalogued in
   [`docs/props-and-assets-backlog.md`](docs/props-and-assets-backlog.md).
 

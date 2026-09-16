@@ -18,7 +18,7 @@ function rgbKey(r: number, g: number, b: number): string {
 }
 
 function assertRgba8(png: Uint8Array) {
-  expect(png.subarray(12, 16).toString('ascii')).toBe('IHDR');
+  expect(Buffer.from(png.subarray(12, 16)).toString('ascii')).toBe('IHDR');
   expect(png[24]).toBe(8);
   expect(png[25]).toBe(6);
 }

@@ -13,8 +13,8 @@ is in [`progress.md`](../progress.md).
 |---|---|
 | Terrain bases | deep water, shallow water, sand, grass, rock — 4 variants each, plus fringes and animated foam |
 | Standing terrain props | `prop.cypress` (forest tiles), `prop.peak` (mountain tiles) |
-| Decor scatter | `prop.bush`, `prop.boulder`, `prop.palm`, `prop.reeds` — added in this PR |
-| Buildings | hut, farm (+ field), granary, mill (animated), bakery (animated), well, 3 scaffold sizes |
+| Decor scatter | `prop.bush`, `prop.boulder`, `prop.palm`, `prop.reeds`, `prop.flowers`, `prop.stump`, `prop.deadfall`, `prop.mushroom`, `prop.shoreRock`, `prop.driftwood`, `prop.lilypad`, `prop.cactus`, `prop.campfire` (animated) |
+| Buildings | hut, farm (+ field), granary, mill (animated), bakery (animated), well, fence, gate, signpost, storehouse, 3 scaffold sizes |
 | Crops | wheat, 4 growth stages, sway animation on the ripe stage |
 | Characters | one villager body in 3 facings × idle/4-frame walk/lie-down, recolored into 6 dyes |
 | Character VFX | 4 thought bubbles (tool, fork, zzz, speech) |
@@ -47,11 +47,15 @@ Roughly what each kind of addition costs, in the order the work happens:
 
 | Idea | Notes |
 |---|---|
-| Bushes, boulders, palms, reeds | **Done in this PR.** Deterministic hash scatter, hidden under building footprints. |
-| Tree stumps and deadfall | Scatter on grass adjacent to forest; sells the idea that the forest was logged. Could later be driven by depleted `ResourceNode`s rather than a hash. |
-| Flower patches, seasonal tint | The clock already exposes a season; a spring-only flower prop is a two-line placement rule and makes seasons legible on the map. |
+| Bushes, boulders, palms, reeds | **Done.** Deterministic hash scatter, hidden under building footprints. |
+| Tree stumps and deadfall | **Done.** Scatter on grass adjacent to forest. Could later be driven by depleted `ResourceNode`s rather than a hash. |
+| Flower patches, seasonal tint | **Done.** Spring-only `prop.flowers` on grass, gated on `snapshot.clock.season`. |
+| Forest-margin mushrooms | **Done.** `prop.mushroom` alongside stump/deadfall on the forest edge. |
+| Cliff / shoreline rocks | **Done.** `prop.shoreRock` on sand touching deep water, `prop.driftwood` on the wider shoreline. |
+| Lily pads on open water | **Done.** `prop.lilypad` scatters on calm shallow water that doesn't touch land, keeping the shoreline (reeds/rocks/driftwood) visually distinct from open sea. |
+| Desert cactus | **Done.** `prop.cactus` as a rarer alternative to `prop.palm` on inland sand. |
+| Campfire | **Done.** `prop.campfire` scatters sparsely on open grass (away from forest), two-frame flame flicker using the same animation path as reeds sway. |
 | Depleted-node art | `ResourceNode.amount` is already in the sim but invisible. A stump variant for an exhausted forest tile and a rubble variant for exhausted rock would make gathering readable. Needs nodes on the wire (they aren't in the tick snapshot today). |
-| Cliff / shoreline rocks | Wet-rock props on sand tiles touching deep water. |
 | Dirt paths worn by villagers | Track tile traversal counts in the sim, blend a path fringe over grass. Genuinely nice, genuinely not cheap. |
 
 ### Terrain types
@@ -66,13 +70,13 @@ Roughly what each kind of addition costs, in the order the work happens:
 
 | Idea | Notes |
 |---|---|
-| Well | **Done in this PR.** 1×1 amenity, unlocks at population 4, no jobs — a village landmark and a natural hook if a thirst need ever lands. |
+| Well | **Done.** 1×1 amenity, unlocks at population 4, no jobs — a village landmark and a natural hook if a thirst need ever lands. |
+| Fences, gates, signposts | **Done.** 1×1 zero-job decorative buildings — data + sprite only. |
+| Storehouse (generic) | **Done.** Wood/stone counterpart to the grain-only granary; same `haul` job kind. |
 | Woodcutter's lodge / quarry hut | Would let gathering be assigned to a building instead of raw terrain, which is how the other jobs already work. Needs a job kind. |
 | Market | A social/trade hub; `gold` exists in the resource list and is currently unused, so this is where an economy sink would go. |
-| Storehouse (generic) | Granary only stores grain/flour/food. A wood/stone store is a data-only addition. |
 | Chapel / meeting hall | Pure amenity for the Socialize need — a destination beats wandering to a random tile. |
 | Fishing hut | New job kind against shallow-water tiles; would give coastal villages a reason to exist. |
-| Fences, gates, signposts | 1×1 zero-job decorative buildings. Data + sprite only, and they let the player decorate. |
 
 ### Characters
 

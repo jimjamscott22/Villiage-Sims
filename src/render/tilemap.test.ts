@@ -215,22 +215,36 @@ describe('terrainProps', () => {
     ]);
   });
 
-  it('scatters decor only on grass, sand and rock', () => {
+  it('scatters decor only on grass, sand, rock and open shallow water', () => {
     const rows = Array.from({ length: 24 }, (_, y) =>
-      Array.from({ length: 24 }, (_, x) => [GRASS, SAND, ROCK, FOREST, MOUNTAIN][(x + y) % 5]),
+      Array.from({ length: 24 }, (_, x) => [GRASS, SAND, ROCK, FOREST, MOUNTAIN, SHALLOW][(x + y) % 6]),
     );
     const props = terrainProps(grid(rows));
     const decor = props.filter((prop) => prop.decor);
     expect(decor.length).toBeGreaterThan(0);
-    const grassKeys = new Set(['prop.bush', 'prop.flowers', 'prop.stump', 'prop.deadfall', 'prop.mushroom']);
-    const sandKeys = new Set(['prop.palm', 'prop.reeds', 'prop.shoreRock', 'prop.driftwood']);
+    const grassKeys = new Set([
+      'prop.bush', 'prop.flowers', 'prop.stump', 'prop.deadfall', 'prop.mushroom', 'prop.campfire',
+    ]);
+    const sandKeys = new Set(['prop.palm', 'prop.reeds', 'prop.shoreRock', 'prop.driftwood', 'prop.cactus']);
     for (const prop of decor) {
       const terrain = rows[prop.y][prop.x];
-      expect([GRASS, SAND, ROCK]).toContain(terrain);
+      expect([GRASS, SAND, ROCK, SHALLOW]).toContain(terrain);
       if (terrain === GRASS) expect(grassKeys.has(prop.key)).toBe(true);
       if (terrain === ROCK) expect(prop.key).toBe('prop.boulder');
       if (terrain === SAND) expect(sandKeys.has(prop.key)).toBe(true);
+      if (terrain === SHALLOW) expect(prop.key).toBe('prop.lilypad');
     }
+  });
+
+  it('places lily pads only on open shallow water, never touching land', () => {
+    const rows = [
+      [GRASS, SHALLOW, SHALLOW, SHALLOW, SHALLOW, SHALLOW],
+      [GRASS, SHALLOW, SHALLOW, SHALLOW, SHALLOW, SHALLOW],
+      [GRASS, SHALLOW, SHALLOW, SHALLOW, SHALLOW, SHALLOW],
+    ];
+    const lilypads = terrainProps(grid(rows)).filter((prop) => prop.key === 'prop.lilypad');
+    expect(lilypads.length).toBeGreaterThan(0);
+    for (const pad of lilypads) expect(pad.x).toBeGreaterThan(1);
   });
 
   it('tags spring flowers with season 0', () => {
@@ -258,7 +272,7 @@ describe('terrainProps', () => {
     expect(terrainProps(grid(rows))).toEqual(terrainProps(grid(rows)));
   });
 
-  it('picks reeds on sand that touches water and palms inland', () => {
+  it('picks reeds on sand that touches water and palms/cacti inland', () => {
     // A one-tile sand strip: the left cell borders shallow water, the right does not.
     const rows = [
       [SAND, SAND, SAND, SAND],
@@ -269,7 +283,8 @@ describe('terrainProps', () => {
         .filter((prop) => prop.y === 0)
         .map((prop) => prop.key),
     );
-    expect([...sandKeys].every((key) => key === 'prop.reeds' || key === 'prop.palm')).toBe(true);
+    const inlandKeys = new Set(['prop.reeds', 'prop.palm', 'prop.cactus']);
+    expect([...sandKeys].every((key) => inlandKeys.has(key))).toBe(true);
     expect(sandKeys.has('prop.reeds')).toBe(true);
   });
 });

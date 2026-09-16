@@ -310,6 +310,84 @@ export const PALM: SpriteGrid = grid(16, 32, {
   for (let x = 5; x <= 12; x += 1) set(x, 30, 'b');
 });
 
+/** Floating lily pad for calm open water. 16×16, anchorY 0. */
+export const LILYPAD: SpriteGrid = grid(16, 16, {
+  d: P.vegDarkest,
+  v: P.vegDark,
+  m: P.vegMid,
+  l: P.vegLight,
+  w: P.wheat,
+}, (set) => {
+  for (let y = 6; y <= 11; y += 1) {
+    const half = Math.floor(3 + Math.sin(((y - 6) / 5) * Math.PI) * 2);
+    for (let x = 8 - half; x <= 7 + half; x += 1) {
+      // A wedge notch cut from the east side, like a real lily pad.
+      if (y >= 7 && y <= 8 && x >= 9) continue;
+      const edge = x === 8 - half || x === 7 + half || y === 6;
+      set(x, y, edge ? 'd' : y <= 8 ? 'l' : y % 2 === 0 ? 'm' : 'v');
+    }
+  }
+  set(6, 9, 'w');
+  set(6, 8, 'l');
+});
+
+/** Saguaro-style cactus for dry inland sand. 16×16, anchorY 0. */
+export const CACTUS: SpriteGrid = grid(16, 16, {
+  d: P.vegDarkest,
+  v: P.vegDark,
+  m: P.vegMid,
+  l: P.vegLight,
+  i: P.ink,
+  c: P.sandShadow,
+}, (set) => {
+  for (let y = 3; y <= 12; y += 1) {
+    for (let x = 6; x <= 9; x += 1) {
+      const edge = x === 6 || x === 9 || y === 3;
+      set(x, y, edge ? 'd' : x === 7 ? 'l' : 'm');
+    }
+  }
+  for (let y = 6; y <= 10; y += 1) set(4, y, y === 6 || y === 10 ? 'd' : 'v');
+  set(5, 6, 'd');
+  set(5, 5, 'd');
+  for (let y = 8; y <= 11; y += 1) set(11, y, y === 8 || y === 11 ? 'd' : 'v');
+  set(10, 8, 'd');
+  set(10, 7, 'd');
+  set(7, 5, 'i');
+  set(8, 8, 'i');
+  for (let x = 4; x <= 11; x += 1) set(x, 13, 'c');
+});
+
+/** Flickering campfire for open grass. 16×16, anchorY 0, two flame frames. */
+function campfire(phase: number): SpriteGrid {
+  return grid(16, 16, {
+    s: P.stoneShadow,
+    m: P.stoneMid,
+    d: P.terraDark,
+    t: P.terraMid,
+    l: P.terraLight,
+    w: P.wheat,
+    i: P.ink,
+    c: P.sandShadow,
+  }, (set) => {
+    // Crossed logs.
+    for (let x = 4; x <= 11; x += 1) set(x, 12, x % 3 === 0 ? 'i' : 'd');
+    set(5, 11, 'i');
+    set(10, 11, 'i');
+    // Ring of stones.
+    for (const sx of [3, 6, 9, 12]) set(sx, 13, sx % 2 === 0 ? 's' : 'm');
+    // Flame, taller and brighter on the second phase.
+    const lift = phase * 2;
+    for (let y = 11 - lift; y <= 10; y += 1) {
+      const half = y === 11 - lift ? 0 : 1;
+      for (let x = 7 - half; x <= 8 + half; x += 1) set(x, y, y <= 8 - lift ? 'w' : y <= 9 ? 'l' : 't');
+    }
+    set(7, 9 - lift, 'w');
+    for (let x = 3; x <= 12; x += 1) set(x, 14, 'c');
+  });
+}
+
+export const CAMPFIRE_FRAMES: SpriteGrid[] = [campfire(0), campfire(1)];
+
 export interface PropSprite {
   grid: SpriteGrid;
   anchorY: number;
@@ -329,4 +407,7 @@ export const PROP_SPRITES: Record<string, PropSprite> = {
   'prop.mushroom': { grid: MUSHROOM, anchorY: 0 },
   'prop.shoreRock': { grid: SHORE_ROCK, anchorY: 0 },
   'prop.driftwood': { grid: DRIFTWOOD, anchorY: 0 },
+  'prop.lilypad': { grid: LILYPAD, anchorY: 0 },
+  'prop.cactus': { grid: CACTUS, anchorY: 0 },
+  'prop.campfire': { grid: CAMPFIRE_FRAMES[0], anchorY: 0, frames: CAMPFIRE_FRAMES },
 };

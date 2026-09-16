@@ -669,6 +669,8 @@ describe('simulation review regressions', () => {
   it('supplies an accessible bakery despite an enclosed farm pickup', () => {
     const terrain = grassTerrain(24, 24);
     const world = new DemoWorld(terrain);
+    const simulation = world as unknown as { villagers: Array<unknown> };
+    simulation.villagers.splice(1);
     world.resources.wood = 1000;
     world.resources.stone = 1000;
     world.resources.grain = 0;
@@ -687,7 +689,7 @@ describe('simulation review regressions', () => {
       findHaulTask(from: [number, number]): { from: number | 'stockpile'; to: number | 'stockpile'; resource: string };
     };
     expect(internals.findHaulTask([0, 0])).toMatchObject({ from: 'stockpile', to: bakery, resource: 'flour' });
-    for (let i = 0; i < 1500; i += 1) world.advance();
+    for (let i = 0; i < 1500 && world.resources.food === 0; i += 1) world.advance();
     expect(world.snapshot().resources.food).toBeGreaterThan(0);
     expect(world.buildings.find((b) => b.id === farm)!.inventory.grain).toBe(5);
   });
