@@ -5,12 +5,13 @@ use std::collections::VecDeque;
 #[derive(Clone, Debug)]
 pub(super) struct Destination { pub tile: (i32, i32), pub building: u32, pub density: u32 }
 type BuildingKey = (u32, u8, (i32, i32), u8, bool);
+type HutFootprint = (Vec<(i32, i32)>, BTreeSet<u32>);
 #[derive(Clone, Debug, Default)]
 pub(super) struct LeisureCache {
     signature: Vec<BuildingKey>,
     components: Vec<u32>,
     pub destinations: Vec<Destination>,
-    huts: Vec<(Vec<(i32, i32)>, BTreeSet<u32>)>,
+    huts: Vec<HutFootprint>,
 }
 
 impl World {
