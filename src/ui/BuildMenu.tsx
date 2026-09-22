@@ -29,6 +29,10 @@ function formatRecipe(building: BuildingDef): string {
   return ` · ${inputs}→${outputs}`;
 }
 
+export function nextSelection(current: string | null, clicked: string): string | null {
+  return current === clicked ? null : clicked;
+}
+
 export function BuildMenu({
   catalog,
   selectedKind,
@@ -56,7 +60,7 @@ export function BuildMenu({
                 <li key={crop.id}>
                   <button
                     type="button"
-                    onClick={() => onSelectCrop(active ? null : crop.id)}
+                    onClick={() => onSelectCrop(nextSelection(selectedCrop, crop.id))}
                     className={`pixel-btn pixel-focus w-full px-2 py-2 text-left transition ${
                       active ? 'pixel-btn-active' : ''
                     }`}
@@ -92,7 +96,7 @@ export function BuildMenu({
                   <button
                     type="button"
                     disabled={locked}
-                    onClick={() => onSelectKind(active ? null : building.id)}
+                    onClick={() => onSelectKind(nextSelection(selectedKind, building.id))}
                     className={`pixel-btn pixel-focus relative w-full px-2 py-2 text-left transition ${
                       locked
                         ? 'cursor-not-allowed opacity-60'
