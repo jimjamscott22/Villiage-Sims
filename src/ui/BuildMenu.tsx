@@ -56,6 +56,7 @@ export function BuildMenu({
                 <li key={crop.id}>
                   <button
                     type="button"
+                    aria-pressed={active}
                     onClick={() => onSelectCrop(active ? null : crop.id)}
                     className={`pixel-btn pixel-focus w-full px-2 py-2 text-left transition ${
                       active ? 'pixel-btn-active' : ''
@@ -91,8 +92,11 @@ export function BuildMenu({
                 <li key={building.id}>
                   <button
                     type="button"
-                    disabled={locked}
-                    onClick={() => onSelectKind(active ? null : building.id)}
+                    aria-pressed={active}
+                    aria-disabled={locked}
+                    onClick={() => {
+                      if (!locked) onSelectKind(active ? null : building.id);
+                    }}
                     className={`pixel-btn pixel-focus relative w-full px-2 py-2 text-left transition ${
                       locked
                         ? 'cursor-not-allowed opacity-60'

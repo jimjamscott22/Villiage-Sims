@@ -54,10 +54,8 @@ pub fn find_path(
         &start,
         |&(x, y)| {
             expansions = expansions.saturating_add(1);
-            if expansions > MAX_EXPANSIONS {
-                return Vec::new();
-            }
-            successors(x, y, width, height, passable)
+            let limit = if expansions > MAX_EXPANSIONS { 0 } else { 8 };
+            successors(x, y, width, height, passable).take(limit)
         },
         |&(x, y)| heuristic(x, y, goal.0, goal.1),
         |&pos| pos == goal,
@@ -84,32 +82,30 @@ fn heuristic(x: i32, y: i32, gx: i32, gy: i32) -> u32 {
     diag * DIAG_COST + ortho * ORTHO_COST
 }
 
-fn successors(
+fn successors<'a>(
     x: i32,
     y: i32,
     width: i32,
     height: i32,
-    passable: &dyn Fn(i32, i32) -> bool,
-) -> Vec<((i32, i32), u32)> {
-    let mut out = Vec::with_capacity(8);
-    for &(dx, dy) in &NEIGHBOR_DELTAS {
+    passable: &'a dyn Fn(i32, i32) -> bool,
+) -> impl Iterator<Item = ((i32, i32), u32)> + 'a {
+    NEIGHBOR_DELTAS.into_iter().filter_map(move |(dx, dy)| {
         let nx = x + dx;
         let ny = y + dy;
         if !in_bounds((nx, ny), width, height) || !passable(nx, ny) {
-            continue;
+            return None;
         }
         let diagonal = dx != 0 && dy != 0;
         if diagonal {
             // No corner-cutting: both flanking orthogonals must be walkable.
             if !passable(x + dx, y) || !passable(x, y + dy) {
-                continue;
+                return None;
             }
-            out.push(((nx, ny), DIAG_COST));
+            Some(((nx, ny), DIAG_COST))
         } else {
-            out.push(((nx, ny), ORTHO_COST));
+            Some(((nx, ny), ORTHO_COST))
         }
-    }
-    out
+    })
 }
 
 #[cfg(test)]

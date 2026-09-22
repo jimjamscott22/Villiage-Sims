@@ -42,6 +42,10 @@ mod social;
 mod leisure;
 #[path = "legacy_v3.rs"]
 pub(crate) mod legacy_v3;
+mod commands_handler;
+mod persistence_validation;
+mod population;
+mod progression;
 use social::{Encounter, Behavior};
 
 const VIEWPORT_MARGIN_TILES: f32 = 4.0;
@@ -54,47 +58,47 @@ pub const DEFAULT_TILE_SIZE: u32 = 32;
 pub const DEFAULT_SEED: u64 = 42;
 
 #[derive(Clone, Copy, Debug, Default)]
-struct Viewport {
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
+pub(crate) struct Viewport {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) w: f32,
+    pub(crate) h: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct World {
-    width: u32,
-    height: u32,
-    tile_size: u32,
-    tiles: Vec<u8>,
-    seed: u64,
-    clock: Clock,
-    catalog: Catalog,
-    buildings: Vec<Building>,
-    crops: Vec<Crop>,
-    nodes: Vec<ResourceNode>,
-    occupancy: Vec<Option<u32>>,
-    resources: ResourceTotals,
-    next_building_id: u32,
-    next_crop_id: u32,
-    next_villager_id: u32,
-    villagers: Vec<Villager>,
-    job_board: JobBoard,
-    chronicle: Chronicle,
-    unlocked: BTreeSet<String>,
-    completed_objectives: BTreeSet<String>,
-    encounters: Vec<Encounter>,
-    behavior: BTreeMap<u32, Behavior>,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) tile_size: u32,
+    pub(crate) tiles: Vec<u8>,
+    pub(crate) seed: u64,
+    pub(crate) clock: Clock,
+    pub(crate) catalog: Catalog,
+    pub(crate) buildings: Vec<Building>,
+    pub(crate) crops: Vec<Crop>,
+    pub(crate) nodes: Vec<ResourceNode>,
+    pub(crate) occupancy: Vec<Option<u32>>,
+    pub(crate) resources: ResourceTotals,
+    pub(crate) next_building_id: u32,
+    pub(crate) next_crop_id: u32,
+    pub(crate) next_villager_id: u32,
+    pub(crate) villagers: Vec<Villager>,
+    pub(crate) job_board: JobBoard,
+    pub(crate) chronicle: Chronicle,
+    pub(crate) unlocked: BTreeSet<String>,
+    pub(crate) completed_objectives: BTreeSet<String>,
+    pub(crate) encounters: Vec<Encounter>,
+    pub(crate) behavior: BTreeMap<u32, Behavior>,
     #[serde(skip)]
-    leisure_cache: leisure::LeisureCache,
+    pub(crate) leisure_cache: leisure::LeisureCache,
     #[serde(skip)]
-    viewport: Viewport,
+    pub(crate) viewport: Viewport,
     /// When set, day rollover writes a rotating autosave into this directory.
     #[serde(skip)]
-    autosave_dir: Option<PathBuf>,
+    pub(crate) autosave_dir: Option<PathBuf>,
     /// Last autosave slot written this session (`1..=3`).
     #[serde(skip)]
-    last_autosave_slot: Option<u8>,
+    pub(crate) last_autosave_slot: Option<u8>,
 }
 
 impl World {
@@ -145,54 +149,9 @@ impl World {
         world
     }
 
-    fn spawn_starting_villagers(&mut self) {
-        let cx = self.width as i32 / 2;
-        let cy = self.height as i32 / 2;
-        let mut used = Vec::new();
-        let traits_pool: Vec<String> = self.catalog.traits.iter().map(|t| t.id.clone()).collect();
-        for (i, name) in STARTING_VILLAGER_NAMES.iter().enumerate() {
-            let id = (i as u32) + 1;
-            let tile = self
-                .find_spawn_tile(cx, cy, &used)
-                .unwrap_or((cx + i as i32, cy));
-            used.push(tile);
-            let pos = self.tile_center(tile.0, tile.1);
-            let mut v_traits = Vec::new();
-            if !traits_pool.is_empty() {
-                v_traits.push(traits_pool[i % traits_pool.len()].clone());
-            }
-            self.villagers
-                .push(Villager::new(id, *name, pos).with_traits(v_traits));
-            self.next_villager_id = id.saturating_add(1);
-        }
-    }
+    
 
-    fn find_spawn_tile(&self, cx: i32, cy: i32, used: &[(i32, i32)]) -> Option<(i32, i32)> {
-        if let Some(tile) = self.find_walkable_near(cx, cy) {
-            if !used.contains(&tile) {
-                return Some(tile);
-            }
-        }
-        let max_r = self.width.max(self.height) as i32;
-        for r in 0..=max_r {
-            for dy in -r..=r {
-                for dx in -r..=r {
-                    if dx.abs() != r && dy.abs() != r && r > 0 {
-                        continue;
-                    }
-                    let x = cx + dx;
-                    let y = cy + dy;
-                    if used.contains(&(x, y)) {
-                        continue;
-                    }
-                    if self.is_spawn_candidate(x, y) {
-                        return Some((x, y));
-                    }
-                }
-            }
-        }
-        None
-    }
+    
 
     pub fn default_world() -> Self {
         Self::generate(
@@ -215,85 +174,7 @@ impl World {
         &self.chronicle
     }
 
-    pub fn handle_command(&mut self, command: SimCommand) {
-        match command {
-            SimCommand::SetViewport { x, y, w, h } => {
-                self.viewport = Viewport { x, y, w, h };
-            }
-            SimCommand::ValidatePlacement {
-                kind,
-                x,
-                y,
-                rotation,
-                reply,
-            } => {
-                let validity = self.validate_placement(&kind, x, y, rotation);
-                let _ = reply.send(validity);
-            }
-            SimCommand::PlaceBuilding {
-                kind,
-                x,
-                y,
-                rotation,
-                reply,
-            } => {
-                let result = self.place_building(&kind, x, y, rotation);
-                let _ = reply.send(result);
-            }
-            SimCommand::Demolish { entity_id, reply } => {
-                let result = self.demolish(entity_id);
-                let _ = reply.send(result);
-            }
-            SimCommand::MoveVillagerTo {
-                x,
-                y,
-                villager_id,
-                reply,
-            } => {
-                let result = self.order_move_villager(x, y, villager_id);
-                let _ = reply.send(result);
-            }
-            SimCommand::GetVillagerDetail { id, reply } => {
-                let result = self.villager_detail(id);
-                let _ = reply.send(result);
-            }
-            SimCommand::SetSpeed { speed } => {
-                let _ = self.clock.set_speed(speed);
-            }
-            SimCommand::PlantCrop { kind, x, y, reply } => {
-                let result = self.plant_crop(&kind, x, y);
-                let _ = reply.send(result);
-            }
-            SimCommand::AdvanceClock {
-                days,
-                season,
-                reply,
-            } => {
-                let result = self.advance_clock(days, season);
-                let _ = reply.send(result);
-            }
-            SimCommand::GetTerrain { reply } => {
-                let _ = reply.send(self.terrain_snapshot());
-            }
-            SimCommand::GetChronicle { reply } => {
-                let views: Vec<_> = self.chronicle.entries().map(|e| e.view()).collect();
-                let _ = reply.send(views);
-            }
-            SimCommand::SaveGame { path, reply } => {
-                let _ = reply.send(crate::persist::save_world(self, &path));
-            }
-            SimCommand::LoadGame { path, reply } => {
-                let autosave_dir = self.autosave_dir.clone();
-                let result = crate::persist::load_world(&path).map(|loaded| {
-                    *self = loaded;
-                    self.autosave_dir = autosave_dir;
-                    self.last_autosave_slot = None;
-                    self.world_init(crate::persist::SAVE_VERSION)
-                });
-                let _ = reply.send(result);
-            }
-        }
-    }
+    
 
     pub fn set_autosave_dir(&mut self, dir: Option<PathBuf>) {
         self.autosave_dir = dir;
@@ -376,31 +257,7 @@ impl World {
 
     /// Every building id whose unlock conditions are currently met.
     /// A building with no conditions is always unlocked.
-    pub fn satisfied_unlocks(&self) -> BTreeSet<String> {
-        let population = self.villagers.len() as u32;
-        let completed: BTreeSet<&str> = self
-            .buildings
-            .iter()
-            .filter(|b| b.state == BuildState::Complete)
-            .filter_map(|b| self.catalog.get(b.kind_index).map(|def| def.id.as_str()))
-            .collect();
-
-        self.catalog
-            .buildings
-            .iter()
-            .filter(|def| match &def.unlock_conditions {
-                None => true,
-                Some(cond) => {
-                    cond.min_population.is_none_or(|min| population >= min)
-                        && cond
-                            .requires_building
-                            .as_deref()
-                            .is_none_or(|req| completed.contains(req))
-                }
-            })
-            .map(|def| def.id.clone())
-            .collect()
-    }
+    
 
     pub fn unlocked(&self) -> &BTreeSet<String> {
         &self.unlocked
@@ -410,15 +267,7 @@ impl World {
     /// unlocked even if the conditions later lapse (e.g. population dipping back
     /// below a threshold). `satisfied_unlocks()` is a current-conditions snapshot,
     /// so this only ever grows `self.unlocked`, never shrinks it.
-    fn check_unlocks(&mut self) {
-        let satisfied = self.satisfied_unlocks();
-        let newly: Vec<String> = satisfied.difference(&self.unlocked).cloned().collect();
-        for building in newly {
-            let body = ChronicleBody::BuildingUnlocked { building };
-            self.chronicle.push(&self.clock, None, body);
-        }
-        self.unlocked.extend(satisfied);
-    }
+    
 
     fn objective_satisfied(&self, condition: &ObjectiveCondition) -> bool {
         match condition {
@@ -450,76 +299,9 @@ impl World {
 
     /// Objectives are monotonic: once met they stay completed even if the
     /// underlying condition later lapses (e.g. a building is demolished).
-    fn check_objectives(&mut self) {
-        let newly: Vec<String> = self
-            .catalog
-            .objectives
-            .iter()
-            .filter(|obj| !self.completed_objectives.contains(&obj.id))
-            .filter(|obj| self.objective_satisfied(&obj.condition))
-            .map(|obj| obj.id.clone())
-            .collect();
-        self.completed_objectives.extend(newly);
-    }
+    
 
-    fn check_population_dynamics(&mut self) {
-        // An Eating villager has already consumed a ration. Let that activity
-        // finish restoring hunger, even if food arrived just before starvation.
-        let mut dead_ids = Vec::new();
-        for v in &mut self.villagers {
-            if v.needs.hunger == 0.0 && !matches!(v.state, AgentState::Eating { .. }) {
-                v.starvation_ticks += 1;
-                if v.starvation_ticks >= 300 {
-                    dead_ids.push((v.id, v.name.clone()));
-                }
-            } else {
-                v.starvation_ticks = 0;
-            }
-        }
-        for (id, name) in &dead_ids {
-            self.job_board.release_claimed_by(*id);
-            if let Some(index) = self.villagers.iter().position(|v| v.id == *id) {
-                if let Some(carrying) = self.villagers[index].carrying.take() {
-                    self.deposit_to_stockpile(&carrying.resource, carrying.amount);
-                }
-                let focus = Some(self.pos_to_tile(self.villagers[index].pos));
-                self.villagers.remove(index);
-                let body = ChronicleBody::VillagerDied {
-                    id: *id,
-                    name: name.clone(),
-                    cause: "starvation".to_string(),
-                };
-                self.chronicle.push(&self.clock, focus, body);
-            }
-        }
-
-        // Birth checks
-        let capacity = self.housing_capacity();
-        if (self.villagers.len() as u32) < capacity
-            && self.clock.tick % 200 == 0
-            && !self.villagers.is_empty()
-        {
-            let next_id = self.next_villager_id;
-            self.next_villager_id = self.next_villager_id.saturating_add(1);
-            let name_idx = (next_id as usize) % EXTRA_VILLAGER_NAMES.len();
-            let name = EXTRA_VILLAGER_NAMES[name_idx].to_string();
-            let cx = self.width as i32 / 2;
-            let cy = self.height as i32 / 2;
-            if let Some(tile) = self.find_walkable_near(cx, cy) {
-                let pos = self.tile_center(tile.0, tile.1);
-                let traits_pool: Vec<String> =
-                    self.catalog.traits.iter().map(|t| t.id.clone()).collect();
-                let mut v_traits = Vec::new();
-                if !traits_pool.is_empty() {
-                    v_traits.push(traits_pool[(next_id as usize) % traits_pool.len()].clone());
-                }
-                self.villagers
-                    .push(Villager::new(next_id, name.clone(), pos).with_traits(v_traits));
-                let body = ChronicleBody::VillagerBorn { id: next_id, name };
-                self.chronicle.push(&self.clock, Some(tile), body);
-            }
-        }
-    }
+    
 
     pub(crate) fn seed(&self) -> u64 {
         self.seed
@@ -599,134 +381,7 @@ impl World {
         }
     }
 
-    pub(crate) fn prepare_after_load(&mut self) -> Result<(), String> {
-        if self.width == 0 || self.height == 0 || self.tile_size == 0 {
-            return Err("save has invalid world dimensions".into());
-        }
-        let expected_len =
-            self.width
-                .checked_mul(self.height)
-                .ok_or_else(|| "save world dimensions overflow".to_string())? as usize;
-        if self.tiles.len() != expected_len || self.occupancy.len() != expected_len {
-            return Err("save world grid length does not match its dimensions".into());
-        }
-        if self
-            .tiles
-            .iter()
-            .any(|terrain| Terrain::from_u8(*terrain).is_none())
-        {
-            return Err("save contains an unknown terrain value".into());
-        }
-        self.catalog.validate()?;
-
-        let mut building_ids = BTreeSet::new();
-        let mut expected_occupancy = vec![None; expected_len];
-        for building in &self.buildings {
-            if building.id == 0 || !building_ids.insert(building.id) {
-                return Err(format!(
-                    "save contains invalid or duplicate building id {}",
-                    building.id
-                ));
-            }
-            let def = self
-                .catalog
-                .get(building.kind_index)
-                .ok_or_else(|| format!("building {} has an unknown kind", building.id))?;
-            for (x, y) in
-                footprint_tiles(building.origin, rotated_footprint(def, building.rotation))
-            {
-                if x < 0 || y < 0 || x >= self.width as i32 || y >= self.height as i32 {
-                    return Err(format!("building {} is outside the world", building.id));
-                }
-                let index = y as usize * self.width as usize + x as usize;
-                if expected_occupancy[index].replace(building.id).is_some() {
-                    return Err("save contains overlapping buildings".into());
-                }
-            }
-        }
-        if self.occupancy != expected_occupancy {
-            return Err("save building occupancy is inconsistent".into());
-        }
-        if self.next_building_id <= building_ids.last().copied().unwrap_or(0) {
-            return Err("save has an invalid next building id".into());
-        }
-
-        let mut crop_ids = BTreeSet::new();
-        for crop in &self.crops {
-            if crop.id == 0 || !crop_ids.insert(crop.id) {
-                return Err(format!(
-                    "save contains invalid or duplicate crop id {}",
-                    crop.id
-                ));
-            }
-            let def = self
-                .catalog
-                .get_crop(crop.kind_index)
-                .ok_or_else(|| format!("crop {} has an unknown kind", crop.id))?;
-            if crop.kind != def.id {
-                return Err(format!(
-                    "crop {} kind does not match its catalog entry",
-                    crop.id
-                ));
-            }
-            if crop.tile.0 < 0
-                || crop.tile.1 < 0
-                || crop.tile.0 >= self.width as i32
-                || crop.tile.1 >= self.height as i32
-            {
-                return Err(format!("crop {} is outside the world", crop.id));
-            }
-        }
-        if self.next_crop_id <= crop_ids.last().copied().unwrap_or(0) {
-            return Err("save has an invalid next crop id".into());
-        }
-
-        let mut villager_ids = BTreeSet::new();
-        let world_width = self.width as f32 * self.tile_size as f32;
-        let world_height = self.height as f32 * self.tile_size as f32;
-        for villager in &self.villagers {
-            if villager.id == 0 || !villager_ids.insert(villager.id) {
-                return Err(format!(
-                    "save contains invalid or duplicate villager id {}",
-                    villager.id
-                ));
-            }
-            if !villager.pos.0.is_finite()
-                || !villager.pos.1.is_finite()
-                || villager.pos.0 < 0.0
-                || villager.pos.1 < 0.0
-                || villager.pos.0 >= world_width
-                || villager.pos.1 >= world_height
-            {
-                return Err(format!("villager {} has an invalid position", villager.id));
-            }
-            for need in [
-                villager.needs.hunger,
-                villager.needs.energy,
-                villager.needs.social,
-                villager.needs.happiness,
-            ] {
-                if !need.is_finite() || !(0.0..=1.0).contains(&need) {
-                    return Err(format!("villager {} has invalid needs", villager.id));
-                }
-            }
-        }
-        if self.next_villager_id <= villager_ids.last().copied().unwrap_or(0) {
-            return Err("save has an invalid next villager id".into());
-        }
-        self.job_board
-            .validate_loaded(&villager_ids, &building_ids)?;
-
-        self.validate_behavior()?;
-        self.leisure_cache = Default::default();
-        self.viewport = Viewport {
-            x: 0.0,
-            y: 0.0,
-            w: world_width,
-            h: world_height,
-        };
-        Ok(())
-    }
+    
 
     pub fn tick_snapshot(&self) -> TickSnapshot {
         let building_inventories: Vec<_> = self
@@ -1997,17 +1652,7 @@ impl World {
         None
     }
 
-    fn is_spawn_candidate(&self, x: i32, y: i32) -> bool {
-        if !self.is_passable(x, y) {
-            return false;
-        }
-        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-            if self.is_passable(x + dx, y + dy) {
-                return true;
-            }
-        }
-        false
-    }
+    
 
     fn openness_score(&self, x: i32, y: i32) -> i32 {
         let mut score = 0;
@@ -2085,132 +1730,11 @@ impl World {
             .collect()
     }
 
-    pub fn validate_placement(
-        &self,
-        kind: &str,
-        x: i32,
-        y: i32,
-        rotation: u8,
-    ) -> PlacementValidity {
-        let Some((kind_index, def)) = self.catalog.find(kind) else {
-            return PlacementValidity {
-                valid: false,
-                reason: format!("unknown building '{kind}'"),
-            };
-        };
-        let _ = kind_index;
-        // The frontend hides locked buildings, but it holds no authoritative state —
-        // the sim must reject a direct placement attempt too (e.g. a raw `invoke`
-        // bypassing the UI). Gating here also covers `validate_placement`, so the
-        // ghost preview reflects the lock without a second check.
-        if !self.unlocked.contains(&def.id) {
-            return PlacementValidity {
-                valid: false,
-                reason: format!("{} is locked", def.id),
-            };
-        }
-        let footprint = rotated_footprint(def, rotation);
-        let tiles = footprint_tiles((x, y), footprint);
+    
 
-        for (tx, ty) in tiles {
-            if tx < 0 || ty < 0 || tx >= self.width as i32 || ty >= self.height as i32 {
-                return PlacementValidity {
-                    valid: false,
-                    reason: "out of bounds".into(),
-                };
-            }
-            let index = (ty as u32 * self.width + tx as u32) as usize;
-            let terrain = Terrain::from_u8(self.tiles[index]).unwrap_or(Terrain::DeepWater);
-            if !terrain_allowed(def, terrain) {
-                return PlacementValidity {
-                    valid: false,
-                    reason: format!("invalid terrain for {}", def.id),
-                };
-            }
-            if self.occupancy[index].is_some() {
-                return PlacementValidity {
-                    valid: false,
-                    reason: "tile occupied".into(),
-                };
-            }
-        }
+    
 
-        if !self.derived_resources().can_afford(&def.cost) {
-            return PlacementValidity {
-                valid: false,
-                reason: "insufficient resources".into(),
-            };
-        }
-
-        PlacementValidity {
-            valid: true,
-            reason: String::new(),
-        }
-    }
-
-    pub fn place_building(
-        &mut self,
-        kind: &str,
-        x: i32,
-        y: i32,
-        rotation: u8,
-    ) -> Result<PlacementResult, String> {
-        let validity = self.validate_placement(kind, x, y, rotation);
-        if !validity.valid {
-            return Err(validity.reason);
-        }
-        let (kind_index, footprint, cost) = {
-            let (kind_index, def) = self
-                .catalog
-                .find(kind)
-                .ok_or_else(|| format!("unknown building '{kind}'"))?;
-            (
-                kind_index,
-                rotated_footprint(def, rotation),
-                def.cost.clone(),
-            )
-        };
-        let tiles = footprint_tiles((x, y), footprint);
-        self.withdraw_cost(&cost)?;
-
-        let id = self.next_building_id;
-        self.next_building_id = self.next_building_id.saturating_add(1);
-        for (tx, ty) in &tiles {
-            let index = (*ty as u32 * self.width + *tx as u32) as usize;
-            self.occupancy[index] = Some(id);
-        }
-        self.buildings.push(Building {
-            id,
-            kind_index,
-            origin: (x, y),
-            rotation: rotation % 4,
-            state: BuildState::UnderConstruction { progress_ticks: 0 },
-            inventory: BTreeMap::new(),
-            recipe_ticks: 0,
-        });
-        self.invalidate_paths_if_needed();
-        Ok(PlacementResult { id })
-    }
-
-    pub fn plant_crop(&mut self, kind: &str, x: i32, y: i32) -> Result<(), String> {
-        let (kind_index, def) = self
-            .catalog
-            .find_crop(kind)
-            .ok_or_else(|| format!("unknown crop '{kind}'"))?;
-        let _ = def;
-        let farm_id = self
-            .completed_farm_at(x, y)
-            .ok_or_else(|| "tile is not on a completed farm".to_string())?;
-        let _ = farm_id;
-        if self.crops.iter().any(|crop| crop.tile == (x, y)) {
-            return Err("tile already has a crop".into());
-        }
-        let id = self.next_crop_id;
-        self.next_crop_id = self.next_crop_id.saturating_add(1);
-        self.crops
-            .push(Crop::new(id, kind.to_string(), kind_index, (x, y)));
-        Ok(())
-    }
+    
 
     pub fn advance_clock(&mut self, days: u32, season: Option<u8>) -> Result<(), String> {
         for _ in 0..days {
@@ -2646,56 +2170,7 @@ impl World {
         self.crops.retain(|crop| !tiles.contains(&crop.tile));
     }
 
-    pub fn demolish(&mut self, entity_id: u32) -> Result<(), String> {
-        let index = self
-            .buildings
-            .iter()
-            .position(|building| building.id == entity_id)
-            .ok_or_else(|| format!("unknown building {entity_id}"))?;
-        let building = self.buildings.remove(index);
-        let def = self
-            .catalog
-            .get(building.kind_index)
-            .ok_or_else(|| "missing building definition".to_string())?
-            .clone();
-        let footprint = rotated_footprint(&def, building.rotation);
-        let tiles = footprint_tiles(building.origin, footprint);
-        for (tx, ty) in &tiles {
-            if *tx < 0 || *ty < 0 || *tx >= self.width as i32 || *ty >= self.height as i32 {
-                continue;
-            }
-            let tile_index = (*ty as u32 * self.width + *tx as u32) as usize;
-            if self.occupancy[tile_index] == Some(entity_id) {
-                self.occupancy[tile_index] = None;
-            }
-        }
-        self.remove_crops_on_tiles(&tiles);
-        for (resource, amount) in building.inventory {
-            self.deposit_to_stockpile(&resource, amount);
-        }
-        self.resources.refund(&def.cost);
-        let released = self.job_board.remove_site(entity_id);
-        for villager in &mut self.villagers {
-            if released.contains(&villager.id) {
-                villager.current_job = None;
-                if matches!(
-                    villager.state,
-                    AgentState::Working { .. }
-                        | AgentState::MovingTo {
-                            purpose: MovePurpose::Work,
-                            ..
-                        }
-                ) {
-                    villager.clear_path_to_idle();
-                }
-            } else if let Some(job_id) = villager.current_job {
-                if self.job_board.get(job_id).is_none() {
-                    villager.current_job = None;
-                }
-            }
-        }
-        Ok(())
-    }
+    
 }
 
 #[cfg(test)]

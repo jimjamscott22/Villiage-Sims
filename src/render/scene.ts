@@ -337,16 +337,18 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
   // Terrain-defining props (cypress, peak) are never covered: those tiles aren't buildable.
   // Covered tiles use the full (already viewport-culled) building list so decor under a
   // partially-visible footprint stays suppressed even when only part of the building draws.
-  const covered = new Set<string>();
+  const covered = new Set<number>();
   for (const building of snapshot.buildings) {
     const [fw, fh] = footprintOf(catalog.buildings[building.kind], building.rot);
     for (let dy = 0; dy < fh; dy += 1) {
-      for (let dx = 0; dx < fw; dx += 1) covered.add(`${building.x + dx},${building.y + dy}`);
+      for (let dx = 0; dx < fw; dx += 1) {
+        covered.add((building.x + dx) | ((building.y + dy) << 16));
+      }
     }
   }
 
   const pushProp = (prop: TerrainProp) => {
-    if (prop.decor && covered.has(`${prop.x},${prop.y}`)) return;
+    if (prop.decor && covered.has(prop.x | (prop.y << 16))) return;
     if (prop.season != null && prop.season !== snapshot.clock.season) return;
     propsDrawn += 1;
     pushSprite(list, {
