@@ -87,10 +87,10 @@ pub struct World {
     pub(crate) chronicle: Chronicle,
     pub(crate) unlocked: BTreeSet<String>,
     pub(crate) completed_objectives: BTreeSet<String>,
-    pub(crate) encounters: Vec<Encounter>,
-    pub(crate) behavior: BTreeMap<u32, Behavior>,
+    encounters: Vec<Encounter>,
+    behavior: BTreeMap<u32, Behavior>,
     #[serde(skip)]
-    pub(crate) leisure_cache: leisure::LeisureCache,
+    leisure_cache: leisure::LeisureCache,
     #[serde(skip)]
     pub(crate) viewport: Viewport,
     /// When set, day rollover writes a rotating autosave into this directory.
@@ -257,8 +257,6 @@ impl World {
 
     /// Every building id whose unlock conditions are currently met.
     /// A building with no conditions is always unlocked.
-    
-
     pub fn unlocked(&self) -> &BTreeSet<String> {
         &self.unlocked
     }
@@ -267,8 +265,6 @@ impl World {
     /// unlocked even if the conditions later lapse (e.g. population dipping back
     /// below a threshold). `satisfied_unlocks()` is a current-conditions snapshot,
     /// so this only ever grows `self.unlocked`, never shrinks it.
-    
-
     fn objective_satisfied(&self, condition: &ObjectiveCondition) -> bool {
         match condition {
             ObjectiveCondition::BuildingCount { id, count } => {
@@ -299,10 +295,6 @@ impl World {
 
     /// Objectives are monotonic: once met they stay completed even if the
     /// underlying condition later lapses (e.g. a building is demolished).
-    
-
-    
-
     pub(crate) fn seed(&self) -> u64 {
         self.seed
     }
