@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::economy::CarryStack;
 use super::needs::Needs;
 
-pub use super::utility::{ActionKind, EAT_TICKS, SLEEP_TICKS};
+pub use super::utility::{ActionKind, DRINK_TICKS, EAT_TICKS, SLEEP_TICKS};
 
 /// Why the villager is walking to a tile.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -11,6 +11,8 @@ pub enum MovePurpose {
     PlayerOrder,
     Work,
     Wander,
+    /// Walking to a water source. Appended so older saves keep their indices.
+    Drink,
 }
 
 /// Villager FSM + utility-driven activity states (Milestone 7).
@@ -34,6 +36,10 @@ pub enum AgentState {
     Socializing {
         ticks_remaining: u32,
     },
+    /// Appended after Socializing so older saves keep their variant indices.
+    Drinking {
+        ticks_remaining: u32,
+    },
 }
 
 impl AgentState {
@@ -45,6 +51,7 @@ impl AgentState {
             Self::Eating { .. } => 3,
             Self::Sleeping { .. } => 4,
             Self::Socializing { .. } => 5,
+            Self::Drinking { .. } => 6,
         }
     }
 
@@ -55,11 +62,13 @@ impl AgentState {
                 MovePurpose::PlayerOrder => "Moving",
                 MovePurpose::Work => "Going to work",
                 MovePurpose::Wander => "Wandering",
+                MovePurpose::Drink => "Fetching water",
             },
             Self::Working { .. } => "Working",
             Self::Eating { .. } => "Eating",
             Self::Sleeping { .. } => "Sleeping",
             Self::Socializing { .. } => "Socializing",
+            Self::Drinking { .. } => "Drinking",
         }
     }
 
@@ -105,14 +114,16 @@ pub struct Villager {
     pub carrying: Option<CarryStack>,
     /// Villager traits.
     pub traits: Vec<String>,
-    /// Ticks with hunger == 0.0.
-    pub starvation_ticks: u32,
     /// Transient thought bubble shown above the villager. Not persisted in saves.
     #[serde(skip)]
     pub thought: Option<String>,
     /// Ticks remaining before the thought bubble disappears.
     #[serde(skip)]
     pub thought_ttl: u8,
+    /// Ticks before this villager may search for water again after finding none
+    /// reachable. Runtime-only: a fresh search after load is harmless.
+    #[serde(skip)]
+    pub water_search_cooldown: u16,
 }
 
 impl Villager {
@@ -129,9 +140,9 @@ impl Villager {
             current_action: None,
             carrying: None,
             traits: Vec::new(),
-            starvation_ticks: 0,
             thought: None,
             thought_ttl: 0,
+            water_search_cooldown: 0,
         }
     }
 
@@ -170,6 +181,14 @@ impl Villager {
             ticks_remaining: EAT_TICKS,
         };
         self.current_action = Some(ActionKind::Eat);
+    }
+
+    pub fn begin_drinking(&mut self) {
+        self.path = None;
+        self.state = AgentState::Drinking {
+            ticks_remaining: DRINK_TICKS,
+        };
+        self.current_action = Some(ActionKind::Drink);
     }
 
     pub fn begin_sleeping(&mut self) {

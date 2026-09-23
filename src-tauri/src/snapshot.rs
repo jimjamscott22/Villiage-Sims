@@ -59,7 +59,7 @@ pub struct VillagerView {
     pub id: u32,
     pub x: f32,
     pub y: f32,
-    /// 0 Idle, 1 Moving, 2 Working, 3 Eating, 4 Sleeping, 5 Socializing.
+    /// 0 Idle, 1 Moving, 2 Working, 3 Eating, 4 Sleeping, 5 Socializing, 6 Drinking.
     #[serde(default)]
     pub state: u8,
     /// True while the villager holds a haul stack, so the renderer can pick the carry pose.
@@ -95,6 +95,8 @@ pub struct VillagerDetail {
     pub hunger: f32,
     pub energy: f32,
     pub social: f32,
+    pub thirst: f32,
+    pub health: f32,
     pub happiness: f32,
     pub job_kind: Option<String>,
     pub job_site: Option<u32>,

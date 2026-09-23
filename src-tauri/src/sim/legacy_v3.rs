@@ -1,4 +1,5 @@
-// Frozen version-3 world layout. Villager and supporting wire layouts are unchanged.
+// Frozen version-3 world layout. Villagers use the frozen version-4 layout.
+use super::legacy_v4::LegacyVillager;
 use super::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -18,7 +19,7 @@ pub(crate) struct LegacyWorld {
     next_building_id: u32,
     next_crop_id: u32,
     next_villager_id: u32,
-    villagers: Vec<Villager>,
+    villagers: Vec<LegacyVillager>,
     job_board: JobBoard,
     chronicle: Chronicle,
     unlocked: BTreeSet<String>,
@@ -52,7 +53,11 @@ impl LegacyWorld {
             next_building_id: self.next_building_id,
             next_crop_id: self.next_crop_id,
             next_villager_id: self.next_villager_id,
-            villagers: self.villagers,
+            villagers: self
+                .villagers
+                .into_iter()
+                .map(LegacyVillager::into_villager)
+                .collect(),
             job_board: self.job_board,
             chronicle: self.chronicle,
             unlocked: self.unlocked,

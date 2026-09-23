@@ -93,8 +93,10 @@ the demo transport, or the two drift. Deterministic browser-smoke hooks are expo
 
 **Persistence** (`src-tauri/src/persist.rs`): versioned `bincode` saves (`SAVE_VERSION`), header
 = magic + version + seed. Loading an older version decodes through a frozen legacy
-representation (see `sim::world::legacy_v3`) and converts it into the current `World` — old
-saves must keep loading after the layout changes. Camera/UI state and cached paths are not
+representation (see `sim::world::legacy_v3` / `legacy_v4`; v4 also freezes the pre-thirst
+`Villager`) and converts it into the current `World` — old saves must keep loading after the
+layout changes. New enum variants (`AgentState`, `MovePurpose`, `ActionKind`) are appended, never
+inserted, so saved variant indices stay valid. Camera/UI state and cached paths are not
 saved.
 
 ## Non-obvious gotchas

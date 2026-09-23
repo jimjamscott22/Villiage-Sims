@@ -1,5 +1,6 @@
 //! Focused regression scenarios from the September 2026 simulation review.
 use super::*;
+use crate::sim::needs::HEALTH_DAMAGE;
 use crate::sim::utility::EAT_TICKS;
 
 fn open_world(size: u32) -> World {
@@ -71,7 +72,8 @@ fn last_moment_meal_finishes_before_starvation_and_preserves_cargo() {
     let mut world = open_world(64);
     world.order_move_villager(60, 0, Some(1)).unwrap();
     world.villagers[0].needs.set_hunger(0.0);
-    world.villagers[0].starvation_ticks = 299;
+    // One more tick of starvation damage would be fatal.
+    world.villagers[0].needs.set_health(HEALTH_DAMAGE * 0.5);
     let cargo = CarryStack {
         resource: "grain".into(),
         amount: 3,
@@ -86,7 +88,7 @@ fn last_moment_meal_finishes_before_starvation_and_preserves_cargo() {
 
     let worker = world.villagers.iter().find(|v| v.id == 1).unwrap();
     assert_eq!(worker.needs.hunger, 1.0);
-    assert_eq!(worker.starvation_ticks, 0);
+    assert!(worker.needs.health > 0.0);
     assert_eq!(worker.carrying, Some(cargo));
     assert_eq!(world.resources.food, 0);
 }

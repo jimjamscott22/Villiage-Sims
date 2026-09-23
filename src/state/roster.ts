@@ -2,7 +2,9 @@ import type { VillagerDetail } from './types';
 
 /** Stats shown as columns in the villager roster, in display order. */
 export const ROSTER_STATS = [
+  { key: 'health', label: 'Health', short: 'HP' },
   { key: 'hunger', label: 'Hunger', short: 'HUN' },
+  { key: 'thirst', label: 'Thirst', short: 'THR' },
   { key: 'energy', label: 'Energy', short: 'NRG' },
   { key: 'social', label: 'Social', short: 'SOC' },
   { key: 'happiness', label: 'Happiness', short: 'HAP' },
@@ -23,7 +25,10 @@ export function statTone(value: number): StatTone {
   return 'ok';
 }
 
-/** The villager's most depleted need (happiness is derived, so it is excluded). */
+/**
+ * The villager's most depleted stat, including health (happiness is derived from
+ * the needs, so it is excluded).
+ */
 export function lowestNeed(detail: VillagerDetail): { key: RosterStatKey; label: string; value: number } {
   let lowest: { key: RosterStatKey; label: string; value: number } | null = null;
   for (const stat of ROSTER_STATS) {

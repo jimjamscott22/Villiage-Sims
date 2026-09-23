@@ -79,7 +79,7 @@ export function VillagerRoster({
 
   return (
     <section
-      className="pixel-panel absolute left-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[min(34rem,calc(100%-1.5rem))] flex-col text-xs text-white/80"
+      className="pixel-panel absolute left-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[min(46rem,calc(100%-1.5rem))] flex-col text-xs text-white/80"
       data-testid="villager-roster"
       aria-label="Villager roster"
     >

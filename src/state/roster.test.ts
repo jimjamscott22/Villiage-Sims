@@ -13,6 +13,8 @@ function detail(id: number, name: string, needs: Partial<VillagerDetail> = {}): 
     hunger: 1,
     energy: 1,
     social: 1,
+    thirst: 1,
+    health: 1,
     happiness: 1,
     jobKind: null,
     jobSite: null,
@@ -27,6 +29,11 @@ describe('roster helpers', () => {
     expect(statTone(0.1)).toBe('critical');
     expect(statTone(0.3)).toBe('low');
     expect(statTone(0.4)).toBe('ok');
+  });
+
+  it('counts health and thirst as stats that can need attention', () => {
+    expect(lowestNeed(detail(1, 'Ada', { health: 0.1, hunger: 0.5 })).key).toBe('health');
+    expect(lowestNeed(detail(1, 'Ada', { thirst: 0.05, hunger: 0.5 })).key).toBe('thirst');
   });
 
   it('finds the most depleted need, ignoring derived happiness', () => {
