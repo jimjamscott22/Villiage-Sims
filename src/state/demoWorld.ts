@@ -202,6 +202,11 @@ const ARRIVE_EPSILON_PX = 0.5;
 const HUNGER_DECAY = 0.00008;
 const ENERGY_DECAY = 0.00005;
 const SOCIAL_DECAY = 0.00003;
+const THIRST_DECAY = 0.00012;
+const HEALTH_DAMAGE = 1 / 300;
+const HEALTH_REGEN = 1 / 6000;
+const HEALTH_REGEN_THRESHOLD = 0.25;
+const WATER_SEARCH_COOLDOWN_TICKS = 200;
 const WORK_CYCLE_TICKS = 40;
 const DEFAULT_JOB_PRIORITY = 10;
 const MINUTES_PER_TICK = 0.06;
@@ -222,10 +227,11 @@ const NIGHT_BONUS = 1.5;
 const NIGHT_START_MINUTE = 20 * 60;
 const NIGHT_END_MINUTE = 6 * 60;
 const EAT_TICKS = 60;
+const DRINK_TICKS = 40;
 const SLEEP_TICKS = 100;
 const WANDER_RADIUS = 6;
 const DEMO_SEED = 42;
-export const DEMO_SAVE_VERSION = 2;
+export const DEMO_SAVE_VERSION = 3;
 
 /** Match Rust `weather::mix` — unsigned 64-bit wrapping. */
 function mixU64(a: bigint | number, b: number, c: number, d: number): bigint {
@@ -266,9 +272,10 @@ function demoStormDamageIndex(
   return Number(hash % BigInt(buildingCount));
 }
 
-type ActionKind = 'eat' | 'sleep' | 'work' | 'socialize' | 'wander';
-type MovePurpose = 'player' | 'work' | 'wander';
-type AgentStateName = 'idle' | 'moving' | 'working' | 'eating' | 'sleeping' | 'socializing';
+type ActionKind = 'eat' | 'sleep' | 'work' | 'socialize' | 'wander' | 'drink';
+type MovePurpose = 'player' | 'work' | 'wander' | 'drink';
+type AgentStateName =
+  | 'idle' | 'moving' | 'working' | 'eating' | 'sleeping' | 'socializing' | 'drinking';
 type DemoJobKind = 'tend_crops' | 'gather' | 'haul' | 'produce';
 
 function actionThought(kind: ActionKind): string {
@@ -278,6 +285,7 @@ function actionThought(kind: ActionKind): string {
     case 'work': return 'Time to work!';
     case 'socialize': return "Let's chat!";
     case 'wander': return 'Wandering...';
+    case 'drink': return 'Thirsty!';
   }
 }
 
@@ -304,7 +312,8 @@ interface HaulTask {
   to: HaulEndpoint;
 }
 
-const ACTION_ORDER: ActionKind[] = ['eat', 'sleep', 'work', 'socialize', 'wander'];
+// Matches Rust `ActionKind::as_u8` (Drink was appended last).
+const ACTION_ORDER: ActionKind[] = ['eat', 'sleep', 'work', 'socialize', 'wander', 'drink'];
 
 function actionRank(kind: ActionKind): number {
   return ACTION_ORDER.indexOf(kind);
@@ -397,6 +406,12 @@ function distanceFactor(dist: number): number {
 function scoreEat(hunger: number, food: number): number {
   if (food < 1) return 0;
   const deficit = Math.max(0, Math.min(1, 1 - hunger));
+  return deficit * deficit;
+}
+
+function scoreDrink(thirst: number, waterReachable: boolean): number {
+  if (!waterReachable) return 0;
+  const deficit = Math.max(0, Math.min(1, 1 - thirst));
   return deficit * deficit;
 }
 
@@ -498,6 +513,8 @@ interface DemoNeeds {
   hunger: number;
   energy: number;
   social: number;
+  thirst: number;
+  health: number;
   happiness: number;
 }
 
@@ -520,6 +537,8 @@ export interface DemoVillager {
   traits: string[];
   thought: string | null;
   thoughtTtl: number;
+  /** Ticks before searching for water again after none was reachable (Rust: runtime-only). */
+  waterSearchCooldown?: number;
 }
 
 interface DemoClock {
@@ -559,11 +578,24 @@ interface ScoredAction {
 }
 
 function recomputeHappiness(needs: DemoNeeds): void {
-  needs.happiness = Math.max(0, Math.min(1, (needs.hunger + needs.energy + needs.social) / 3));
+  needs.happiness = Math.max(
+    0,
+    Math.min(1, (needs.hunger + needs.energy + needs.social + needs.thirst) / 4),
+  );
+}
+
+/** Mirrors Rust `Needs::tick_health`; the demo never kills villagers, so health just floors at 0. */
+function tickHealth(needs: DemoNeeds, starving: boolean, parched: boolean): void {
+  const harms = Number(starving) + Number(parched);
+  if (harms > 0) {
+    needs.health = Math.max(0, needs.health - HEALTH_DAMAGE * harms);
+  } else if (needs.hunger >= HEALTH_REGEN_THRESHOLD && needs.thirst >= HEALTH_REGEN_THRESHOLD) {
+    needs.health = Math.min(1, needs.health + HEALTH_REGEN);
+  }
 }
 
 function fullNeeds(): DemoNeeds {
-  const needs = { hunger: 1, energy: 1, social: 1, happiness: 1 };
+  const needs = { hunger: 1, energy: 1, social: 1, thirst: 1, health: 1, happiness: 1 };
   recomputeHappiness(needs);
   return needs;
 }
@@ -576,6 +608,7 @@ function stateByte(v: DemoVillager): number {
     case 'eating': return 3;
     case 'sleeping': return 4;
     case 'socializing': return 5;
+    case 'drinking': return 6;
   }
 }
 
@@ -585,11 +618,13 @@ function stateLabel(v: DemoVillager): string {
     case 'moving':
       if (v.purpose === 'work') return 'Going to work';
       if (v.purpose === 'wander') return 'Wandering';
+      if (v.purpose === 'drink') return 'Fetching water';
       return 'Moving';
     case 'working': return 'Working';
     case 'eating': return 'Eating';
     case 'sleeping': return 'Sleeping';
     case 'socializing': return 'Socializing';
+    case 'drinking': return 'Drinking';
   }
 }
 
@@ -773,11 +808,15 @@ export class DemoWorld {
     const cx = Math.floor(this.terrain.width / 2);
     const cy = Math.floor(this.terrain.height / 2);
     const used: Array<[number, number]> = [];
+    // Mirrors Rust: everyone after the first spawns where the first can walk,
+    // so nobody starts walled into a rock pocket with no route to water.
+    let home: Uint8Array | null = null;
     for (let i = 0; i < STARTING_VILLAGER_NAMES.length; i += 1) {
       const name = STARTING_VILLAGER_NAMES[i];
       const id = this.nextVillagerId;
       this.nextVillagerId += 1;
-      const tile = this.findSpawnTile(cx, cy, used) ?? [cx + i, cy];
+      const tile = this.findSpawnTile(cx, cy, used, home) ?? [cx + i, cy];
+      home ??= this.reachableFrom(tile);
       used.push(tile);
       const [px, py] = this.tileCenter(tile[0], tile[1]);
       this.villagers.push({
@@ -807,9 +846,12 @@ export class DemoWorld {
     cx: number,
     cy: number,
     used: Array<[number, number]>,
+    region: Uint8Array | null,
   ): [number, number] | null {
+    const inRegion = (x: number, y: number) =>
+      region == null || (this.inBounds(x, y) && region[y * this.terrain.width + x] === 1);
     const first = this.findWalkableNear(cx, cy);
-    if (first && !used.some((u) => u[0] === first[0] && u[1] === first[1])) {
+    if (first && !used.some((u) => u[0] === first[0] && u[1] === first[1]) && inRegion(first[0], first[1])) {
       return first;
     }
     const maxR = Math.max(this.terrain.width, this.terrain.height);
@@ -820,7 +862,7 @@ export class DemoWorld {
           const x = cx + dx;
           const y = cy + dy;
           if (used.some((u) => u[0] === x && u[1] === y)) continue;
-          if (this.isSpawnCandidate(x, y)) return [x, y];
+          if (this.isSpawnCandidate(x, y) && inRegion(x, y)) return [x, y];
         }
       }
     }
@@ -877,7 +919,7 @@ export class DemoWorld {
       throw new Error(`could not decode save: ${cause instanceof Error ? cause.message : String(cause)}`);
     }
     if (state == null || typeof state !== 'object') throw new Error('could not decode save: invalid data');
-    if (state.version !== DEMO_SAVE_VERSION && state.version !== 1) {
+    if (state.version !== DEMO_SAVE_VERSION && state.version !== 1 && state.version !== 2) {
       throw new Error(`unsupported save version ${String(state.version)} (expected ${DEMO_SAVE_VERSION})`);
     }
     if (state.seed !== DEMO_SEED) throw new Error('save header seed does not match the demo world');
@@ -905,6 +947,14 @@ export class DemoWorld {
     world.nextJobId = state.nextJobId;
     world.nextVillagerId = state.nextVillagerId;
     world.villagers = state.villagers;
+    if (state.version < 3) {
+      // Versions 1–2 predate thirst and health: start both full.
+      for (const v of world.villagers) {
+        v.needs.thirst = 1;
+        v.needs.health = 1;
+        recomputeHappiness(v.needs);
+      }
+    }
     world.jobs = state.jobs;
     world.clock = state.clock;
     if (state.version === 1) {
@@ -972,6 +1022,14 @@ export class DemoWorld {
     this.social.prepare();
     for (let i = 0; i < this.villagers.length; i += 1) {
       this.tickVillagerAt(i);
+    }
+    // Rust ticks health in `check_population_dynamics`, after villagers act.
+    for (const villager of this.villagers) {
+      tickHealth(
+        villager.needs,
+        villager.needs.hunger === 0 && villager.state !== 'eating',
+        villager.needs.thirst === 0 && villager.state !== 'drinking',
+      );
     }
     this.social.tick();
     this.checkUnlocks();
@@ -1060,12 +1118,22 @@ export class DemoWorld {
       hunger: villager.needs.hunger,
       energy: villager.needs.energy,
       social: villager.needs.social,
+      thirst: villager.needs.thirst,
+      health: villager.needs.health,
       happiness: villager.needs.happiness,
       jobKind: job?.kind ?? null,
       jobSite: job?.site ?? null,
       traits: villager.traits ?? [],
+      tile: this.posToTile(villager.x, villager.y),
       thought: villager.thought ?? undefined,
     };
+  }
+
+  /** Detail for every villager, ordered by id; not viewport-culled (mirrors `villager_roster`). */
+  getVillagerRoster(): VillagerDetail[] {
+    return [...this.villagers]
+      .sort((a, b) => a.id - b.id)
+      .map((villager) => this.getVillagerDetail(villager.id));
   }
 
   private generateNodes(): ResourceNode[] {
@@ -1398,6 +1466,7 @@ export class DemoWorld {
       n.hunger = Math.max(0, Math.min(1, n.hunger - HUNGER_DECAY));
       n.energy = Math.max(0, Math.min(1, n.energy - ENERGY_DECAY));
       n.social = Math.max(0, Math.min(1, n.social - SOCIAL_DECAY));
+      n.thirst = Math.max(0, Math.min(1, n.thirst - THIRST_DECAY));
       recomputeHappiness(n);
     }
   }
@@ -1461,6 +1530,7 @@ export class DemoWorld {
       villager.thoughtTtl -= 1;
       if (villager.thoughtTtl === 0) villager.thought = null;
     }
+    villager.waterSearchCooldown = Math.max(0, (villager.waterSearchCooldown ?? 0) - 1);
 
     if (villager.currentJob != null && !this.jobs.some((job) => job.id === villager.currentJob)) {
       villager.currentJob = null;
@@ -1481,6 +1551,17 @@ export class DemoWorld {
       this.social.leisure.clear(villager);
       this.beginEat(index);
     }
+    if (
+      villager.needs.thirst === 0
+      && villager.waterSearchCooldown === 0
+      && villager.state !== 'eating'
+      && villager.state !== 'drinking'
+      && !(villager.state === 'moving' && villager.purpose === 'drink')
+    ) {
+      this.social.cancel(villager.id);
+      this.social.leisure.clear(villager);
+      this.beginDrink(index);
+    }
 
     const pair = this.social.pair(villager.id);
     if (pair) {
@@ -1489,6 +1570,9 @@ export class DemoWorld {
     switch (villager.state) {
       case 'eating':
         this.tickEating(index);
+        return;
+      case 'drinking':
+        this.tickDrinking(index);
         return;
       case 'sleeping':
         this.tickSleeping(index);
@@ -1521,6 +1605,7 @@ export class DemoWorld {
     if (
       villager.state === 'idle'
       && (villager.currentAction === 'eat'
+        || villager.currentAction === 'drink'
         || villager.currentAction === 'sleep'
         || villager.currentAction === 'socialize')
     ) {
@@ -1551,6 +1636,11 @@ export class DemoWorld {
     const villager = this.villagers[index];
     const actions: ScoredAction[] = [
       { kind: 'eat', score: scoreEat(villager.needs.hunger, this.deriveTotals().food), jobId: null },
+      {
+        kind: 'drink',
+        score: scoreDrink(villager.needs.thirst, (villager.waterSearchCooldown ?? 0) === 0),
+        jobId: null,
+      },
       { kind: 'sleep', score: scoreSleep(villager.needs.energy, isNight(this.clock.minute)), jobId: null },
       { kind: 'socialize', score: scoreSocialize(villager.needs.social, partnerInRange), jobId: null },
       { kind: 'wander', score: scoreWander(), jobId: null },
@@ -1580,6 +1670,9 @@ export class DemoWorld {
     switch (kind) {
       case 'eat':
         this.beginEat(index);
+        break;
+      case 'drink':
+        this.beginDrink(index);
         break;
       case 'sleep':
         this.beginSleep(index);
@@ -1612,6 +1705,100 @@ export class DemoWorld {
     villager.activityTicks = EAT_TICKS;
     villager.currentAction = 'eat';
     this.setThought(index, actionThought('eat'));
+  }
+
+  /** Mirrors Rust `begin_drink`: walk to the nearest shoreline/well tile, then drink. */
+  private beginDrink(index: number): void {
+    const villager = this.villagers[index];
+    const start = this.posToTile(villager.x, villager.y);
+    const target = this.nearestWaterAccess(start);
+    const path = target == null
+      ? null
+      : target[0] === start[0] && target[1] === start[1] ? [] : this.computePath(start, target);
+    if (target == null || path == null) {
+      villager.waterSearchCooldown = WATER_SEARCH_COOLDOWN_TICKS;
+      if (villager.currentAction === 'drink') villager.currentAction = null;
+      return;
+    }
+    this.setThought(index, actionThought('drink'));
+    if (path.length === 0) {
+      this.startDrinking(villager);
+      return;
+    }
+    villager.state = 'moving';
+    villager.purpose = 'drink';
+    villager.target = target;
+    villager.path = path;
+    villager.currentAction = 'drink';
+  }
+
+  private startDrinking(villager: DemoVillager): void {
+    villager.path = null;
+    villager.target = null;
+    villager.purpose = null;
+    villager.state = 'drinking';
+    villager.activityTicks = DRINK_TICKS;
+    villager.currentAction = 'drink';
+  }
+
+  private wellIds(): Set<number> {
+    return new Set(
+      this.buildings
+        .filter((b) => b.complete && DEMO_CATALOG.buildings[b.kindIndex]?.id === 'well')
+        .map((b) => b.id),
+    );
+  }
+
+  private isWaterAccess(x: number, y: number, wells: Set<number>): boolean {
+    return ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(([dx, dy]) => {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!this.inBounds(nx, ny)) return false;
+      const i = ny * this.terrain.width + nx;
+      const terrain = this.terrain.tiles[i];
+      const occupant = this.occupancy[i];
+      return terrain === 0 || terrain === 1 || (occupant != null && wells.has(occupant));
+    });
+  }
+
+  /** Same fixed-order BFS as Rust `nearest_water_access`, so both pick the same tile. */
+  private nearestWaterAccess(start: [number, number]): [number, number] | null {
+    if (!this.inBounds(start[0], start[1])) return null;
+    const wells = this.wellIds();
+    const width = this.terrain.width;
+    const visited = new Uint8Array(this.terrain.tiles.length);
+    const queue: Array<[number, number]> = [start];
+    visited[start[1] * width + start[0]] = 1;
+    for (let head = 0; head < queue.length; head += 1) {
+      const [x, y] = queue[head];
+      if (this.isWaterAccess(x, y, wells)) return [x, y];
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (!this.isPassable(nx, ny)) continue;
+        const i = ny * width + nx;
+        if (!visited[i]) {
+          visited[i] = 1;
+          queue.push([nx, ny]);
+        }
+      }
+    }
+    return null;
+  }
+
+  private tickDrinking(index: number): void {
+    const villager = this.villagers[index];
+    if (villager.activityTicks <= 1) {
+      villager.needs.thirst = 1;
+      recomputeHappiness(villager.needs);
+      villager.state = 'idle';
+      villager.path = null;
+      villager.target = null;
+      villager.purpose = null;
+      villager.currentAction = null;
+    } else {
+      villager.activityTicks -= 1;
+    }
   }
 
   private beginSleep(index: number): void {
@@ -2382,6 +2569,18 @@ export class DemoWorld {
     villager.path = null;
     villager.target = null;
     if (purpose === 'wander' && !this.social.pair(villager.id)) this.social.leisure.arrive(villager);
+    if (purpose === 'drink') {
+      const [x, y] = this.posToTile(villager.x, villager.y);
+      if (this.isWaterAccess(x, y, this.wellIds())) {
+        this.startDrinking(villager);
+      } else {
+        // The well was demolished en route; decide again next tick.
+        villager.purpose = null;
+        villager.state = 'idle';
+        villager.currentAction = null;
+      }
+      return;
+    }
     if (purpose === 'player' || purpose === 'wander') {
       villager.purpose = null;
       villager.state = 'idle';
@@ -2518,6 +2717,27 @@ export class DemoWorld {
       }
     }
     return null;
+  }
+
+  /** Tiles walkable-connected to `start` (4-neighbour, matching A*'s no corner-cutting). */
+  private reachableFrom(start: [number, number]): Uint8Array {
+    const width = this.terrain.width;
+    const seen = new Uint8Array(this.terrain.tiles.length);
+    if (!this.isPassable(start[0], start[1])) return seen;
+    seen[start[1] * width + start[0]] = 1;
+    const queue: Array<[number, number]> = [start];
+    for (let head = 0; head < queue.length; head += 1) {
+      const [x, y] = queue[head];
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (this.isPassable(nx, ny) && !seen[ny * width + nx]) {
+          seen[ny * width + nx] = 1;
+          queue.push([nx, ny]);
+        }
+      }
+    }
+    return seen;
   }
 
   private isSpawnCandidate(x: number, y: number): boolean {

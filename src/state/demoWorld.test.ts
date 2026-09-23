@@ -536,7 +536,7 @@ describe('DemoWorld pathfinding', () => {
       width: 16,
       height: 16,
       tick: 75,
-      saveVersion: 2,
+      saveVersion: 3,
     });
   });
 
@@ -544,7 +544,7 @@ describe('DemoWorld pathfinding', () => {
     const state = JSON.parse(new DemoWorld(grassTerrain()).exportState()) as Record<string, unknown>;
     state.version = 99;
     expect(() => DemoWorld.importState(JSON.stringify(state))).toThrow(
-      'unsupported save version 99 (expected 2)',
+      'unsupported save version 99 (expected 3)',
     );
   });
 

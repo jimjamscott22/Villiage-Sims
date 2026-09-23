@@ -49,6 +49,7 @@ pub fn run() {
             commands::demolish,
             commands::move_villager_to,
             commands::get_villager_detail,
+            commands::get_villager_roster,
             commands::get_chronicle,
             commands::plant_crop,
             commands::advance_clock,

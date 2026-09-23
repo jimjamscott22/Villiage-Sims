@@ -146,6 +146,20 @@ pub(crate) async fn get_villager_detail(
 }
 
 #[tauri::command]
+pub(crate) async fn get_villager_roster(
+    state: State<'_, AppState>,
+) -> Result<Vec<VillagerDetail>, String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::GetVillagerRoster { reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped get_villager_roster".to_string())
+}
+
+#[tauri::command]
 pub(crate) async fn get_chronicle(
     state: State<'_, AppState>,
 ) -> Result<Vec<ChronicleEntryView>, String> {

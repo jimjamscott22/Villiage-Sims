@@ -32,7 +32,15 @@ Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 - Paired conversations: villagers reserve a reachable meeting tile, stop together, restore the existing Social satisfaction meter over six seconds, and cool down afterward. Urgent needs, player orders, death, blocked routes, and demolished destinations release both participants.
 - Purposeful leisure: free villagers visit reachable hut or well perimeters, pause briefly, and avoid immediately repeating the previous destination. Completed huts increase local social and leisure priority up to a five-hut cap; isolated villagers can still meet.
 - Needs decay; farms advertise `TendCrops`; mill/bakery `Produce`; granary/mill/bakery `Haul`; forest/rock `Gather`.
-- Population & Housing: base capacity + Hut capacity (+2/hut); automatic birth when under capacity; starvation death on zero hunger.
+- Population & Housing: base capacity + Hut capacity (+2/hut); automatic birth when under capacity.
+- Thirst & Health: thirst decays ~1.5x faster than hunger; the Drink action (`(1 - thirst)^2`) walks
+  villagers to the nearest reachable shoreline or completed well (fixed-order BFS) and restores it.
+  Health falls `1/300` per tick per empty survival need (hunger/thirst, exempting an in-progress
+  meal/drink) and regenerates slowly while both are ≥ 25%; death at zero health is recorded as
+  starvation or dehydration. Happiness now averages hunger, energy, social and thirst.
+- Spawn connectivity: starting villagers after the first must spawn in the region walkable from
+  the first villager's tile (Rust + demo). Previously the demo map walled 4 of 5 villagers into
+  rock pockets with no route to water.
 - Character Traits: `traits.json` assigned to villagers and rendered in `VillagerPanel`.
 - Tech / Progression Tree: buildings locked in `BuildMenu` until population or building pre-requisites are met.
 - ResourceBar displays live population / housing capacity counter (`Pop X/Y`).
@@ -42,12 +50,20 @@ Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
 - Village Chronicle: a 200-entry capped log of births, deaths, building completions, unlocks,
   harvests and season turns, owned by the sim, saved with the world, shown in a collapsible drawer.
   Clicking an entry centres the camera on its subject.
-- Persistence: versioned bincode save/load (`SAVE_VERSION` 4; version 3 saves migrate); manual Slot 1 Save/Load; rotating
+- Persistence: versioned bincode save/load (`SAVE_VERSION` 5; versions 3–4 migrate via the frozen
+  `legacy_v4` villager layout, starting thirst/health full); manual Slot 1 Save/Load; rotating
   autosave through slots 1–3 every in-game day.
 - Weather: deterministic daily Clear/Rain/Storm from seed+date. Rain/Storm water outdoor crops;
   Storm knocks one building back to half-built. Shown in the ClockBar.
 - Interaction polish: pixel selection brackets plus hover tooltips for villagers, buildings and
   crops. Hover inspection is suppressed during build/plant placement so the ghost remains clear.
+- Villager roster overlay (`SIMS` button / `V`): lists every living villager with Health, Hunger,
+  Thirst, Energy, Social and Happiness bars, sortable per column (stats sort neediest-first), flags critical needs,
+  and clicking a row selects the villager and centres the camera. Data comes from the on-demand
+  `get_villager_roster` command (polled only while open), never the tick payload.
+- Name tags (`TAGS` button / `N`): each villager's name is drawn under its feet; duplicate names get
+  `#id`. Below 0.4× zoom only the selected villager keeps its tag. Names are fetched via the roster
+  when an unlabelled villager id appears in a snapshot (startup, births).
 - Persistence acceptance: a 50-villager save is byte-identical after reload and remains identical
   after both the original and loaded simulations advance.
 

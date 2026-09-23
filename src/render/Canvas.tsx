@@ -9,6 +9,7 @@ import { drawBuildings, drawCrops, drawVillagers } from './drawEntities';
 import { drawGhost } from './drawGhost';
 import { drawTerrain } from './drawTerrain';
 import { hoverTargetAt, type HoverTarget } from './hover';
+import { drawNameTags, nameTagPlacements } from './nameTags';
 import { formatPerfOverlay, PerfTracker, perfEnabledFromSearch } from './perfStats';
 import type { Facing } from './scene';
 import { atlasHasEntities, buildDrawListWithStats, paintScene } from './scene';
@@ -41,6 +42,9 @@ interface CanvasProps {
   onSelectBuilding: (id: number | null) => void;
   onSelectVillager: (id: number | null) => void;
   onSnapshot: (snapshot: TickSnapshot) => void;
+  /** Villager id → name-tag label; drawn under each villager when `showNameTags`. */
+  tagLabels: ReadonlyMap<number, string>;
+  showNameTags: boolean;
   /** `nonce` increments on every focus request so clicking the same tile twice
    * in a row still produces a new object identity and re-runs the focus effect
    * below — React bails out of re-renders on `Object.is(prev, next)`, and a
@@ -87,6 +91,8 @@ export function Canvas({
   onSelectBuilding,
   onSelectVillager,
   onSnapshot,
+  tagLabels,
+  showNameTags,
   focusTile,
 }: CanvasProps) {
   const viewportRef = useRef<HTMLElement>(null);
@@ -105,6 +111,8 @@ export function Canvas({
   const selectedBuildingIdRef = useRef(selectedBuildingId);
   const selectedVillagerIdRef = useRef(selectedVillagerId);
   const onSnapshotRef = useRef(onSnapshot);
+  const tagLabelsRef = useRef(tagLabels);
+  const showNameTagsRef = useRef(showNameTags);
   const onSelectBuildingRef = useRef(onSelectBuilding);
   const onSelectVillagerRef = useRef(onSelectVillager);
   const onRotationChangeRef = useRef(onRotationChange);
@@ -115,6 +123,10 @@ export function Canvas({
   useEffect(() => {
     selectedKindRef.current = selectedKind;
   }, [selectedKind]);
+  useEffect(() => {
+    tagLabelsRef.current = tagLabels;
+    showNameTagsRef.current = showNameTags;
+  }, [tagLabels, showNameTags]);
   useEffect(() => {
     selectedCropRef.current = selectedCrop;
   }, [selectedCrop]);
@@ -453,6 +465,20 @@ export function Canvas({
               );
             }
           }
+        }
+        if (showNameTagsRef.current) {
+          drawNameTags(
+            ctx,
+            nameTagPlacements(
+              rendered.villagers,
+              tagLabelsRef.current,
+              camera,
+              viewWidth,
+              viewHeight,
+              selectedVillagerIdRef.current,
+            ),
+            dpr,
+          );
         }
       }
 

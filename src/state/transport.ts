@@ -38,6 +38,7 @@ interface Transport {
   demolish(entityId: number): Promise<void>;
   moveVillagerTo(x: number, y: number, villagerId?: number | null): Promise<void>;
   getVillagerDetail(id: number): Promise<VillagerDetail>;
+  getVillagerRoster(): Promise<VillagerDetail[]>;
   plantCrop(kind: string, x: number, y: number): Promise<void>;
   advanceClock(days: number, season: number | null): Promise<void>;
   saveGame(slot: number): Promise<void>;
@@ -117,6 +118,10 @@ class BrowserTransport implements Transport {
     return this.world.getVillagerDetail(id);
   }
 
+  async getVillagerRoster(): Promise<VillagerDetail[]> {
+    return this.world.getVillagerRoster();
+  }
+
   async plantCrop(kind: string, x: number, y: number): Promise<void> {
     this.world.plantCrop(kind, x, y);
     this.emit(this.world.snapshot());
@@ -183,6 +188,7 @@ const tauriTransport: Transport = {
   moveVillagerTo: (x, y, villagerId) =>
     invoke('move_villager_to', { x, y, villagerId: villagerId ?? null }),
   getVillagerDetail: (id) => invoke<VillagerDetail>('get_villager_detail', { id }),
+  getVillagerRoster: () => invoke<VillagerDetail[]>('get_villager_roster'),
   plantCrop: (kind, x, y) => invoke('plant_crop', { kind, x, y }),
   advanceClock: (days, season) => invoke('advance_clock', { days, season }),
   saveGame: (slot) => invoke('save_game', { slot }),
