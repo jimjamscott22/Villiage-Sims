@@ -257,6 +257,9 @@ impl World {
                 let result = self.villager_detail(id);
                 let _ = reply.send(result);
             }
+            SimCommand::GetVillagerRoster { reply } => {
+                let _ = reply.send(self.villager_roster());
+            }
             SimCommand::SetSpeed { speed } => {
                 let _ = self.clock.set_speed(speed);
             }
@@ -788,8 +791,21 @@ impl World {
             job_kind,
             job_site,
             traits: villager.traits.clone(),
+            tile: self.pos_to_tile(villager.pos),
             thought: villager.thought.clone(),
         })
+    }
+
+    /// Detail for every living villager, ordered by id. Fetched on demand by the
+    /// roster overlay; unlike tick snapshots it is not viewport-culled.
+    pub fn villager_roster(&self) -> Vec<VillagerDetail> {
+        let mut roster: Vec<VillagerDetail> = self
+            .villagers
+            .iter()
+            .filter_map(|villager| self.villager_detail(villager.id).ok())
+            .collect();
+        roster.sort_by_key(|detail| detail.id);
+        roster
     }
 
     /// Move a villager to `(x, y)`. When `villager_id` is set, that villager is
@@ -2886,6 +2902,27 @@ mod tests {
         assert!(world.villager().needs.hunger < before);
         let detail = world.villager_detail(1).unwrap();
         assert!(detail.hunger < before);
+    }
+
+    #[test]
+    fn roster_lists_every_living_villager_by_id() {
+        let mut world = World::generate(16, 16, 32, 5);
+        for _ in 0..50 {
+            world.advance();
+        }
+
+        let roster = world.villager_roster();
+        assert_eq!(roster.len(), world.villagers().len());
+        assert!(roster.windows(2).all(|pair| pair[0].id < pair[1].id));
+        for detail in &roster {
+            let villager = world
+                .villagers()
+                .iter()
+                .find(|v| v.id == detail.id)
+                .unwrap();
+            assert_eq!(detail.name, villager.name);
+            assert_eq!(detail.tile, world.pos_to_tile(villager.pos));
+        }
     }
 
     #[test]

@@ -45,6 +45,8 @@ export interface VillagerDetail {
   jobKind: string | null;
   jobSite: number | null;
   traits: string[];
+  /** Tile the villager stands on, used by the roster to centre the camera. */
+  tile: [number, number];
   /** Current thought bubble text, if any. */
   thought?: string;
 }

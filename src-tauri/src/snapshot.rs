@@ -99,6 +99,8 @@ pub struct VillagerDetail {
     pub job_kind: Option<String>,
     pub job_site: Option<u32>,
     pub traits: Vec<String>,
+    /// Tile the villager currently stands on, so the roster can centre the camera.
+    pub tile: (i32, i32),
     /// Current thought bubble text, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thought: Option<String>,

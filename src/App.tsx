@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Canvas } from './render/Canvas';
 import { formatEntry } from './state/chronicle';
+import { buildTagLabels, hasUnlabelledVillager } from './state/roster';
 import { transport } from './state/transport';
 import type {
   Catalog,
@@ -18,8 +19,23 @@ import { ResourceBar } from './ui/ResourceBar';
 import { FloatingText, type Floater } from './ui/FloatingText';
 import { ObjectivesPanel } from './ui/ObjectivesPanel';
 import { ToastStack, type Toast } from './ui/ToastStack';
+import { VillagerRoster } from './ui/VillagerRoster';
 
 const DETAIL_POLL_MS = 250;
+const ROSTER_POLL_MS = 500;
+
+function sameLabels(a: ReadonlyMap<number, string>, b: ReadonlyMap<number, string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const [id, label] of a) if (b.get(id) !== label) return false;
+  return true;
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+  );
+}
 
 export default function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -35,6 +51,56 @@ export default function App() {
   const [worldKey, setWorldKey] = useState(0);
   const [persistenceBusy, setPersistenceBusy] = useState(false);
   const [persistenceStatus, setPersistenceStatus] = useState('Slot 1 · Not saved this session');
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [showNameTags, setShowNameTags] = useState(true);
+  const [roster, setRoster] = useState<VillagerDetail[] | null>(null);
+  const [tagLabels, setTagLabels] = useState<ReadonlyMap<number, string>>(() => new Map());
+  // Mirrors tagLabels for the snapshot handler, which runs outside React's render.
+  const tagLabelsRef = useRef<ReadonlyMap<number, string>>(tagLabels);
+  // Bumped on load so a roster fetched from the old world can't land in the new one.
+  const rosterGenerationRef = useRef(0);
+  const rosterInFlightRef = useRef(false);
+
+  const refreshRoster = useCallback(() => {
+    if (rosterInFlightRef.current) return;
+    rosterInFlightRef.current = true;
+    const generation = rosterGenerationRef.current;
+    void transport
+      .getVillagerRoster()
+      .then((entries) => {
+        if (generation !== rosterGenerationRef.current) return;
+        setRoster(entries);
+        const next = buildTagLabels(entries);
+        if (!sameLabels(tagLabelsRef.current, next)) {
+          tagLabelsRef.current = next;
+          setTagLabels(next);
+        }
+      })
+      .catch(() => {
+        // Best-effort: the next poll or unlabelled villager retries.
+      })
+      .finally(() => {
+        rosterInFlightRef.current = false;
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!rosterOpen) return;
+    refreshRoster();
+    const timer = window.setInterval(refreshRoster, ROSTER_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [rosterOpen, refreshRoster]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || isTypingTarget(event.target)) return;
+      const key = event.key.toLowerCase();
+      if (key === 'v') setRosterOpen((open) => !open);
+      else if (key === 'n') setShowNameTags((show) => !show);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   useEffect(() => {
     void transport
@@ -133,6 +199,11 @@ export default function App() {
     setUnlocked(snapshot.unlocked ?? []);
     setWinterWarning(snapshot.winterWarning ?? false);
     setCompletedObjectives(snapshot.completedObjectives ?? []);
+    // Names aren't in tick payloads (snapshot rule 4); fetch the roster when a
+    // villager we can't label shows up, e.g. at startup or after a birth.
+    if (hasUnlabelledVillager(tagLabelsRef.current, snapshot.villagers.map((villager) => villager.id))) {
+      refreshRoster();
+    }
     setSelectedVillagerId((current) => {
       if (current == null) return current;
       return snapshot.villagers.some((villager) => villager.id === current) ? current : null;
@@ -233,6 +304,11 @@ export default function App() {
       setSelectedBuildingId(null);
       setSelectedVillagerId(null);
       setVillagerDetail(null);
+      rosterGenerationRef.current += 1;
+      rosterInFlightRef.current = false;
+      tagLabelsRef.current = new Map();
+      setTagLabels(tagLabelsRef.current);
+      setRoster(null);
       setRotation(0);
       setChronicle([]);
       setToasts([]);
@@ -268,6 +344,26 @@ export default function App() {
         </div>
         <div className="flex min-w-0 items-center gap-2 justify-self-end">
           <ObjectivesPanel catalog={catalog} completed={completedObjectives} />
+          <button
+            type="button"
+            data-testid="toggle-roster"
+            aria-pressed={rosterOpen}
+            title="Villager roster (V)"
+            onClick={() => setRosterOpen((open) => !open)}
+            className={`pixel-btn pixel-focus px-2 py-1 ${rosterOpen ? 'pixel-btn-active' : ''}`}
+          >
+            <PixelText text="SIMS" />
+          </button>
+          <button
+            type="button"
+            data-testid="toggle-name-tags"
+            aria-pressed={showNameTags}
+            title="Villager name tags (N)"
+            onClick={() => setShowNameTags((show) => !show)}
+            className={`pixel-btn pixel-focus px-2 py-1 ${showNameTags ? 'pixel-btn-active' : ''}`}
+          >
+            <PixelText text="TAGS" />
+          </button>
           <button
             type="button"
             data-testid="save-game"
@@ -321,8 +417,23 @@ export default function App() {
             onSelectBuilding={setSelectedBuildingId}
             onSelectVillager={setSelectedVillagerId}
             onSnapshot={onSnapshot}
+            tagLabels={tagLabels}
+            showNameTags={showNameTags}
             focusTile={focusTile}
           />
+          {rosterOpen && (
+            <VillagerRoster
+              roster={roster}
+              selectedVillagerId={selectedVillagerId}
+              showNameTags={showNameTags}
+              onToggleNameTags={() => setShowNameTags((show) => !show)}
+              onSelect={(detail) => {
+                setSelectedVillagerId(detail.id);
+                setFocusTile((previous) => ({ tile: detail.tile, nonce: (previous?.nonce ?? 0) + 1 }));
+              }}
+              onClose={() => setRosterOpen(false)}
+            />
+          )}
           <ToastStack
             toasts={toasts}
             onDismiss={dismissToast}

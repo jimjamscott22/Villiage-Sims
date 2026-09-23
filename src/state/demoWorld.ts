@@ -1064,8 +1064,16 @@ export class DemoWorld {
       jobKind: job?.kind ?? null,
       jobSite: job?.site ?? null,
       traits: villager.traits ?? [],
+      tile: this.posToTile(villager.x, villager.y),
       thought: villager.thought ?? undefined,
     };
+  }
+
+  /** Detail for every villager, ordered by id; not viewport-culled (mirrors `villager_roster`). */
+  getVillagerRoster(): VillagerDetail[] {
+    return [...this.villagers]
+      .sort((a, b) => a.id - b.id)
+      .map((villager) => this.getVillagerDetail(villager.id));
   }
 
   private generateNodes(): ResourceNode[] {

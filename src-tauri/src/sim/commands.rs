@@ -41,6 +41,9 @@ pub enum SimCommand {
         id: u32,
         reply: oneshot::Sender<Result<VillagerDetail, String>>,
     },
+    GetVillagerRoster {
+        reply: oneshot::Sender<Vec<VillagerDetail>>,
+    },
     SetSpeed {
         speed: u8,
     },

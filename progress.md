@@ -48,6 +48,13 @@ Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
   Storm knocks one building back to half-built. Shown in the ClockBar.
 - Interaction polish: pixel selection brackets plus hover tooltips for villagers, buildings and
   crops. Hover inspection is suppressed during build/plant placement so the ghost remains clear.
+- Villager roster overlay (`SIMS` button / `V`): lists every living villager with Hunger, Energy,
+  Social and Happiness bars, sortable per column (stats sort neediest-first), flags critical needs,
+  and clicking a row selects the villager and centres the camera. Data comes from the on-demand
+  `get_villager_roster` command (polled only while open), never the tick payload.
+- Name tags (`TAGS` button / `N`): each villager's name is drawn under its feet; duplicate names get
+  `#id`. Below 0.4× zoom only the selected villager keeps its tag. Names are fetched via the roster
+  when an unlabelled villager id appears in a snapshot (startup, births).
 - Persistence acceptance: a 50-villager save is byte-identical after reload and remains identical
   after both the original and loaded simulations advance.
 
