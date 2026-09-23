@@ -815,7 +815,8 @@ export class DemoWorld {
       const name = STARTING_VILLAGER_NAMES[i];
       const id = this.nextVillagerId;
       this.nextVillagerId += 1;
-      const tile = this.findSpawnTile(cx, cy, used, home) ?? [cx + i, cy];
+      const tile = (home == null ? this.firstSpawnTile(cx, cy) : this.findSpawnTile(cx, cy, used, home))
+        ?? [cx + i, cy];
       home ??= this.reachableFrom(tile);
       used.push(tile);
       const [px, py] = this.tileCenter(tile[0], tile[1]);
@@ -840,6 +841,34 @@ export class DemoWorld {
         thoughtTtl: 0,
       });
     }
+  }
+
+  /**
+   * Mirrors Rust `first_spawn_tile`: the most open tile near the centre unless its
+   * area can't reach water, then the nearest candidate in an area that can.
+   */
+  private firstSpawnTile(cx: number, cy: number): [number, number] | null {
+    const preferred = this.findSpawnTile(cx, cy, [], null);
+    if (preferred == null || this.nearestWaterAccess(preferred) != null) return preferred;
+    // Each landlocked area is searched once, then skipped wholesale.
+    const landlocked = this.reachableFrom(preferred);
+    const width = this.terrain.width;
+    const maxR = Math.max(width, this.terrain.height);
+    for (let r = 0; r <= maxR; r += 1) {
+      for (let dy = -r; dy <= r; dy += 1) {
+        for (let dx = -r; dx <= r; dx += 1) {
+          if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+          const x = cx + dx;
+          const y = cy + dy;
+          if (!this.isSpawnCandidate(x, y) || landlocked[y * width + x]) continue;
+          if (this.nearestWaterAccess([x, y]) != null) return [x, y];
+          this.reachableFrom([x, y]).forEach((reached, i) => {
+            if (reached) landlocked[i] = 1;
+          });
+        }
+      }
+    }
+    return preferred;
   }
 
   private findSpawnTile(
@@ -1788,6 +1817,14 @@ export class DemoWorld {
 
   private tickDrinking(index: number): void {
     const villager = this.villagers[index];
+    // Mirrors Rust: a well demolished or storm-damaged mid-drink ends the drink
+    // without a refill; the next decision searches for water again.
+    const [x, y] = this.posToTile(villager.x, villager.y);
+    if (!this.isWaterAccess(x, y, this.wellIds())) {
+      villager.state = 'idle';
+      villager.currentAction = null;
+      return;
+    }
     if (villager.activityTicks <= 1) {
       villager.needs.thirst = 1;
       recomputeHappiness(villager.needs);
