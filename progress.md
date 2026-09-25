@@ -40,7 +40,9 @@ Roadmap source of truth: [`docs/villagesim-spec.md`](docs/villagesim-spec.md).
   starvation or dehydration. Happiness now averages hunger, energy, social and thirst.
 - Spawn connectivity: starting villagers after the first must spawn in the region walkable from
   the first villager's tile (Rust + demo). Previously the demo map walled 4 of 5 villagers into
-  rock pockets with no route to water.
+  rock pockets with no route to water. The first villager also avoids a landlocked area: if the most
+  open central tile can't reach water, spawn moves to the nearest area that can. Drinking re-checks
+  its water source each tick, so a well demolished or storm-damaged mid-drink gives no refill.
 - Character Traits: `traits.json` assigned to villagers and rendered in `VillagerPanel`.
 - Tech / Progression Tree: buildings locked in `BuildMenu` until population or building pre-requisites are met.
 - ResourceBar displays live population / housing capacity counter (`Pop X/Y`).

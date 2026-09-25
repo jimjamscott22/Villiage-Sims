@@ -95,3 +95,47 @@ describe('demo spawn connectivity', () => {
     }
   });
 });
+
+describe('demo water review fixes', () => {
+  it('stops drinking without a refill when the well is demolished mid-drink', () => {
+    const tiles = new Array(16 * 16).fill(3);
+    const world = new DemoWorld({ width: 16, height: 16, tileSize: 32, tiles });
+    const inner = world as unknown as Internals & {
+      buildings: Array<{ id: number; complete: boolean }>;
+      unlocked: string[];
+    };
+    inner.villagers.splice(1);
+    inner.unlocked.push('well');
+    const well = world.placeBuilding('well', 8, 8, 0);
+    inner.buildings.find((b) => b.id === well.id)!.complete = true;
+    const villager = inner.villagers[0];
+    villager.needs.thirst = 0.05;
+    advanceUntil(world, 400, () => villager.state === 'drinking');
+
+    world.demolish(well.id);
+    world.advance();
+    expect(villager.state).not.toBe('drinking');
+    for (let i = 0; i < 40; i += 1) world.advance();
+    expect(villager.needs.thirst).toBeLessThan(0.1);
+  });
+
+  it('skips an open but landlocked centre when choosing where to spawn', () => {
+    const size = 24;
+    const tiles = new Array(size * size).fill(3);
+    for (let i = 0; i < size; i += 1) tiles[i * size] = 1;
+    for (let y = 4; y <= 19; y += 1) {
+      for (let x = 4; x <= 19; x += 1) {
+        if (x === 4 || x === 19 || y === 4 || y === 19) tiles[y * size + x] = 5;
+      }
+    }
+    const world = new DemoWorld({ width: size, height: size, tileSize: 32, tiles });
+    const inner = world as unknown as Internals & {
+      posToTile(x: number, y: number): [number, number];
+      nearestWaterAccess(start: [number, number]): [number, number] | null;
+    };
+    for (const villager of inner.villagers) {
+      const tile = inner.posToTile(villager.x, (villager as unknown as { y: number }).y);
+      expect(inner.nearestWaterAccess(tile)).not.toBeNull();
+    }
+  });
+});

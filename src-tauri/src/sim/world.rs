@@ -154,14 +154,17 @@ impl World {
         let cy = self.height as i32 / 2;
         let mut used = Vec::new();
         // Everyone after the first must spawn where the first villager can walk,
-        // or they end up walled into a rock pocket with no route to water.
+        // and the first picks an area with a route to water, or the whole village
+        // starts walled in and dies of thirst.
         let mut home: Option<Vec<bool>> = None;
         let traits_pool: Vec<String> = self.catalog.traits.iter().map(|t| t.id.clone()).collect();
         for (i, name) in STARTING_VILLAGER_NAMES.iter().enumerate() {
             let id = (i as u32) + 1;
-            let tile = self
-                .find_spawn_tile(cx, cy, &used, home.as_deref())
-                .unwrap_or((cx + i as i32, cy));
+            let tile = match home {
+                None => self.first_spawn_tile(cx, cy),
+                Some(ref region) => self.find_spawn_tile(cx, cy, &used, Some(region)),
+            }
+            .unwrap_or((cx + i as i32, cy));
             if home.is_none() {
                 home = Some(self.reachable_from(tile));
             }
@@ -175,6 +178,41 @@ impl World {
                 .push(Villager::new(id, *name, pos).with_traits(v_traits));
             self.next_villager_id = id.saturating_add(1);
         }
+    }
+
+    /// The most open spawn tile near the centre, unless its walkable area has no
+    /// route to water; then the nearest spawn candidate in an area that does.
+    /// Falls back to the preferred tile only when no area on the map has water.
+    fn first_spawn_tile(&self, cx: i32, cy: i32) -> Option<(i32, i32)> {
+        let preferred = self.find_spawn_tile(cx, cy, &[], None)?;
+        if self.nearest_water_access(preferred).is_some() {
+            return Some(preferred);
+        }
+        // Each landlocked area is searched once, then skipped wholesale.
+        let mut landlocked = self.reachable_from(preferred);
+        let max_r = self.width.max(self.height) as i32;
+        for r in 0..=max_r {
+            for dy in -r..=r {
+                for dx in -r..=r {
+                    if dx.abs() != r && dy.abs() != r {
+                        continue;
+                    }
+                    let (x, y) = (cx + dx, cy + dy);
+                    if !self.is_spawn_candidate(x, y)
+                        || landlocked[(y as u32 * self.width + x as u32) as usize]
+                    {
+                        continue;
+                    }
+                    if self.nearest_water_access((x, y)).is_some() {
+                        return Some((x, y));
+                    }
+                    for (seen, reached) in landlocked.iter_mut().zip(self.reachable_from((x, y))) {
+                        *seen |= reached;
+                    }
+                }
+            }
+        }
+        Some(preferred)
     }
 
     fn find_spawn_tile(
@@ -1696,6 +1734,14 @@ impl World {
     }
 
     fn tick_drinking(&mut self, index: usize, ticks_remaining: u32) {
+        // The well may be demolished or storm-damaged mid-drink: stop without
+        // refilling, and the next decision searches for water again.
+        let (x, y) = self.pos_to_tile(self.villagers[index].pos);
+        if !self.is_water_access(x, y, &self.well_ids()) {
+            self.villagers[index].state = AgentState::Idle;
+            self.villagers[index].current_action = None;
+            return;
+        }
         if ticks_remaining <= 1 {
             self.villagers[index].needs.set_thirst(1.0);
             self.villagers[index].state = AgentState::Idle;
@@ -3133,6 +3179,37 @@ mod tests {
     }
 
     #[test]
+    fn losing_the_well_mid_drink_stops_without_refilling() {
+        let mut world = grass_world();
+        world.resources.wood = 50;
+        world.resources.stone = 50;
+        let well = place_complete(&mut world, "well", 5, 5);
+        world.villager_mut().needs.set_thirst(0.05);
+        advance_until(&mut world, 300, |w| {
+            matches!(w.villager().state, AgentState::Drinking { .. })
+        });
+        // A storm knocks the only water source back to a construction site.
+        world
+            .buildings
+            .iter_mut()
+            .find(|b| b.id == well)
+            .unwrap()
+            .state = BuildState::UnderConstruction { progress_ticks: 0 };
+        world.advance();
+        assert!(!matches!(
+            world.villager().state,
+            AgentState::Drinking { .. }
+        ));
+        for _ in 0..DRINK_TICKS {
+            world.advance();
+        }
+        assert!(
+            world.villager().needs.thirst < 0.1,
+            "no refill without water"
+        );
+    }
+
+    #[test]
     fn villager_without_water_dies_of_dehydration() {
         let mut world = grass_world();
         world.resources.food = 100;
@@ -3162,6 +3239,36 @@ mod tests {
         let detail = world.villager_detail(1).unwrap();
         assert!(detail.health > 0.5);
         assert_eq!(detail.thirst, world.villager().needs.thirst);
+    }
+
+    #[test]
+    fn starting_villagers_skip_an_open_but_landlocked_centre() {
+        let mut world = World::generate(24, 24, 32, 1);
+        world.tiles = vec![Terrain::Grass as u8; 24 * 24];
+        world.occupancy = vec![None; 24 * 24];
+        // The most open land is a 14x14 field in the centre, ringed by rock and
+        // with no water. The only water is a lake column on the western edge.
+        for i in 0..24 {
+            world.tiles[i * 24] = Terrain::ShallowWater as u8;
+        }
+        for y in 4..=19 {
+            for x in 4..=19 {
+                if x == 4 || x == 19 || y == 4 || y == 19 {
+                    world.tiles[y * 24 + x] = Terrain::Rock as u8;
+                }
+            }
+        }
+        world.villagers.clear();
+        world.spawn_starting_villagers();
+
+        for villager in world.villagers() {
+            let tile = world.pos_to_tile(villager.pos);
+            assert!(
+                world.nearest_water_access(tile).is_some(),
+                "{} spawned at {tile:?} with no route to water",
+                villager.name
+            );
+        }
     }
 
     #[test]
