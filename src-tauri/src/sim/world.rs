@@ -12,7 +12,8 @@ use super::agents::{
     REPATH_COOLDOWN_TICKS, STARTING_VILLAGER_NAMES, Villager, WORK_CYCLE_TICKS,
 };
 use super::buildings::{
-    BuildState, Building, BuildingStatus, footprint_tiles, rotated_footprint, terrain_allowed,
+    BuildState, Building, BuildingStatus, PlacementResult, PlacementValidity, footprint_tiles,
+    rotated_footprint, terrain_allowed,
 };
 use super::catalog::{BuildingDef, Catalog, ObjectiveCondition};
 use super::chronicle::{Chronicle, ChronicleBody};
