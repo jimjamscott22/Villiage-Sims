@@ -22,7 +22,7 @@ export interface VillagerView {
   id: number;
   x: number;
   y: number;
-  /** 0 Idle, 1 Moving, 2 Working, 3 Eating, 4 Sleeping, 5 Socializing. */
+  /** 0 Idle, 1 Moving, 2 Working, 3 Eating, 4 Sleeping, 5 Socializing, 6 Drinking. */
   state?: number;
   /** Position delta vs previous snapshot — used for facing. Absent when unknown. */
   dx?: number;
@@ -41,10 +41,15 @@ export interface VillagerDetail {
   hunger: number;
   energy: number;
   social: number;
+  thirst: number;
+  /** 0 = dead. Falls while hunger or thirst is empty, recovers when both are met. */
+  health: number;
   happiness: number;
   jobKind: string | null;
   jobSite: number | null;
   traits: string[];
+  /** Tile the villager stands on, used by the roster to centre the camera. */
+  tile: [number, number];
   /** Current thought bubble text, if any. */
   thought?: string;
 }

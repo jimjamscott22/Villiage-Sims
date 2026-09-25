@@ -7,7 +7,7 @@ use crate::sim::world::World;
 const SAVE_MAGIC: [u8; 8] = *b"VILSAVE\0";
 const HEADER_LEN: usize = SAVE_MAGIC.len() + size_of::<u32>() + size_of::<u64>();
 const MAX_SAVE_BYTES: u64 = 64 * 1024 * 1024;
-pub const SAVE_VERSION: u32 = 4;
+pub const SAVE_VERSION: u32 = 5;
 
 fn config() -> impl bincode::config::Config {
     bincode::config::standard().with_limit::<{ MAX_SAVE_BYTES as usize }>()
@@ -54,7 +54,7 @@ pub(crate) fn decode_world(bytes: &[u8]) -> Result<World, String> {
             .try_into()
             .expect("fixed save version header"),
     );
-    if version != SAVE_VERSION && version != 3 {
+    if version != SAVE_VERSION && !(3..=4).contains(&version) {
         return Err(format!(
             "unsupported save version {version} (expected {SAVE_VERSION})"
         ));
@@ -68,6 +68,11 @@ pub(crate) fn decode_world(bytes: &[u8]) -> Result<World, String> {
     let payload = &bytes[payload_offset..];
     let (mut world, consumed): (World, usize) = if version == 3 {
         let (legacy, consumed): (crate::sim::world::legacy_v3::LegacyWorld, usize) =
+            bincode::serde::decode_from_slice(payload, config())
+                .map_err(|error| format!("could not decode legacy save: {error}"))?;
+        (legacy.into_world(), consumed)
+    } else if version == 4 {
+        let (legacy, consumed): (crate::sim::world::legacy_v4::LegacyWorld, usize) =
             bincode::serde::decode_from_slice(payload, config())
                 .map_err(|error| format!("could not decode legacy save: {error}"))?;
         (legacy.into_world(), consumed)
@@ -188,12 +193,45 @@ mod tests {
     }
 
     #[test]
+    fn version_4_save_migrates_with_full_thirst_and_carried_over_starvation() {
+        use crate::sim::needs::HEALTH_DAMAGE;
+        use crate::sim::world::legacy_v4::LegacyWorld;
+
+        let mut world = World::generate(16, 16, 32, 5);
+        for _ in 0..40 {
+            world.advance();
+        }
+        let legacy = LegacyWorld::from_world(&world, 150);
+        let payload = bincode::serde::encode_to_vec(&legacy, config()).expect("encode v4");
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&SAVE_MAGIC);
+        bytes.extend_from_slice(&4u32.to_le_bytes());
+        bytes.extend_from_slice(&world.seed().to_le_bytes());
+        bytes.extend_from_slice(&payload);
+
+        let loaded = decode_world(&bytes).expect("v4 save loads");
+        assert_eq!(loaded.villagers().len(), world.villagers().len());
+        for (old, new) in world.villagers().iter().zip(loaded.villagers()) {
+            assert_eq!(new.id, old.id);
+            assert_eq!(new.needs.hunger, old.needs.hunger);
+            assert_eq!(new.needs.thirst, 1.0);
+            assert!((new.needs.health - (1.0 - 150.0 * HEALTH_DAMAGE)).abs() < 1e-5);
+        }
+        // Re-saving writes the current version, which round-trips byte-for-byte.
+        let resaved = encode_world(&loaded).expect("encode v5");
+        assert_eq!(
+            encode_world(&decode_world(&resaved).unwrap()).unwrap(),
+            resaved
+        );
+    }
+
+    #[test]
     fn rejects_unknown_version_before_decoding() {
         let mut bytes = encode_world(&World::generate(8, 8, 32, 4)).expect("encode world");
         bytes[SAVE_MAGIC.len()..SAVE_MAGIC.len() + size_of::<u32>()]
             .copy_from_slice(&1u32.to_le_bytes());
         let error = decode_world(&bytes).expect_err("version must be rejected");
-        assert_eq!(error, "unsupported save version 1 (expected 4)");
+        assert_eq!(error, "unsupported save version 1 (expected 5)");
     }
 
     #[test]

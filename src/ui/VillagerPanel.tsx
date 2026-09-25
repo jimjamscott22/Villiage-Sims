@@ -24,7 +24,9 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
             )}
           </div>
           <div className="flex flex-col gap-1.5">
+            <SegmentedBar label="Health" value={detail.health} />
             <SegmentedBar label="Hunger" value={detail.hunger} />
+            <SegmentedBar label="Thirst" value={detail.thirst} />
             <SegmentedBar label="Energy" value={detail.energy} />
             <SegmentedBar label="Social" value={detail.social} />
             <SegmentedBar label="Happiness" value={detail.happiness} />

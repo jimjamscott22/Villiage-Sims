@@ -44,6 +44,9 @@ pub fn handle_command(&mut self, command: SimCommand) {
                 let result = self.villager_detail(id);
                 let _ = reply.send(result);
             }
+            SimCommand::GetVillagerRoster { reply } => {
+                let _ = reply.send(self.villager_roster());
+            }
             SimCommand::SetSpeed { speed } => {
                 let _ = self.clock.set_speed(speed);
             }

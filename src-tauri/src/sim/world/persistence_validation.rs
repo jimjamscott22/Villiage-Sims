@@ -107,6 +107,8 @@ pub(crate) fn prepare_after_load(&mut self) -> Result<(), String> {
                 villager.needs.hunger,
                 villager.needs.energy,
                 villager.needs.social,
+                villager.needs.thirst,
+                villager.needs.health,
                 villager.needs.happiness,
             ] {
                 if !need.is_finite() || !(0.0..=1.0).contains(&need) {

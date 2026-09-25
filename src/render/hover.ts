@@ -7,6 +7,7 @@ const VILLAGER_STATE_LABELS = [
   'Eating',
   'Sleeping',
   'Socializing',
+  'Drinking',
 ] as const;
 
 const BUILDING_STATUS_LABELS = [

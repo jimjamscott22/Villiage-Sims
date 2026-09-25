@@ -14,6 +14,8 @@ pub enum ActionKind {
     Work,
     Socialize,
     Wander,
+    /// Appended after Wander so saved `current_action` indices stay valid.
+    Drink,
 }
 
 impl ActionKind {
@@ -24,6 +26,7 @@ impl ActionKind {
             Self::Work => 2,
             Self::Socialize => 3,
             Self::Wander => 4,
+            Self::Drink => 5,
         }
     }
 
@@ -35,6 +38,7 @@ impl ActionKind {
             Self::Work => "Time to work!",
             Self::Socialize => "Let's chat!",
             Self::Wander => "Wandering...",
+            Self::Drink => "Thirsty!",
         }
     }
 }
@@ -48,6 +52,7 @@ pub const NIGHT_START_MINUTE: u32 = 20 * 60;
 pub const NIGHT_END_MINUTE: u32 = 6 * 60;
 
 pub const EAT_TICKS: u32 = 60;
+pub const DRINK_TICKS: u32 = 40;
 pub const SLEEP_TICKS: u32 = 100;
 pub const WANDER_RADIUS: i32 = 6;
 
@@ -72,6 +77,16 @@ pub fn score_eat(hunger: f32, food: u32) -> f32 {
         return 0.0;
     }
     let deficit = (1.0 - hunger).clamp(0.0, 1.0);
+    deficit * deficit
+}
+
+/// Same curve as Eat. `water_reachable` is false while a recent search for
+/// water from this villager failed, so a stranded villager doesn't fixate on it.
+pub fn score_drink(thirst: f32, water_reachable: bool) -> f32 {
+    if !water_reachable {
+        return 0.0;
+    }
+    let deficit = (1.0 - thirst).clamp(0.0, 1.0);
     deficit * deficit
 }
 
@@ -107,6 +122,8 @@ pub struct ScoreContext<'a> {
     pub hunger: f32,
     pub energy: f32,
     pub social: f32,
+    pub thirst: f32,
+    pub water_reachable: bool,
     pub from: (i32, i32),
     pub food: u32,
     pub night: bool,
@@ -122,6 +139,11 @@ pub fn score_all(ctx: &ScoreContext<'_>) -> Vec<ScoredAction> {
         ScoredAction {
             kind: ActionKind::Eat,
             score: score_eat(ctx.hunger, ctx.food),
+            job_id: None,
+        },
+        ScoredAction {
+            kind: ActionKind::Drink,
+            score: score_drink(ctx.thirst, ctx.water_reachable),
             job_id: None,
         },
         ScoredAction {
@@ -271,6 +293,14 @@ mod tests {
     }
 
     #[test]
+    fn drink_ramps_as_thirst_drops_and_needs_water() {
+        assert!((score_drink(1.0, true) - 0.0).abs() < 1e-5);
+        assert!((score_drink(0.0, true) - 1.0).abs() < 1e-5);
+        assert!(score_drink(0.5, true) > score_drink(0.8, true));
+        assert_eq!(score_drink(0.0, false), 0.0);
+    }
+
+    #[test]
     fn sleep_gets_night_bonus() {
         let day = score_sleep(0.0, false);
         let night = score_sleep(0.0, true);
@@ -365,6 +395,8 @@ mod tests {
             hunger: 1.0,
             energy: 1.0,
             social: 1.0,
+            thirst: 1.0,
+            water_reachable: true,
             from: (0, 0),
             food: 10,
             night: false,

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -45,11 +45,15 @@ mod commands_handler;
 mod persistence_validation;
 mod population;
 mod progression;
+#[path = "legacy_v4.rs"]
+pub(crate) mod legacy_v4;
 use social::{Encounter, Behavior};
 
 const VIEWPORT_MARGIN_TILES: f32 = 4.0;
 const TICKS_PER_SECOND: f32 = 20.0;
 const ARRIVE_EPSILON_PX: f32 = 0.5;
+/// After finding no reachable water, wait this long (10 s) before searching again.
+const WATER_SEARCH_COOLDOWN_TICKS: u16 = 200;
 
 pub const DEFAULT_WIDTH: u32 = 128;
 pub const DEFAULT_HEIGHT: u32 = 128;
@@ -148,9 +152,6 @@ impl World {
         world
     }
 
-    
-
-    
 
     pub fn default_world() -> Self {
         Self::generate(
@@ -173,7 +174,6 @@ impl World {
         &self.chronicle
     }
 
-    
 
     pub fn set_autosave_dir(&mut self, dir: Option<PathBuf>) {
         self.autosave_dir = dir;
@@ -372,7 +372,6 @@ impl World {
         }
     }
 
-    
 
     pub fn tick_snapshot(&self) -> TickSnapshot {
         let building_inventories: Vec<_> = self
@@ -430,12 +429,27 @@ impl World {
             hunger: villager.needs.hunger,
             energy: villager.needs.energy,
             social: villager.needs.social,
+            thirst: villager.needs.thirst,
+            health: villager.needs.health,
             happiness: villager.needs.happiness,
             job_kind,
             job_site,
             traits: villager.traits.clone(),
+            tile: self.pos_to_tile(villager.pos),
             thought: villager.thought.clone(),
         })
+    }
+
+    /// Detail for every living villager, ordered by id. Fetched on demand by the
+    /// roster overlay; unlike tick snapshots it is not viewport-culled.
+    pub fn villager_roster(&self) -> Vec<VillagerDetail> {
+        let mut roster: Vec<VillagerDetail> = self
+            .villagers
+            .iter()
+            .filter_map(|villager| self.villager_detail(villager.id).ok())
+            .collect();
+        roster.sort_by_key(|detail| detail.id);
+        roster
     }
 
     /// Move a villager to `(x, y)`. When `villager_id` is set, that villager is
@@ -895,6 +909,8 @@ impl World {
             self.villagers[index].repath_cooldown -= 1;
         }
         self.villagers[index].tick_thought();
+        let cooldown = &mut self.villagers[index].water_search_cooldown;
+        *cooldown = cooldown.saturating_sub(1);
 
         if let Some(job_id) = self.villagers[index].current_job {
             if self.job_board.get(job_id).is_none() {
@@ -927,6 +943,22 @@ impl World {
             self.clear_leisure(index);
             self.begin_eat(index);
         }
+        if self.villagers[index].needs.thirst == 0.0
+            && self.villagers[index].water_search_cooldown == 0
+            && !matches!(
+                self.villagers[index].state,
+                AgentState::Eating { .. }
+                    | AgentState::Drinking { .. }
+                    | AgentState::MovingTo {
+                        purpose: MovePurpose::Drink,
+                        ..
+                    }
+            )
+        {
+            self.cancel_encounter(self.villagers[index].id);
+            self.clear_leisure(index);
+            self.begin_drink(index);
+        }
 
         if let Some(pair) = self.encounter_for(self.villagers[index].id) {
             if pair.talking || pair.b == self.villagers[index].id { return; }
@@ -937,6 +969,9 @@ impl World {
         match state {
             AgentState::Eating { ticks_remaining } => {
                 self.tick_eating(index, ticks_remaining);
+            }
+            AgentState::Drinking { ticks_remaining } => {
+                self.tick_drinking(index, ticks_remaining);
             }
             AgentState::Sleeping { ticks_remaining } => {
                 self.tick_sleeping(index, ticks_remaining);
@@ -973,8 +1008,9 @@ impl World {
         // retaining them as `current_action` feeds a near-zero live score into
         // hysteresis and traps the villager (re-eat until food is gone, then stuck).
         if matches!(self.villagers[index].state, AgentState::Idle) {
-            if let Some(ActionKind::Eat | ActionKind::Sleep | ActionKind::Socialize) =
-                self.villagers[index].current_action
+            if let Some(
+                ActionKind::Eat | ActionKind::Drink | ActionKind::Sleep | ActionKind::Socialize,
+            ) = self.villagers[index].current_action
             {
                 self.villagers[index].current_action = None;
             }
@@ -987,6 +1023,8 @@ impl World {
             hunger: self.villagers[index].needs.hunger,
             energy: self.villagers[index].needs.energy,
             social: self.villagers[index].needs.social,
+            thirst: self.villagers[index].needs.thirst,
+            water_reachable: self.villagers[index].water_search_cooldown == 0,
             from,
             food: self.available_food(),
             night: night_from_clock(&self.clock),
@@ -1048,6 +1086,7 @@ impl World {
         if kind != ActionKind::Wander && kind != ActionKind::Socialize { self.clear_leisure(index); }
         match kind {
             ActionKind::Eat => self.begin_eat(index),
+            ActionKind::Drink => self.begin_drink(index),
             ActionKind::Sleep => {
                 self.villagers[index].begin_sleeping();
                 self.villagers[index].set_thought(kind.thought(), 40);
@@ -1069,6 +1108,92 @@ impl World {
         }
         self.villagers[index].begin_eating();
         self.villagers[index].set_thought(ActionKind::Eat.thought(), 40);
+    }
+
+    /// Walk to the nearest reachable water (shoreline or a finished well) and drink.
+    /// Work claims and cargo are kept, as with eating, so work can resume after.
+    fn begin_drink(&mut self, index: usize) {
+        let start = self.pos_to_tile(self.villagers[index].pos);
+        let target = self.nearest_water_access(start);
+        let path = target.and_then(|tile| {
+            if tile == start {
+                Some(Vec::new())
+            } else {
+                self.compute_path(start, tile)
+            }
+        });
+        let (Some(tile), Some(path)) = (target, path) else {
+            self.villagers[index].water_search_cooldown = WATER_SEARCH_COOLDOWN_TICKS;
+            if self.villagers[index].current_action == Some(ActionKind::Drink) {
+                self.villagers[index].current_action = None;
+            }
+            return;
+        };
+        self.villagers[index].set_thought(ActionKind::Drink.thought(), 40);
+        if path.is_empty() {
+            self.villagers[index].begin_drinking();
+            return;
+        }
+        self.villagers[index].state = AgentState::MovingTo {
+            target: tile,
+            purpose: MovePurpose::Drink,
+        };
+        self.villagers[index].path = Some(path);
+        self.villagers[index].current_action = Some(ActionKind::Drink);
+    }
+
+    /// Ids of completed wells, whose footprint tiles count as a water source.
+    fn well_ids(&self) -> BTreeSet<u32> {
+        self.buildings
+            .iter()
+            .filter(|b| b.state == BuildState::Complete)
+            .filter(|b| self.catalog.get(b.kind_index).is_some_and(|def| def.id == "well"))
+            .map(|b| b.id)
+            .collect()
+    }
+
+    fn is_water_access(&self, x: i32, y: i32, wells: &BTreeSet<u32>) -> bool {
+        [(1, 0), (-1, 0), (0, 1), (0, -1)].iter().any(|(dx, dy)| {
+            let (nx, ny) = (x + dx, y + dy);
+            if !self.in_bounds(nx, ny) {
+                return false;
+            }
+            let i = (ny as u32 * self.width + nx as u32) as usize;
+            matches!(
+                Terrain::from_u8(self.tiles[i]),
+                Some(Terrain::ShallowWater | Terrain::DeepWater)
+            ) || self.occupancy[i].is_some_and(|id| wells.contains(&id))
+        })
+    }
+
+    /// Breadth-first search over walkable tiles for the closest tile beside water
+    /// or a completed well. Deterministic: neighbours are expanded in fixed order.
+    fn nearest_water_access(&self, start: (i32, i32)) -> Option<(i32, i32)> {
+        if !self.in_bounds(start.0, start.1) {
+            return None;
+        }
+        let wells = self.well_ids();
+        let width = self.width as i32;
+        let mut visited = vec![false; self.tiles.len()];
+        let mut queue = VecDeque::from([start]);
+        visited[(start.1 * width + start.0) as usize] = true;
+        while let Some((x, y)) = queue.pop_front() {
+            if self.is_water_access(x, y, &wells) {
+                return Some((x, y));
+            }
+            for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let (nx, ny) = (x + dx, y + dy);
+                if !self.is_passable(nx, ny) {
+                    continue;
+                }
+                let i = (ny * width + nx) as usize;
+                if !visited[i] {
+                    visited[i] = true;
+                    queue.push_back((nx, ny));
+                }
+            }
+        }
+        None
     }
 
     fn begin_work(&mut self, index: usize, job_id: Option<u32>) {
@@ -1187,6 +1312,27 @@ impl World {
         }
     }
 
+    fn tick_drinking(&mut self, index: usize, ticks_remaining: u32) {
+        // The well may be demolished or storm-damaged mid-drink: stop without
+        // refilling, and the next decision searches for water again.
+        let (x, y) = self.pos_to_tile(self.villagers[index].pos);
+        if !self.is_water_access(x, y, &self.well_ids()) {
+            self.villagers[index].state = AgentState::Idle;
+            self.villagers[index].current_action = None;
+            return;
+        }
+        if ticks_remaining <= 1 {
+            self.villagers[index].needs.set_thirst(1.0);
+            self.villagers[index].state = AgentState::Idle;
+            self.villagers[index].path = None;
+            self.villagers[index].current_action = None;
+        } else {
+            self.villagers[index].state = AgentState::Drinking {
+                ticks_remaining: ticks_remaining - 1,
+            };
+        }
+    }
+
     fn tick_sleeping(&mut self, index: usize, ticks_remaining: u32) {
         if ticks_remaining <= 1 {
             self.villagers[index].needs.set_energy(1.0);
@@ -1289,6 +1435,16 @@ impl World {
             }
             MovePurpose::PlayerOrder => {
                 self.villagers[index].state = AgentState::Idle;
+            }
+            MovePurpose::Drink => {
+                let (x, y) = self.pos_to_tile(self.villagers[index].pos);
+                if self.is_water_access(x, y, &self.well_ids()) {
+                    self.villagers[index].begin_drinking();
+                } else {
+                    // The well was demolished en route; decide again next tick.
+                    self.villagers[index].state = AgentState::Idle;
+                    self.villagers[index].current_action = None;
+                }
             }
             MovePurpose::Work => {
                 if let Some(job_id) = self.villagers[index].current_job {
@@ -1643,7 +1799,6 @@ impl World {
         None
     }
 
-    
 
     fn openness_score(&self, x: i32, y: i32) -> i32 {
         let mut score = 0;
@@ -2172,7 +2327,7 @@ mod tests {
     use crate::sim::jobs::{Job, JobKind};
     use crate::sim::needs::Needs;
     use crate::sim::terrain::Terrain;
-    use crate::sim::utility::EAT_TICKS;
+    use crate::sim::utility::{DRINK_TICKS, EAT_TICKS};
 
     fn grass_world() -> World {
         let mut world = World::generate(8, 8, 32, 1);
@@ -2352,6 +2507,195 @@ mod tests {
         assert!(world.villager().needs.hunger < before);
         let detail = world.villager_detail(1).unwrap();
         assert!(detail.hunger < before);
+    }
+
+    /// Advance until `done` holds, failing after `limit` ticks.
+    fn advance_until(world: &mut World, limit: u32, done: impl Fn(&World) -> bool) {
+        for _ in 0..limit {
+            world.advance();
+            if done(world) {
+                return;
+            }
+        }
+        panic!("condition not reached within {limit} ticks");
+    }
+
+    #[test]
+    fn thirsty_villager_walks_to_the_shore_and_drinks() {
+        let mut world = grass_world();
+        for y in 0..8 {
+            world.tiles[(y * 8 + 7) as usize] = Terrain::ShallowWater as u8;
+        }
+        world.villager_mut().needs.set_thirst(0.05);
+        advance_until(&mut world, 200, |w| {
+            matches!(w.villager().state, AgentState::Drinking { .. })
+        });
+        assert_eq!(
+            world.pos_to_tile(world.villager().pos).0,
+            6,
+            "drinks beside the water"
+        );
+        advance_until(&mut world, DRINK_TICKS + 1, |w| {
+            w.villager().needs.thirst == 1.0
+        });
+        assert_eq!(world.villager().state, AgentState::Idle);
+    }
+
+    #[test]
+    fn completed_well_is_a_water_source() {
+        let mut world = grass_world();
+        world.resources.wood = 50;
+        world.resources.stone = 50;
+        place_complete(&mut world, "well", 5, 5);
+        world.villager_mut().needs.set_thirst(0.05);
+        advance_until(&mut world, 300, |w| {
+            matches!(w.villager().state, AgentState::Drinking { .. })
+        });
+        let (x, y) = world.pos_to_tile(world.villager().pos);
+        assert_eq!((x - 5).abs() + (y - 5).abs(), 1, "drinks next to the well");
+    }
+
+    #[test]
+    fn losing_the_well_mid_drink_stops_without_refilling() {
+        let mut world = grass_world();
+        world.resources.wood = 50;
+        world.resources.stone = 50;
+        let well = place_complete(&mut world, "well", 5, 5);
+        world.villager_mut().needs.set_thirst(0.05);
+        advance_until(&mut world, 300, |w| {
+            matches!(w.villager().state, AgentState::Drinking { .. })
+        });
+        // A storm knocks the only water source back to a construction site.
+        world
+            .buildings
+            .iter_mut()
+            .find(|b| b.id == well)
+            .unwrap()
+            .state = BuildState::UnderConstruction { progress_ticks: 0 };
+        world.advance();
+        assert!(!matches!(
+            world.villager().state,
+            AgentState::Drinking { .. }
+        ));
+        for _ in 0..DRINK_TICKS {
+            world.advance();
+        }
+        assert!(
+            world.villager().needs.thirst < 0.1,
+            "no refill without water"
+        );
+    }
+
+    #[test]
+    fn villager_without_water_dies_of_dehydration() {
+        let mut world = grass_world();
+        world.resources.food = 100;
+        world.villager_mut().needs.set_thirst(0.0);
+        let name = world.villager().name.clone();
+        advance_until(&mut world, 400, |w| w.villagers().iter().all(|v| v.id != 1));
+        let death = world
+            .chronicle()
+            .to_vec()
+            .into_iter()
+            .find_map(|entry| match entry.body {
+                ChronicleBody::VillagerDied {
+                    name: dead, cause, ..
+                } => Some((dead, cause)),
+                _ => None,
+            })
+            .expect("death recorded");
+        assert_eq!(death, (name, "dehydration".to_string()));
+    }
+
+    #[test]
+    fn health_recovers_once_needs_are_met() {
+        let mut world = grass_world();
+        world.villager_mut().needs.set_health(0.5);
+        world.advance();
+        assert!(world.villager().needs.health > 0.5);
+        let detail = world.villager_detail(1).unwrap();
+        assert!(detail.health > 0.5);
+        assert_eq!(detail.thirst, world.villager().needs.thirst);
+    }
+
+    #[test]
+    fn starting_villagers_skip_an_open_but_landlocked_centre() {
+        let mut world = World::generate(24, 24, 32, 1);
+        world.tiles = vec![Terrain::Grass as u8; 24 * 24];
+        world.occupancy = vec![None; 24 * 24];
+        // The most open land is a 14x14 field in the centre, ringed by rock and
+        // with no water. The only water is a lake column on the western edge.
+        for i in 0..24 {
+            world.tiles[i * 24] = Terrain::ShallowWater as u8;
+        }
+        for y in 4..=19 {
+            for x in 4..=19 {
+                if x == 4 || x == 19 || y == 4 || y == 19 {
+                    world.tiles[y * 24 + x] = Terrain::Rock as u8;
+                }
+            }
+        }
+        world.villagers.clear();
+        world.spawn_starting_villagers();
+
+        for villager in world.villagers() {
+            let tile = world.pos_to_tile(villager.pos);
+            assert!(
+                world.nearest_water_access(tile).is_some(),
+                "{} spawned at {tile:?} with no route to water",
+                villager.name
+            );
+        }
+    }
+
+    #[test]
+    fn starting_villagers_never_spawn_in_a_walled_off_pocket() {
+        let mut world = World::generate(24, 24, 32, 1);
+        world.tiles = vec![Terrain::Grass as u8; 24 * 24];
+        world.occupancy = vec![None; 24 * 24];
+        // A 3x3 grass pocket at the map centre, walled in by rock: the old spiral
+        // search from the centre put villagers 2-5 inside it.
+        for y in 10..=14 {
+            for x in 10..=14 {
+                if x == 10 || x == 14 || y == 10 || y == 14 {
+                    world.tiles[y * 24 + x] = Terrain::Rock as u8;
+                }
+            }
+        }
+        world.villagers.clear();
+        world.spawn_starting_villagers();
+
+        let home = world.reachable_from(world.pos_to_tile(world.villagers[0].pos));
+        for villager in world.villagers() {
+            let (x, y) = world.pos_to_tile(villager.pos);
+            assert!(
+                home[(y * 24 + x) as usize],
+                "{} spawned at {:?}, cut off from the others",
+                villager.name,
+                (x, y)
+            );
+        }
+    }
+
+    #[test]
+    fn roster_lists_every_living_villager_by_id() {
+        let mut world = World::generate(16, 16, 32, 5);
+        for _ in 0..50 {
+            world.advance();
+        }
+
+        let roster = world.villager_roster();
+        assert_eq!(roster.len(), world.villagers().len());
+        assert!(roster.windows(2).all(|pair| pair[0].id < pair[1].id));
+        for detail in &roster {
+            let villager = world
+                .villagers()
+                .iter()
+                .find(|v| v.id == detail.id)
+                .unwrap();
+            assert_eq!(detail.name, villager.name);
+            assert_eq!(detail.tile, world.pos_to_tile(villager.pos));
+        }
     }
 
     #[test]
