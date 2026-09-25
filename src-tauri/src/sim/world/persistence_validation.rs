@@ -20,7 +20,9 @@ pub(crate) fn prepare_after_load(&mut self) -> Result<(), String> {
         {
             return Err("save contains an unknown terrain value".into());
         }
-        self.catalog.validate()?;
+        // Saves embed the catalog they were written with; content is shipped data, so always
+        // use the current built-in one. Kind indices stay valid because catalogs are append-only.
+        self.catalog = Catalog::load_builtin()?;
 
         let mut building_ids = BTreeSet::new();
         let mut expected_occupancy = vec![None; expected_len];
