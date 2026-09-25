@@ -287,4 +287,23 @@ mod tests {
         let restored = decode_world(&bytes).expect("decode");
         assert_eq!(restored.unlocked(), world.unlocked());
     }
+
+    #[test]
+    fn loading_an_old_save_uses_the_current_builtin_catalog() {
+        // Simulate a save written before strawberries were added to crops.json.
+        let mut world = World::generate(16, 16, 32, 31);
+        world.catalog.crops.retain(|crop| crop.id == "wheat");
+        assert!(world.catalog().find_crop("strawberry").is_none());
+
+        let bytes = encode_world(&world).expect("encode");
+        let restored = decode_world(&bytes).expect("decode");
+        assert!(restored.catalog().find_crop("strawberry").is_some());
+        assert_eq!(
+            restored.catalog().crops.len(),
+            crate::sim::catalog::Catalog::load_builtin()
+                .expect("builtin catalog")
+                .crops
+                .len()
+        );
+    }
 }
