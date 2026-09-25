@@ -100,8 +100,9 @@ function entitySources(): Source[] {
   for (const [key, entry] of Object.entries(BUILDING_SPRITES)) {
     sources.push(fromSprite(key, entry));
   }
+  const cropFallbackKeys = new Set(['wheat', 'strawberry', 'peas', 'carrot']);
   for (const [key, entry] of Object.entries(CROP_SPRITES)) {
-    if (key === 'wheat') continue; // stage keys are the real cells; id fallback is runtime-only
+    if (cropFallbackKeys.has(key)) continue; // stage keys are the real cells; id fallback is runtime-only
     sources.push(fromSprite(key, entry));
   }
   for (const [key, entry] of Object.entries(PROP_SPRITES)) {

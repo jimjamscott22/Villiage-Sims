@@ -232,8 +232,11 @@ mod tests {
         assert!(mill.recipe.is_some());
         let granary = catalog.find("granary").unwrap().1;
         assert!(granary.stores.as_ref().unwrap().contains(&"grain".into()));
-        assert_eq!(catalog.crops.len(), 1);
+        assert_eq!(catalog.crops.len(), 4);
         assert!(catalog.find_crop("wheat").is_some());
+        assert!(catalog.find_crop("strawberry").is_some());
+        assert!(catalog.find_crop("peas").is_some());
+        assert!(catalog.find_crop("carrot").is_some());
     }
 
     #[test]

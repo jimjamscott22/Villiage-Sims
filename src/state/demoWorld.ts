@@ -31,6 +31,36 @@ const DEMO_CROPS: CropDef[] = [
     yield: { grain: 3 },
     seedCost: { grain: 1 },
   },
+  {
+    id: 'strawberry',
+    name: 'Strawberry',
+    stages: 3,
+    ticksPerStage: 200,
+    seasons: ['summer'],
+    waterRequired: true,
+    yield: { food: 2 },
+    seedCost: { food: 1 },
+  },
+  {
+    id: 'peas',
+    name: 'Peas',
+    stages: 3,
+    ticksPerStage: 260,
+    seasons: ['spring', 'autumn'],
+    waterRequired: true,
+    yield: { food: 2 },
+    seedCost: { food: 1 },
+  },
+  {
+    id: 'carrot',
+    name: 'Carrot',
+    stages: 4,
+    ticksPerStage: 300,
+    seasons: ['autumn', 'winter'],
+    waterRequired: true,
+    yield: { food: 3 },
+    seedCost: { food: 1 },
+  },
 ];
 
 export const DEMO_CATALOG: Catalog = {
