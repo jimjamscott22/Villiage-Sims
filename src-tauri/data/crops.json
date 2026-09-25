@@ -8,5 +8,35 @@
     "water_required": true,
     "yield": { "grain": 3 },
     "seed_cost": { "grain": 1 }
+  },
+  {
+    "id": "strawberry",
+    "name": "Strawberry",
+    "stages": 3,
+    "ticks_per_stage": 200,
+    "seasons": ["summer"],
+    "water_required": true,
+    "yield": { "food": 2 },
+    "seed_cost": { "food": 1 }
+  },
+  {
+    "id": "peas",
+    "name": "Peas",
+    "stages": 3,
+    "ticks_per_stage": 260,
+    "seasons": ["spring", "autumn"],
+    "water_required": true,
+    "yield": { "food": 2 },
+    "seed_cost": { "food": 1 }
+  },
+  {
+    "id": "carrot",
+    "name": "Carrot",
+    "stages": 4,
+    "ticks_per_stage": 300,
+    "seasons": ["autumn", "winter"],
+    "water_required": true,
+    "yield": { "food": 3 },
+    "seed_cost": { "food": 1 }
   }
 ]

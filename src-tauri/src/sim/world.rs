@@ -2177,10 +2177,7 @@ impl World {
         if tiles.is_empty() {
             return false;
         }
-        let wheat = self.catalog.find_crop("wheat");
-        let season_ok = wheat.is_some_and(|(_, def)| def.grows_in(self.clock.season));
-        let can_plant = season_ok
-            && wheat.is_some_and(|(_, def)| self.can_afford_seed_cost(building_id, &def.seed_cost));
+        let can_plant = !self.auto_plant_candidates(building_id).is_empty();
         tiles.into_iter().any(|tile| {
             let Some(crop) = self.crops.iter().find(|crop| crop.tile == tile) else {
                 return can_plant;
@@ -2246,28 +2243,43 @@ impl World {
         let Some(job) = self.job_board.get(job_id).cloned() else {
             return;
         };
-        let Some((kind_index, def)) = self.catalog.find_crop("wheat") else {
-            return;
-        };
-        if !def.grows_in(self.clock.season) {
+        let candidates = self.auto_plant_candidates(job.site);
+        if candidates.is_empty() {
             return;
         }
-        let seed_cost = def.seed_cost.clone();
         let tiles = self.farm_footprint_tiles(job.site);
-        let empty = tiles.into_iter().find(|&tile| {
+        let empty = tiles.into_iter().enumerate().find(|&(_, tile)| {
             self.completed_farm_at(tile.0, tile.1) == Some(job.site)
                 && !self.crops.iter().any(|crop| crop.tile == tile)
         });
-        let Some(tile) = empty else {
+        let Some((slot, tile)) = empty else {
             return;
         };
-        if !self.spend_seed_cost(job.site, &seed_cost) {
+        // Rotating by footprint slot mixes every in-season crop across the field.
+        let kind_index = candidates[slot % candidates.len()];
+        let Some(def) = self.catalog.get_crop(kind_index).cloned() else {
+            return;
+        };
+        if !self.spend_seed_cost(job.site, &def.seed_cost) {
             return;
         }
         let id = self.next_crop_id;
         self.next_crop_id = self.next_crop_id.saturating_add(1);
-        self.crops
-            .push(Crop::new(id, "wheat".to_string(), kind_index, tile));
+        self.crops.push(Crop::new(id, def.id, kind_index, tile));
+    }
+
+    /// Catalog indices of crops a farm can auto-plant now: in season and seed affordable.
+    fn auto_plant_candidates(&self, farm_id: u32) -> Vec<u8> {
+        self.catalog
+            .crops
+            .iter()
+            .enumerate()
+            .filter(|(_, def)| {
+                def.grows_in(self.clock.season)
+                    && self.can_afford_seed_cost(farm_id, &def.seed_cost)
+            })
+            .map(|(index, _)| index as u8)
+            .collect()
     }
 
     fn can_afford_seed_cost(&self, farm_id: u32, seed_cost: &BTreeMap<String, u32>) -> bool {
@@ -2851,9 +2863,56 @@ mod tests {
     }
 
     #[test]
-    fn tend_crops_skips_auto_plant_without_seed_grain() {
+    fn auto_plant_candidates_follow_season_and_seed_cost() {
+        let mut world = grass_world();
+        let farm = world.place_building("farm", 2, 2, 0).unwrap().id;
+        let ids = |world: &World| -> Vec<String> {
+            world
+                .auto_plant_candidates(farm)
+                .into_iter()
+                .map(|index| world.catalog().get_crop(index).unwrap().id.clone())
+                .collect()
+        };
+
+        world.resources.grain = 0;
+        world.resources.food = 50;
+        world.advance_clock(0, Some(Season::Spring as u8)).unwrap();
+        assert_eq!(ids(&world), ["peas"], "wheat needs grain seed");
+
+        world.resources.grain = 4;
+        assert_eq!(ids(&world), ["wheat", "peas"]);
+
+        world.advance_clock(0, Some(Season::Summer as u8)).unwrap();
+        assert_eq!(ids(&world), ["wheat", "strawberry"]);
+
+        world.advance_clock(0, Some(Season::Winter as u8)).unwrap();
+        assert_eq!(ids(&world), ["carrot"]);
+
+        world.resources.food = 0;
+        assert!(ids(&world).is_empty(), "carrot seed costs food");
+    }
+
+    #[test]
+    fn tend_crops_auto_plants_a_mix_of_in_season_crops() {
+        let mut world = grass_world();
+        world.resources.grain = 4;
+        world.advance_clock(0, Some(Season::Spring as u8)).unwrap();
+        world.place_building("farm", 2, 2, 0).unwrap();
+        for _ in 0..3000 {
+            world.advance();
+            if world.crops().len() >= 2 {
+                break;
+            }
+        }
+        let kinds: BTreeSet<&str> = world.crops().iter().map(|crop| crop.kind.as_str()).collect();
+        assert_eq!(kinds, BTreeSet::from(["peas", "wheat"]));
+    }
+
+    #[test]
+    fn tend_crops_skips_auto_plant_without_affordable_seed() {
         let mut world = grass_world();
         assert_eq!(world.resources.grain, 0);
+        world.resources.food = 0; // food pays for the vegetable seeds
         world.place_building("farm", 2, 2, 0).unwrap();
         for _ in 0..30 {
             world.advance();
@@ -2861,7 +2920,7 @@ mod tests {
         let farm_id = world.buildings()[0].id;
         assert!(
             !world.farm_needs_tending(farm_id),
-            "empty farm with no seed grain must not be actionable TendCrops work"
+            "empty farm with no affordable seed must not be actionable TendCrops work"
         );
         for _ in 0..500 {
             world.advance();
@@ -2879,7 +2938,7 @@ mod tests {
         }
         assert!(
             world.crops().is_empty(),
-            "TendCrops must not plant wheat when seed grain cannot be paid"
+            "TendCrops must not plant when no seed cost can be paid"
         );
     }
 

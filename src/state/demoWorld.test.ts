@@ -570,9 +570,34 @@ describe('DemoWorld pathfinding', () => {
     expect(saves.has(1)).toBe(true);
   });
 
-  it('does not auto-plant wheat when seed grain cannot be paid', () => {
+  it('picks auto-plant crops by season and seed cost, matching the Rust sim', () => {
+    const world = new DemoWorld(grassTerrain());
+    const farmId = completeBuilding(world, 'farm', 2, 2);
+    const internals = world as unknown as { autoPlantCandidates(farmId: number): number[] };
+    const ids = () => internals.autoPlantCandidates(farmId).map((index) => world.catalog.crops[index].id);
+
+    world.resources.grain = 0;
+    world.resources.food = 50;
+    world.advanceClock(0, 0);
+    expect(ids()).toEqual(['peas']);
+
+    world.resources.grain = 4;
+    expect(ids()).toEqual(['wheat', 'peas']);
+
+    world.advanceClock(0, 1);
+    expect(ids()).toEqual(['wheat', 'strawberry']);
+
+    world.advanceClock(0, 3);
+    expect(ids()).toEqual(['carrot']);
+
+    world.resources.food = 0;
+    expect(ids()).toEqual([]);
+  });
+
+  it('does not auto-plant when no seed cost can be paid', () => {
     const world = new DemoWorld(grassTerrain());
     expect(world.resources.grain).toBe(0);
+    world.resources.food = 0; // food pays for the vegetable seeds
     const farmId = completeBuilding(world, 'farm', 2, 2);
     const internals = world as unknown as {
       farmNeedsTending(buildingId: number): boolean;

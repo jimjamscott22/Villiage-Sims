@@ -31,6 +31,36 @@ const DEMO_CROPS: CropDef[] = [
     yield: { grain: 3 },
     seedCost: { grain: 1 },
   },
+  {
+    id: 'strawberry',
+    name: 'Strawberry',
+    stages: 3,
+    ticksPerStage: 200,
+    seasons: ['summer'],
+    waterRequired: true,
+    yield: { food: 2 },
+    seedCost: { food: 1 },
+  },
+  {
+    id: 'peas',
+    name: 'Peas',
+    stages: 3,
+    ticksPerStage: 260,
+    seasons: ['spring', 'autumn'],
+    waterRequired: true,
+    yield: { food: 2 },
+    seedCost: { food: 1 },
+  },
+  {
+    id: 'carrot',
+    name: 'Carrot',
+    stages: 4,
+    ticksPerStage: 300,
+    seasons: ['autumn', 'winter'],
+    waterRequired: true,
+    yield: { food: 3 },
+    seedCost: { food: 1 },
+  },
 ];
 
 export const DEMO_CATALOG: Catalog = {
@@ -1921,9 +1951,7 @@ export class DemoWorld {
     const tiles = this.farmFootprintTiles(buildingId);
     if (tiles.length === 0) return false;
     const season = SEASON_IDS[this.clock.season];
-    const wheat = DEMO_CROPS.find((def) => def.id === 'wheat');
-    const seasonOk = wheat != null && wheat.seasons.includes(season);
-    const canPlant = seasonOk && this.canAffordSeedCost(buildingId, wheat?.seedCost ?? {});
+    const canPlant = this.autoPlantCandidates(buildingId).length > 0;
     return tiles.some(([x, y]) => {
       const crop = this.crops.find((entry) => entry.x === x && entry.y === y);
       if (!crop) return canPlant;
@@ -2202,26 +2230,39 @@ export class DemoWorld {
     return true;
   }
 
+  /** Catalog indices of crops a farm can auto-plant now: in season and seed affordable. */
+  private autoPlantCandidates(farmId: number): number[] {
+    const season = SEASON_IDS[this.clock.season];
+    const out: number[] = [];
+    DEMO_CROPS.forEach((def, index) => {
+      if (def.seasons.includes(season) && this.canAffordSeedCost(farmId, def.seedCost ?? {})) {
+        out.push(index);
+      }
+    });
+    return out;
+  }
+
   private tendAutoPlant(jobId: number): void {
     const job = this.jobs.find((entry) => entry.id === jobId);
     if (!job) return;
-    const wheat = DEMO_CROPS.find((crop) => crop.id === 'wheat');
-    if (!wheat) return;
-    const seasonName = SEASON_IDS[this.clock.season];
-    if (!wheat.seasons.includes(seasonName)) return;
-    const kindIndex = DEMO_CROPS.findIndex((crop) => crop.id === 'wheat');
+    const candidates = this.autoPlantCandidates(job.site);
+    if (candidates.length === 0) return;
     const tiles = this.farmFootprintTiles(job.site);
-    const empty = tiles.find(([tx, ty]) =>
+    const slot = tiles.findIndex(([tx, ty]) =>
       this.completedFarmAt(tx, ty) === job.site
       && !this.crops.some((crop) => crop.x === tx && crop.y === ty)
     );
-    if (!empty) return;
-    if (!this.spendSeedCost(job.site, wheat.seedCost ?? {})) return;
+    if (slot < 0) return;
+    const empty = tiles[slot];
+    // Rotating by footprint slot mixes every in-season crop across the field.
+    const kindIndex = candidates[slot % candidates.length];
+    const def = DEMO_CROPS[kindIndex];
+    if (!this.spendSeedCost(job.site, def.seedCost ?? {})) return;
     const id = this.nextCropId;
     this.nextCropId += 1;
     this.crops.push({
       id,
-      kind: 'wheat',
+      kind: def.id,
       kindIndex,
       x: empty[0],
       y: empty[1],

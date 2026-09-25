@@ -66,7 +66,7 @@ export function BuildMenu({
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <AtlasThumb cellKey={`wheat.0`} scale={1} />
+                      <AtlasThumb cellKey={`${crop.id}.${crop.stages - 1}`} scale={1} />
                       <div>
                         <div className="font-medium text-white/90">{crop.name}</div>
                         <div className="text-[11px] text-white/55">
