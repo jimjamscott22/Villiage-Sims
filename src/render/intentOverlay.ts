@@ -115,79 +115,89 @@ export function planIntentOverlay(input: PlanIntentInput): IntentPlan | null {
 }
 
 const INTENT_COLOR = '#f4c95d';
-const INTENT_MUTED = 'rgba(244, 201, 93, 0.55)';
+const INTENT_MUTED = 'rgba(244, 201, 93, 0.85)';
 const LABEL_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
 
-/** Draw a planned intent overlay in world space (camera transform already applied). */
+export interface IntentCamera {
+  worldToScreen(wx: number, wy: number): [number, number];
+}
+
+/**
+ * Draw a planned intent overlay in CSS-pixel screen space (resets transform to
+ * `dpr`), matching name-tag readability at any zoom.
+ */
 export function drawIntentOverlay(
   ctx: CanvasRenderingContext2D,
   plan: IntentPlan,
   tileSize: number,
-  zoom: number,
+  camera: IntentCamera,
+  dpr: number,
 ): void {
-  const invZoom = 1 / Math.max(zoom, 0.01);
-  const x = plan.tileX * tileSize;
-  const y = plan.tileY * tileSize;
+  const x0 = plan.tileX * tileSize;
+  const y0 = plan.tileY * tileSize;
   const w = plan.footprintW * tileSize;
   const h = plan.footprintH * tileSize;
-  const toX = x + w / 2;
-  const toY = y + h / 2;
+  const toWorldX = x0 + w / 2;
+  const toWorldY = y0 + h / 2;
+  const [fromSx, fromSy] = camera.worldToScreen(plan.fromX, plan.fromY);
+  const [toSx, toSy] = camera.worldToScreen(toWorldX, toWorldY);
+  const [tileSx, tileSy] = camera.worldToScreen(x0, y0);
+  const [tileEx, tileEy] = camera.worldToScreen(x0 + w, y0 + h);
+  const left = Math.min(tileSx, tileEx);
+  const top = Math.min(tileSy, tileEy);
+  const right = Math.max(tileSx, tileEx);
+  const bottom = Math.max(tileSy, tileEy);
+
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   if (plan.showLine) {
-    ctx.save();
     ctx.strokeStyle = INTENT_MUTED;
-    ctx.lineWidth = 1.5 * invZoom;
-    ctx.setLineDash([6 * invZoom, 4 * invZoom]);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(plan.fromX, plan.fromY);
-    ctx.lineTo(toX, toY);
+    ctx.moveTo(fromSx, fromSy);
+    ctx.lineTo(toSx, toSy);
     ctx.stroke();
-    ctx.restore();
+    ctx.setLineDash([]);
   }
 
-  const inset = 3 * invZoom;
-  const tick = 6 * invZoom;
-  ctx.save();
+  const inset = 2;
+  const tick = 7;
   ctx.strokeStyle = INTENT_COLOR;
-  ctx.lineWidth = 1.5 * invZoom;
-  ctx.setLineDash([]);
-  // Corner ticks (selection-bracket style).
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  // TL
-  ctx.moveTo(x + inset, y + inset + tick);
-  ctx.lineTo(x + inset, y + inset);
-  ctx.lineTo(x + inset + tick, y + inset);
-  // TR
-  ctx.moveTo(x + w - inset - tick, y + inset);
-  ctx.lineTo(x + w - inset, y + inset);
-  ctx.lineTo(x + w - inset, y + inset + tick);
-  // BL
-  ctx.moveTo(x + inset, y + h - inset - tick);
-  ctx.lineTo(x + inset, y + h - inset);
-  ctx.lineTo(x + inset + tick, y + h - inset);
-  // BR
-  ctx.moveTo(x + w - inset - tick, y + h - inset);
-  ctx.lineTo(x + w - inset, y + h - inset);
-  ctx.lineTo(x + w - inset, y + h - inset - tick);
+  ctx.moveTo(left + inset, top + inset + tick);
+  ctx.lineTo(left + inset, top + inset);
+  ctx.lineTo(left + inset + tick, top + inset);
+  ctx.moveTo(right - inset - tick, top + inset);
+  ctx.lineTo(right - inset, top + inset);
+  ctx.lineTo(right - inset, top + inset + tick);
+  ctx.moveTo(left + inset, bottom - inset - tick);
+  ctx.lineTo(left + inset, bottom - inset);
+  ctx.lineTo(left + inset + tick, bottom - inset);
+  ctx.moveTo(right - inset - tick, bottom - inset);
+  ctx.lineTo(right - inset, bottom - inset);
+  ctx.lineTo(right - inset, bottom - inset - tick);
   ctx.stroke();
-  ctx.restore();
 
-  ctx.save();
   ctx.font = LABEL_FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  const labelY = y - 4 * invZoom;
+  const labelY = top - 4;
   const metrics = ctx.measureText(plan.label);
   const padX = 4;
   const padY = 2;
   const boxW = metrics.width + padX * 2;
   const boxH = 14;
   ctx.fillStyle = 'rgba(58, 42, 12, 0.92)';
-  ctx.fillRect(toX - boxW / 2, labelY - boxH, boxW, boxH);
+  ctx.fillRect(toSx - boxW / 2, labelY - boxH, boxW, boxH);
   ctx.strokeStyle = INTENT_COLOR;
-  ctx.lineWidth = 1 * invZoom;
-  ctx.strokeRect(toX - boxW / 2, labelY - boxH, boxW, boxH);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(toSx - boxW / 2 + 0.5, labelY - boxH + 0.5, boxW - 1, boxH - 1);
   ctx.fillStyle = '#fff6d5';
-  ctx.fillText(plan.label, toX, labelY - padY);
+  ctx.fillText(plan.label, toSx, labelY - padY);
+
   ctx.restore();
 }
