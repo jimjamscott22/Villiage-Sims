@@ -630,6 +630,16 @@ function fullNeeds(): DemoNeeds {
   return needs;
 }
 
+function purposeByte(v: DemoVillager): number | undefined {
+  if (v.state !== 'moving' || v.purpose == null) return undefined;
+  switch (v.purpose) {
+    case 'player': return 0;
+    case 'work': return 1;
+    case 'wander': return 2;
+    case 'drink': return 3;
+  }
+}
+
 function stateByte(v: DemoVillager): number {
   switch (v.state) {
     case 'idle': return 0;
@@ -1119,6 +1129,15 @@ export class DemoWorld {
     return stored < required;
   }
 
+  private viewDestination(v: DemoVillager): [number, number] | undefined {
+    if (v.state === 'moving' && v.target) return v.target;
+    const leisure = this.social.leisure.behavior[v.id]?.destination;
+    if (leisure) return leisure;
+    const pair = this.social.pair(v.id);
+    if (pair) return pair.a === v.id ? pair.meeting : pair.waiting;
+    return undefined;
+  }
+
   snapshot(): TickSnapshot {
     const resources = this.deriveTotals();
     const clock: ClockView = {
@@ -1147,7 +1166,8 @@ export class DemoWorld {
         thought: v.thought ?? undefined,
         activity: this.social.activity(v),
         partnerId: this.social.pair(v.id) ? (this.social.pair(v.id)!.a === v.id ? this.social.pair(v.id)!.b : this.social.pair(v.id)!.a) : undefined,
-        destination: this.social.leisure.behavior[v.id]?.destination ?? undefined,
+        destination: this.viewDestination(v),
+        purpose: purposeByte(v),
         social: v.needs.social,
       })),
       buildings: this.buildingViews(),

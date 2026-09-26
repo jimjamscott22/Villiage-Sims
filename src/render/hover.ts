@@ -1,4 +1,5 @@
-import type { Catalog, TickSnapshot } from '../state/types';
+import type { Catalog, TickSnapshot, VillagerView } from '../state/types';
+import { intentLabel } from './intentOverlay';
 
 const VILLAGER_STATE_LABELS = [
   'Idle',
@@ -38,6 +39,13 @@ function rotatedFootprint(footprint: [number, number], rotation: number): [numbe
   return rotation % 2 === 0 ? footprint : [footprint[1], footprint[0]];
 }
 
+function villagerHoverDetail(villager: VillagerView): string {
+  if (villager.state === 1 && (villager.purpose != null || villager.activity != null || villager.destination)) {
+    return intentLabel(villager);
+  }
+  return VILLAGER_STATE_LABELS[villager.state ?? 0] ?? 'Unknown activity';
+}
+
 /** Return the visually topmost inspectable entity under a world-space pointer. */
 export function hoverTargetAt({
   snapshot,
@@ -48,19 +56,19 @@ export function hoverTargetAt({
   zoom,
 }: HoverTargetInput): HoverTarget | null {
   const hitRadius = Math.max(16, 22 / Math.max(zoom, 0.01));
-  let closestVillager: { id: number; state: number | undefined; distance: number } | null = null;
+  let closestVillager: { villager: VillagerView; distance: number } | null = null;
   for (const villager of snapshot.villagers) {
     const distance = Math.hypot(villager.x - worldX, villager.y - worldY);
     if (distance <= hitRadius && (closestVillager == null || distance < closestVillager.distance)) {
-      closestVillager = { id: villager.id, state: villager.state, distance };
+      closestVillager = { villager, distance };
     }
   }
   if (closestVillager) {
     return {
       kind: 'villager',
-      id: closestVillager.id,
-      title: `Villager #${closestVillager.id}`,
-      detail: VILLAGER_STATE_LABELS[closestVillager.state ?? 0] ?? 'Unknown activity',
+      id: closestVillager.villager.id,
+      title: `Villager #${closestVillager.villager.id}`,
+      detail: villagerHoverDetail(closestVillager.villager),
     };
   }
 

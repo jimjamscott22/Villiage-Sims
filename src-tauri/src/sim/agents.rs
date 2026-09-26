@@ -15,6 +15,18 @@ pub enum MovePurpose {
     Drink,
 }
 
+impl MovePurpose {
+    /// Stable wire byte for tick snapshots (append-only — never reorder).
+    pub fn as_u8(self) -> u8 {
+        match self {
+            Self::PlayerOrder => 0,
+            Self::Work => 1,
+            Self::Wander => 2,
+            Self::Drink => 3,
+        }
+    }
+}
+
 /// Villager FSM + utility-driven activity states (Milestone 7).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentState {
