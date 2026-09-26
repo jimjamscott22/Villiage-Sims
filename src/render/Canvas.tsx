@@ -486,7 +486,7 @@ export function Canvas({
           tileSize: terrain.tileSize,
         });
         if (intent) {
-          drawIntentOverlay(ctx, intent, terrain.tileSize, camera.zoom);
+          drawIntentOverlay(ctx, intent, terrain.tileSize, camera, dpr);
         }
         if (showNameTagsRef.current) {
           drawNameTags(
@@ -609,8 +609,34 @@ export function Canvas({
       advanceDemoTime(ms);
       draw(performance.now() + Math.max(0, ms));
     };
-    window.render_game_to_text = () =>
-      JSON.stringify({
+    window.__focusWorld = (wx: number, wy: number) => {
+      const terrainNow = terrainRef.current;
+      if (!terrainNow) return;
+      camera.zoom = Math.max(camera.zoom, 1);
+      camera.centerOnTile(
+        Math.floor(wx / terrainNow.tileSize),
+        Math.floor(wy / terrainNow.tileSize),
+        terrainNow.tileSize,
+        viewWidth,
+        viewHeight,
+      );
+      draw(performance.now());
+    };
+    window.render_game_to_text = () => {
+      const footprints = (catalogRef.current?.buildings ?? []).map(
+        (building) => building.footprint as [number, number],
+      );
+      const intent = rendered && terrain
+        ? planIntentOverlay({
+            selectedId: selectedVillagerIdRef.current,
+            villagers: rendered.villagers,
+            buildings: rendered.buildings,
+            footprints,
+            detail: villagerDetailRef.current,
+            tileSize: terrain.tileSize,
+          })
+        : null;
+      return JSON.stringify({
         coordinateSystem: 'origin top-left; x right; y down; world pixels',
         mode: transport.mode,
         tick: rendered?.tick ?? tickRef.current,
@@ -634,11 +660,14 @@ export function Canvas({
         resources: rendered?.resources ?? null,
         selectedKind: selectedKindRef.current,
         selectedCrop: selectedCropRef.current,
+        selectedVillagerId: selectedVillagerIdRef.current,
+        intent,
         hover: hoveredTarget,
         villagers: rendered?.villagers ?? [],
         error: errorRef.current,
         perf: perf.snapshot(),
       });
+    };
 
     const onKeyDown = async (event: KeyboardEvent) => {
       if (event.key.toLowerCase() === 'f') {
@@ -846,6 +875,7 @@ export function Canvas({
       delete window.advanceTime;
       delete window.render_game_to_text;
       delete window.__villagePerf;
+      delete window.__focusWorld;
     };
   }, []);
 
