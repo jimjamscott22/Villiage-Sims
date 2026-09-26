@@ -55,6 +55,9 @@ pub struct VillagerView {
     pub partner_id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination: Option<(i32, i32)>,
+    /// Present while `MovingTo`. 0 PlayerOrder, 1 Work, 2 Wander, 3 Drink.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<u8>,
     pub social: f32,
     pub id: u32,
     pub x: f32,

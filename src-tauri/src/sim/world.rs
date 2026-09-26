@@ -388,7 +388,8 @@ impl World {
                 .map(|v| VillagerView {
                     activity: self.activity_kind(v),
                     partner_id: self.encounter_for(v.id).map(|p| if p.a == v.id { p.b } else { p.a }),
-                    destination: self.behavior.get(&v.id).and_then(|b| b.destination),
+                    destination: self.view_destination(v),
+                    purpose: self.view_purpose(v),
                     social: v.needs.social,
                     id: v.id,
                     x: v.pos.0,
@@ -408,6 +409,25 @@ impl World {
             last_autosave_slot: self.last_autosave_slot,
             winter_warning: self.winter_warning(),
             completed_objectives: self.completed_objectives.iter().cloned().collect(),
+        }
+    }
+
+    /// Destination for intent overlay: MovingTo target, else leisure, else encounter tile.
+    pub(crate) fn view_destination(&self, v: &Villager) -> Option<(i32, i32)> {
+        if let AgentState::MovingTo { target, .. } = v.state {
+            return Some(target);
+        }
+        if let Some(dest) = self.behavior.get(&v.id).and_then(|b| b.destination) {
+            return Some(dest);
+        }
+        self.encounter_for(v.id).map(|p| if p.a == v.id { p.meeting } else { p.waiting })
+    }
+
+    /// MovePurpose wire byte while MovingTo; absent otherwise.
+    pub(crate) fn view_purpose(&self, v: &Villager) -> Option<u8> {
+        match v.state {
+            AgentState::MovingTo { purpose, .. } => Some(purpose.as_u8()),
+            _ => None,
         }
     }
 
@@ -3848,6 +3868,24 @@ mod tests {
         assert_eq!(snap.clock.weather, world.current_weather().as_u8());
 
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn snapshot_exposes_moving_destination_and_purpose() {
+        let mut world = grass_world();
+        world.villagers[0].state = AgentState::MovingTo {
+            target: (5, 3),
+            purpose: MovePurpose::Work,
+        };
+        let view = world
+            .tick_snapshot()
+            .villagers
+            .into_iter()
+            .find(|v| v.id == world.villagers[0].id)
+            .expect("villager in snapshot");
+        assert_eq!(view.destination, Some((5, 3)));
+        assert_eq!(view.purpose, Some(MovePurpose::Work.as_u8()));
+        assert_eq!(view.state, 1);
     }
 
     #[test]

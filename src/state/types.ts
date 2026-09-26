@@ -18,6 +18,8 @@ export interface VillagerView {
   activity?: string;
   partnerId?: number;
   destination?: [number, number];
+  /** Present while MovingTo. 0 PlayerOrder, 1 Work, 2 Wander, 3 Drink. */
+  purpose?: number;
   social?: number;
   id: number;
   x: number;

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { SnapshotBuffer } from '../state/snapshot';
 import { advanceDemoTime, transport } from '../state/transport';
-import type { BuildingDef, Catalog, TerrainSnapshot, TickSnapshot } from '../state/types';
+import type { BuildingDef, Catalog, TerrainSnapshot, TickSnapshot, VillagerDetail } from '../state/types';
 import { Camera } from './camera';
 import type { Atlas } from './atlas';
 import { ART_SCALE, drawCell, loadAtlas } from './atlas';
@@ -9,6 +9,7 @@ import { drawBuildings, drawCrops, drawVillagers } from './drawEntities';
 import { drawGhost } from './drawGhost';
 import { drawTerrain } from './drawTerrain';
 import { hoverTargetAt, type HoverTarget } from './hover';
+import { drawIntentOverlay, planIntentOverlay } from './intentOverlay';
 import { drawNameTags, nameTagPlacements } from './nameTags';
 import { formatPerfOverlay, PerfTracker, perfEnabledFromSearch } from './perfStats';
 import type { Facing } from './scene';
@@ -37,6 +38,8 @@ interface CanvasProps {
   rotation: number;
   selectedBuildingId: number | null;
   selectedVillagerId: number | null;
+  /** On-demand detail for the selected villager (job site while Working). */
+  villagerDetail: VillagerDetail | null;
   onRotationChange: (rotation: number) => void;
   onCancelBuild: () => void;
   onSelectBuilding: (id: number | null) => void;
@@ -86,6 +89,7 @@ export function Canvas({
   rotation,
   selectedBuildingId,
   selectedVillagerId,
+  villagerDetail,
   onRotationChange,
   onCancelBuild,
   onSelectBuilding,
@@ -110,6 +114,7 @@ export function Canvas({
   const catalogRef = useRef(catalog);
   const selectedBuildingIdRef = useRef(selectedBuildingId);
   const selectedVillagerIdRef = useRef(selectedVillagerId);
+  const villagerDetailRef = useRef(villagerDetail);
   const onSnapshotRef = useRef(onSnapshot);
   const tagLabelsRef = useRef(tagLabels);
   const showNameTagsRef = useRef(showNameTags);
@@ -142,6 +147,9 @@ export function Canvas({
   useEffect(() => {
     selectedVillagerIdRef.current = selectedVillagerId;
   }, [selectedVillagerId]);
+  useEffect(() => {
+    villagerDetailRef.current = villagerDetail;
+  }, [villagerDetail]);
   useEffect(() => {
     onSnapshotRef.current = onSnapshot;
   }, [onSnapshot]);
@@ -465,6 +473,20 @@ export function Canvas({
               );
             }
           }
+        }
+        const footprintsForIntent = (catalogRef.current?.buildings ?? []).map(
+          (building) => building.footprint as [number, number],
+        );
+        const intent = planIntentOverlay({
+          selectedId: selectedVillagerIdRef.current,
+          villagers: rendered.villagers,
+          buildings: rendered.buildings,
+          footprints: footprintsForIntent,
+          detail: villagerDetailRef.current,
+          tileSize: terrain.tileSize,
+        });
+        if (intent) {
+          drawIntentOverlay(ctx, intent, terrain.tileSize, camera.zoom);
         }
         if (showNameTagsRef.current) {
           drawNameTags(

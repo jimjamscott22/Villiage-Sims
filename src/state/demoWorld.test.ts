@@ -657,6 +657,16 @@ describe('DemoWorld pathfinding', () => {
     expect(snap.villagers.find((entry) => entry.id === a.id)?.state).not.toBe(1);
   });
 
+  it('exposes MovingTo destination and purpose on the snapshot', () => {
+    const world = new DemoWorld(grassTerrain());
+    const id = nearestVillagerId(world, 0, 0);
+    world.moveVillagerTo(6, 6, id);
+    const view = villagerById(world, id);
+    expect(view.state).toBe(1);
+    expect(view.destination).toEqual([6, 6]);
+    expect(view.purpose).toBe(0); // player order
+  });
+
   it('falls back when a stale villager id is requested', () => {
     const world = new DemoWorld(grassTerrain());
     expect(() => world.moveVillagerTo(6, 6, 9999)).not.toThrow();

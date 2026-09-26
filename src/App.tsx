@@ -409,6 +409,7 @@ export default function App() {
             rotation={rotation}
             selectedBuildingId={selectedBuildingId}
             selectedVillagerId={selectedVillagerId}
+            villagerDetail={villagerDetail}
             onRotationChange={setRotation}
             onCancelBuild={() => {
               setSelectedKind(null);

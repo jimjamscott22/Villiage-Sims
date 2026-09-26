@@ -66,6 +66,28 @@ describe('hoverTargetAt', () => {
     });
   });
 
+  it('shows purpose-aware detail for a moving villager', () => {
+    const target = hoverTargetAt({
+      snapshot: snapshot({
+        villagers: [
+          { id: 1, x: 80, y: 80, state: 1, purpose: 1, destination: [4, 5] },
+        ],
+      }),
+      catalog,
+      worldX: 80,
+      worldY: 80,
+      tileSize: 32,
+      zoom: 1,
+    });
+
+    expect(target).toEqual({
+      kind: 'villager',
+      id: 1,
+      title: 'Villager #1',
+      detail: 'Going to work',
+    });
+  });
+
   it('shows crop growth above its farm footprint', () => {
     const target = hoverTargetAt({
       snapshot: snapshot({
