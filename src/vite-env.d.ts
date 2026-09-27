@@ -4,6 +4,8 @@ declare global {
   interface Window {
     advanceTime?: (ms: number) => void;
     render_game_to_text?: () => string;
+    /** Centre the camera on a world-pixel point (browser-demo / ?test=1 smoke). */
+    __focusWorld?: (wx: number, wy: number) => void;
     /** Live render/sim perf counters (updated every RAF / tick). */
     __villagePerf?: () => {
       fps: number;
