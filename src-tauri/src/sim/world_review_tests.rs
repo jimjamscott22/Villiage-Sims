@@ -161,3 +161,45 @@ fn recipe_supply_skips_an_unreachable_storage_source() {
     assert_eq!(task.from, HaulEndpoint::Building(reachable));
     assert_eq!(task.to, HaulEndpoint::Building(bakery));
 }
+
+#[test]
+fn haul_task_prefers_the_pickup_nearest_the_worker() {
+    let mut world = open_world(32);
+    complete(&mut world, "granary", 20, 20);
+    let far = complete(&mut world, "farm", 2, 2);
+    let near = complete(&mut world, "farm", 11, 2);
+    add_inventory(&mut world, far, "grain", 4);
+    add_inventory(&mut world, near, "grain", 4);
+    let near_stand = world.building_stand_tile(near).unwrap();
+
+    let task = world.find_haul_task(near_stand).expect("haul task");
+    assert_eq!(task.from, HaulEndpoint::Building(near));
+}
+
+#[test]
+fn resuming_hauler_heads_for_delivery_not_job_tile() {
+    let mut world = open_world(32);
+    let granary = complete(&mut world, "granary", 20, 20);
+    complete(&mut world, "farm", 2, 2);
+    let dest_stand = world.building_stand_tile(granary).unwrap();
+    let haul_job = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|job| job.kind == JobKind::Haul)
+        .map(|job| job.id)
+        .expect("a haul job");
+    world.villagers[0].carrying = Some(CarryStack {
+        resource: "grain".into(),
+        amount: 3,
+        dest: HaulEndpoint::Building(granary),
+    });
+
+    world.begin_work(0, Some(haul_job));
+
+    assert_eq!(world.villagers[0].current_job, Some(haul_job));
+    assert!(matches!(
+        world.villagers[0].state,
+        AgentState::MovingTo { target, purpose: MovePurpose::Work } if target == dest_stand
+    ));
+}

@@ -800,7 +800,14 @@ impl World {
     }
 
     /// Skip unavailable routes so one isolated pickup cannot block other deliveries.
+    ///
+    /// Among usable tasks the pickup nearest the worker wins, so a worker standing at
+    /// stocked goods takes them rather than walking to an earlier-listed building.
     fn find_haul_task(&self, worker_tile: (i32, i32)) -> Option<HaulTask> {
+        let dist_to = |tile: (i32, i32)| {
+            (tile.0 - worker_tile.0).abs() + (tile.1 - worker_tile.1).abs()
+        };
+        let mut candidates: Vec<(i32, HaulTask)> = Vec::new();
         for source in &self.buildings {
             if source.state != BuildState::Complete {
                 continue;
@@ -829,26 +836,37 @@ impl World {
                     continue;
                 }
                 if let Some((storage_id, free)) = self.nearest_storage_for(resource, source_stand) {
-                    return Some(HaulTask {
-                        resource: resource.clone(),
-                        amount: (*available).min(CARRY_STACK_MAX).min(free),
-                        from: HaulEndpoint::Building(source.id),
-                        to: HaulEndpoint::Building(storage_id),
-                    });
+                    candidates.push((
+                        dist_to(source_stand),
+                        HaulTask {
+                            resource: resource.clone(),
+                            amount: (*available).min(CARRY_STACK_MAX).min(free),
+                            from: HaulEndpoint::Building(source.id),
+                            to: HaulEndpoint::Building(storage_id),
+                        },
+                    ));
+                    break;
                 }
                 if Self::stockpile_accepts(resource)
                     && self.stockpile_stand().is_some_and(|stand| {
                         self.compute_path(source_stand, stand).is_some()
                     })
                 {
-                    return Some(HaulTask {
-                        resource: resource.clone(),
-                        amount: (*available).min(CARRY_STACK_MAX),
-                        from: HaulEndpoint::Building(source.id),
-                        to: HaulEndpoint::Stockpile,
-                    });
+                    candidates.push((
+                        dist_to(source_stand),
+                        HaulTask {
+                            resource: resource.clone(),
+                            amount: (*available).min(CARRY_STACK_MAX),
+                            from: HaulEndpoint::Building(source.id),
+                            to: HaulEndpoint::Stockpile,
+                        },
+                    ));
+                    break;
                 }
             }
+        }
+        if let Some(best) = Self::nearest_task(&mut candidates) {
+            return Some(best);
         }
 
         for dest in &self.buildings {
@@ -882,12 +900,15 @@ impl World {
                                 && self.compute_path(stand, dest_stand).is_some()
                         })
                     {
-                        return Some(HaulTask {
-                            resource: resource.clone(),
-                            amount: available.min(needed).min(room).min(CARRY_STACK_MAX),
-                            from: HaulEndpoint::Stockpile,
-                            to: HaulEndpoint::Building(dest.id),
-                        });
+                        candidates.push((
+                            dist_to(self.stockpile_stand().unwrap_or(worker_tile)),
+                            HaulTask {
+                                resource: resource.clone(),
+                                amount: available.min(needed).min(room).min(CARRY_STACK_MAX),
+                                from: HaulEndpoint::Stockpile,
+                                to: HaulEndpoint::Building(dest.id),
+                            },
+                        ));
                     }
                 }
                 for source in &self.buildings {
@@ -912,17 +933,31 @@ impl World {
                     {
                         continue;
                     }
-                    return Some(HaulTask {
-                        resource: resource.clone(),
-                        amount: available.min(needed).min(room).min(CARRY_STACK_MAX),
-                        from: HaulEndpoint::Building(source.id),
-                        to: HaulEndpoint::Building(dest.id),
-                    });
+                    candidates.push((
+                        dist_to(source_stand),
+                        HaulTask {
+                            resource: resource.clone(),
+                            amount: available.min(needed).min(room).min(CARRY_STACK_MAX),
+                            from: HaulEndpoint::Building(source.id),
+                            to: HaulEndpoint::Building(dest.id),
+                        },
+                    ));
+                    break;
                 }
             }
         }
 
-        None
+        Self::nearest_task(&mut candidates)
+    }
+
+    /// Smallest distance wins; ties keep the earliest candidate for determinism.
+    fn nearest_task(candidates: &mut Vec<(i32, HaulTask)>) -> Option<HaulTask> {
+        let best = candidates
+            .iter()
+            .enumerate()
+            .min_by_key(|(i, (dist, _))| (*dist, *i))
+            .map(|(i, _)| i)?;
+        Some(candidates.swap_remove(best).1)
     }
 
     fn tick_villager_at(&mut self, index: usize) {
@@ -1271,7 +1306,18 @@ impl World {
         self.villagers[index].current_action = Some(ActionKind::Work);
         let job = self.job_board.get(job_id).expect("claimed job");
         self.villagers[index].set_thought(job.kind.thought(), 40);
-        self.begin_move_to_job(index, job.tile, job_id);
+        let mut tile = job.tile;
+        // A hauler resuming with cargo goes straight to the delivery, not the job's stand tile.
+        if job.kind == JobKind::Haul {
+            if let Some(stand) = self.villagers[index]
+                .carrying
+                .as_ref()
+                .and_then(|carry| self.endpoint_stand_tile(carry.dest))
+            {
+                tile = stand;
+            }
+        }
+        self.begin_move_to_job(index, tile, job_id);
     }
 
     fn job_actionable(&self, job: &crate::sim::jobs::Job, villager_index: usize) -> bool {

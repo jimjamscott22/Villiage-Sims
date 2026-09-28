@@ -1942,7 +1942,12 @@ export class DemoWorld {
     villager.currentAction = 'work';
     const job = this.jobs.find((entry) => entry.id === claimed)!;
     this.setThought(index, jobThought(job.kind));
-    this.beginMoveToJob(index, job.tile, claimed);
+    let tile = job.tile;
+    // A hauler resuming with cargo goes straight to the delivery, not the job's stand tile.
+    if (job.kind === 'haul' && villager.carrying) {
+      tile = this.endpointStandTile(villager.carrying.dest) ?? tile;
+    }
+    this.beginMoveToJob(index, tile, claimed);
   }
 
   private jobActionable(job: DemoJob, villagerIndex: number): boolean {
@@ -2460,7 +2465,16 @@ export class DemoWorld {
     return best ? { id: best.id, free: best.free } : null;
   }
 
+  /** Among usable tasks the pickup nearest the worker wins; ties keep the earliest. */
   private findHaulTask(workerTile: [number, number]): HaulTask | null {
+    const distTo = (tile: [number, number]): number =>
+      Math.abs(tile[0] - workerTile[0]) + Math.abs(tile[1] - workerTile[1]);
+    const candidates: Array<{ dist: number; task: HaulTask }> = [];
+    const nearest = (): HaulTask | null => {
+      let best: { dist: number; task: HaulTask } | null = null;
+      for (const entry of candidates) if (!best || entry.dist < best.dist) best = entry;
+      return best ? best.task : null;
+    };
     for (const source of this.buildings) {
       if (!source.complete) continue;
       const def = DEMO_CATALOG.buildings[source.kindIndex];
@@ -2472,24 +2486,34 @@ export class DemoWorld {
         if (def.recipe && !(resource in def.recipe.outputs)) continue;
         const storage = this.nearestStorageFor(resource, sourceStand);
         if (storage) {
-          return {
-            resource,
-            amount: Math.min(available, CARRY_STACK_MAX, storage.free),
-            from: source.id,
-            to: storage.id,
-          };
+          candidates.push({
+            dist: distTo(sourceStand),
+            task: {
+              resource,
+              amount: Math.min(available, CARRY_STACK_MAX, storage.free),
+              from: source.id,
+              to: storage.id,
+            },
+          });
+          break;
         }
         const stockpile = this.stockpileStand();
         if (stockpileAccepts(resource) && stockpile && this.computePath(sourceStand, stockpile)) {
-          return {
-            resource,
-            amount: Math.min(available, CARRY_STACK_MAX),
-            from: source.id,
-            to: 'stockpile',
-          };
+          candidates.push({
+            dist: distTo(sourceStand),
+            task: {
+              resource,
+              amount: Math.min(available, CARRY_STACK_MAX),
+              from: source.id,
+              to: 'stockpile',
+            },
+          });
+          break;
         }
       }
     }
+    const pickup = nearest();
+    if (pickup) return pickup;
 
     for (const dest of this.buildings) {
       if (!dest.complete) continue;
@@ -2508,12 +2532,15 @@ export class DemoWorld {
           const stockpile = this.stockpileStand();
           if (available > 0 && stockpile
             && this.computePath(workerTile, stockpile) && this.computePath(stockpile, destStand)) {
-            return {
-              resource,
-              amount: Math.min(available, needed, room, CARRY_STACK_MAX),
-              from: 'stockpile',
-              to: dest.id,
-            };
+            candidates.push({
+              dist: distTo(stockpile),
+              task: {
+                resource,
+                amount: Math.min(available, needed, room, CARRY_STACK_MAX),
+                from: 'stockpile',
+                to: dest.id,
+              },
+            });
           }
         }
         for (const source of this.buildings) {
@@ -2524,16 +2551,20 @@ export class DemoWorld {
           const sourceStand = this.buildingStandTile(source.id);
           if (!storageAccepts(sourceDef, resource) || !sourceStand
             || !this.computePath(workerTile, sourceStand) || !this.computePath(sourceStand, destStand)) continue;
-          return {
-            resource,
-            amount: Math.min(available, needed, room, CARRY_STACK_MAX),
-            from: source.id,
-            to: dest.id,
-          };
+          candidates.push({
+            dist: distTo(sourceStand),
+            task: {
+              resource,
+              amount: Math.min(available, needed, room, CARRY_STACK_MAX),
+              from: source.id,
+              to: dest.id,
+            },
+          });
+          break;
         }
       }
     }
-    return null;
+    return nearest();
   }
 
   private tickProduce(jobId: number): void {
