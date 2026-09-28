@@ -1732,15 +1732,19 @@ export class DemoWorld {
     const villager = this.villagers[index];
     if (villager.currentJob != null) {
       const job = this.jobs.find((entry) => entry.id === villager.currentJob);
-      if (job) {
+      // A claim that has gone stale is re-scored like any other job.
+      if (job && this.jobActionable(job, index)) {
         const dist = Math.abs(job.tile[0] - from[0]) + Math.abs(job.tile[1] - from[1]);
         return { kind: 'work', score: scoreWork(job.priority, dist), jobId: job.id };
       }
     }
     const best = this.jobs
-      .filter(job => job.claimedBy == null && this.social.leisure.connected(from, job.tile) && this.jobActionable(job, index))
+      .filter(job => (job.claimedBy == null || job.claimedBy === villager.id)
+        && this.social.leisure.connected(from, job.tile) && this.jobActionable(job, index))
       .map(job => ({ job, score: scoreWork(job.priority, Math.abs(job.tile[0] - from[0]) + Math.abs(job.tile[1] - from[1])) }))
       .sort((a, b) => b.score - a.score || a.job.id - b.job.id)[0];
+    // No usable work: drop a stale Work action so hysteresis cannot pin it.
+    if (!best && villager.currentAction === 'work') villager.currentAction = null;
     return { kind: 'work', score: best?.score ?? 0, jobId: best?.job.id ?? null };
   }
 

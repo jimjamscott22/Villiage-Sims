@@ -203,3 +203,97 @@ fn resuming_hauler_heads_for_delivery_not_job_tile() {
         AgentState::MovingTo { target, purpose: MovePurpose::Work } if target == dest_stand
     ));
 }
+
+fn plant_and_water_farm(world: &mut World, farm: u32) {
+    for (x, y) in world.farm_footprint_tiles(farm) {
+        world.plant_crop("wheat", x, y).unwrap();
+    }
+    for crop in &mut world.crops {
+        crop.watered = true;
+    }
+    world.resources.grain = 0;
+}
+
+#[test]
+fn idle_farm_job_does_not_trap_a_villager_in_place() {
+    let mut world = open_world(24);
+    let farm = complete(&mut world, "farm", 8, 8);
+    plant_and_water_farm(&mut world, farm);
+    let start = world.villagers[0].pos;
+
+    let mut moved = false;
+    for _ in 0..200 {
+        for crop in &mut world.crops {
+            crop.watered = true;
+        }
+        world.advance();
+        moved |= world.villagers[0].pos != start;
+    }
+    assert!(moved, "villager should wander when the only job is unusable");
+}
+
+#[test]
+fn claim_on_a_job_that_became_unusable_is_swapped_for_a_usable_one() {
+    let mut world = open_world(24);
+    let farm = complete(&mut world, "farm", 8, 8);
+    let other = complete(&mut world, "farm", 14, 14);
+    plant_and_water_farm(&mut world, farm);
+    // The second farm is empty, with seed available, so its tending job is usable.
+    world.resources.grain = 20;
+    let stale = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|j| j.site == farm && j.kind == JobKind::TendCrops)
+        .map(|j| j.id)
+        .unwrap();
+    let usable = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|j| j.site == other && j.kind == JobKind::TendCrops)
+        .map(|j| j.id)
+        .unwrap();
+    for crop in world.crops.iter_mut() {
+        crop.watered = true;
+    }
+    // Only the immature-farm job is unusable; make sure the empty farm is not planted.
+    let id = world.villagers[0].id;
+    assert!(world.job_board.claim_id(stale, id));
+    world.villagers[0].current_job = Some(stale);
+    world.villagers[0].current_action = Some(ActionKind::Work);
+    world.villagers[0].state = AgentState::Idle;
+
+    world.maybe_decide(0);
+
+    assert_eq!(world.villagers[0].current_job, Some(usable));
+}
+
+#[test]
+fn stale_claim_with_no_alternative_falls_through_to_another_action() {
+    let mut world = open_world(24);
+    let farm = complete(&mut world, "farm", 8, 8);
+    plant_and_water_farm(&mut world, farm);
+    let stale = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|j| j.site == farm && j.kind == JobKind::TendCrops)
+        .map(|j| j.id)
+        .unwrap();
+    let id = world.villagers[0].id;
+    assert!(world.job_board.claim_id(stale, id));
+    world.villagers[0].current_job = Some(stale);
+    world.villagers[0].current_action = Some(ActionKind::Work);
+    world.villagers[0].state = AgentState::Idle;
+
+    world.maybe_decide(0);
+
+    assert_ne!(world.villagers[0].current_action, Some(ActionKind::Work));
+    assert!(
+        !matches!(world.villagers[0].state, AgentState::Idle)
+            || world.villagers[0].current_action.is_some()
+            || world.has_leisure_intent(0),
+        "villager must take another action in the same decision"
+    );
+}

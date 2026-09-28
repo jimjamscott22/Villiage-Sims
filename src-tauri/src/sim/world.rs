@@ -1092,7 +1092,12 @@ impl World {
         let mut scored = score_all(&ctx);
         // Advertised jobs may currently have no inputs or be disconnected. Such
         // jobs must not win repeatedly and prevent useful leisure movement.
-        if self.villagers[index].current_job.is_none() {
+        // A claim that has gone stale (e.g. nothing left to tend) is re-scored the same way.
+        let claim_usable = self.villagers[index]
+            .current_job
+            .and_then(|job_id| self.job_board.get(job_id))
+            .is_some_and(|job| self.job_actionable(job, index));
+        if !claim_usable {
             let id = self.villagers[index].id;
             let best = self.job_board.jobs().iter()
                 .filter(|j| j.claimed_by.is_none() || j.claimed_by == Some(id))
@@ -1102,6 +1107,10 @@ impl World {
             if let Some(work) = scored.iter_mut().find(|a| a.kind == ActionKind::Work) {
                 work.job_id = best.map(|b| b.0);
                 work.score = best.map_or(0.0, |b| b.1);
+            }
+            // No usable work: drop a stale Work action so hysteresis cannot pin it.
+            if best.is_none() && self.villagers[index].current_action == Some(ActionKind::Work) {
+                self.villagers[index].current_action = None;
             }
         }
         let density = self.hut_density(from);
