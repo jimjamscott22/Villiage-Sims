@@ -86,7 +86,8 @@ Updated 2026-09-28 on branch `fix/sim-review-followups`.
 | R1 | Partly resolved | `4a0300d`: haul pickup is now the nearest to the worker, and a resuming carrier heads for its delivery endpoint instead of the job tile. Still open: an explicit pickup/delivery phase and reservation of goods and destinations. |
 | R2 | Resolved | `a138d20`: stale work claims are re-scored so unusable jobs fall through to a usable job or another action. |
 | R3 | Resolved | Path invalidation now revalidates every edge, including both flanks of diagonal steps, in Rust and the browser demo. A step already past its midpoint still finishes. |
-| R4–R8 | Open | |
+| R7 | Resolved | `release_job_at` is now the single abandonment path (path failure, storm, demolition, player order, unactionable job) and returns any carried cargo to the stockpile. Policy chosen: return, not retarget. Rust and demo. |
+| R4–R6, R8 | Open | |
 
 ## Deferred findings
 

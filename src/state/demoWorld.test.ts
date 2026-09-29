@@ -770,4 +770,27 @@ describe('simulation review regressions', () => {
     internals.invalidatePathsIfNeeded();
     expect(villager.path).not.toEqual([[1, 1]]);
   });
+  it('returns carried cargo when the hauled site is demolished', () => {
+    const world = new DemoWorld(grassTerrain(32, 32));
+    const internals = world as unknown as {
+      villagers: Array<{
+        id: number;
+        currentJob: number | null;
+        carrying: { resource: string; amount: number; dest: unknown } | null;
+      }>;
+      jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+    };
+    const granary = completeBuilding(world, 'granary', 20, 20);
+    completeBuilding(world, 'farm', 2, 2);
+    const haul = internals.jobs.find((job) => job.kind === 'haul')!;
+    const villager = internals.villagers[0];
+    villager.currentJob = haul.id;
+    haul.claimedBy = villager.id;
+    villager.carrying = { resource: 'grain', amount: 3, dest: { building: granary } };
+    const grainBefore = world.resources.grain;
+    world.demolish(haul.site);
+    expect(villager.currentJob).toBeNull();
+    expect(villager.carrying).toBeNull();
+    expect(world.resources.grain).toBeGreaterThanOrEqual(grainBefore + 3);
+  });
 });

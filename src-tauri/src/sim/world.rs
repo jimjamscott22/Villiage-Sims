@@ -506,9 +506,6 @@ impl World {
                 last_err = "no path".into();
                 continue;
             };
-            if let Some(carrying) = self.villagers[index].carrying.take() {
-                self.deposit_to_stockpile(&carrying.resource, carrying.amount);
-            }
             self.cancel_encounter(self.villagers[index].id);
             self.clear_leisure(index);
             self.release_job_at(index);
@@ -1728,18 +1725,25 @@ impl World {
             None => {
                 self.release_job_at(index);
                 self.villagers[index].repath_cooldown = REPATH_COOLDOWN_TICKS;
-                if let Some(carrying) = self.villagers[index].carrying.take() {
-                    self.deposit_to_stockpile(&carrying.resource, carrying.amount);
-                }
                 self.villagers[index].clear_path_to_idle();
             }
         }
     }
 
+    /// Every way a villager gives up a job funnels through here: the claim is
+    /// released and any carried shipment goes back to the stockpile, so cargo
+    /// is never stranded on a worker with no Haul job to deliver it.
     fn release_job_at(&mut self, index: usize) {
         if let Some(job_id) = self.villagers[index].current_job.take() {
             let villager_id = self.villagers[index].id;
             self.job_board.release(job_id, villager_id);
+        }
+        self.return_cargo_to_stockpile(index);
+    }
+
+    fn return_cargo_to_stockpile(&mut self, index: usize) {
+        if let Some(carrying) = self.villagers[index].carrying.take() {
+            self.deposit_to_stockpile(&carrying.resource, carrying.amount);
         }
     }
 
@@ -2112,23 +2116,22 @@ impl World {
 
     fn clear_released_work_claims(&mut self, released: Vec<u32>) {
         for villager_id in released {
-            for villager in &mut self.villagers {
-                if villager.id != villager_id {
-                    continue;
-                }
-                villager.current_job = None;
-                if matches!(
-                    villager.state,
-                    AgentState::Working { .. }
-                        | AgentState::MovingTo {
-                            purpose: MovePurpose::Work,
-                            ..
-                        }
-                ) {
-                    villager.clear_path_to_idle();
-                    if villager.current_action == Some(ActionKind::Work) {
-                        villager.current_action = None;
+            let Some(index) = self.villagers.iter().position(|v| v.id == villager_id) else {
+                continue;
+            };
+            self.release_job_at(index);
+            let villager = &mut self.villagers[index];
+            if matches!(
+                villager.state,
+                AgentState::Working { .. }
+                    | AgentState::MovingTo {
+                        purpose: MovePurpose::Work,
+                        ..
                     }
+            ) {
+                villager.clear_path_to_idle();
+                if villager.current_action == Some(ActionKind::Work) {
+                    villager.current_action = None;
                 }
             }
         }

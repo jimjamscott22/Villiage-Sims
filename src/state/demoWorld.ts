@@ -1328,10 +1328,6 @@ export class DemoWorld {
         lastError = 'no path';
         continue;
       }
-      if (villager.carrying) {
-        this.depositToStockpile(villager.carrying.resource, villager.carrying.amount);
-        villager.carrying = null;
-      }
       this.social.cancel(villager.id);
       this.social.leisure.clear(villager);
       this.releaseJobAt(index);
@@ -1434,16 +1430,9 @@ export class DemoWorld {
       .filter((job) => job.site === entityId && job.claimedBy != null)
       .map((job) => job.claimedBy!);
     this.jobs = this.jobs.filter((job) => job.site !== entityId);
+    this.clearReleasedWorkClaims(released);
     for (const villager of this.villagers) {
-      if (released.includes(villager.id)) {
-        villager.currentJob = null;
-        if (
-          villager.state === 'working'
-          || (villager.state === 'moving' && villager.purpose === 'work')
-        ) {
-          this.clearToIdle(villager);
-        }
-      } else if (villager.currentJob != null && !this.jobs.some((job) => job.id === villager.currentJob)) {
+      if (villager.currentJob != null && !this.jobs.some((job) => job.id === villager.currentJob)) {
         villager.currentJob = null;
       }
     }
@@ -2348,7 +2337,7 @@ export class DemoWorld {
     for (const villagerId of released) {
       const villager = this.villagers.find((entry) => entry.id === villagerId);
       if (!villager) continue;
-      villager.currentJob = null;
+      this.releaseJobAt(this.villagers.indexOf(villager));
       if (villager.state === 'working' || (villager.state === 'moving' && villager.purpose === 'work')) {
         this.clearToIdle(villager);
         if (villager.currentAction === 'work') villager.currentAction = null;
@@ -2656,10 +2645,6 @@ export class DemoWorld {
     }
     this.releaseJobAt(index);
     villager.repathCooldown = REPATH_COOLDOWN_TICKS;
-    if (villager.carrying) {
-      this.depositToStockpile(villager.carrying.resource, villager.carrying.amount);
-      villager.carrying = null;
-    }
     this.clearToIdle(villager);
   }
 
@@ -2789,12 +2774,18 @@ export class DemoWorld {
     villager.path = null;
   }
 
+  /** Every job abandonment funnels here so carried cargo is never stranded. */
   private releaseJobAt(index: number): void {
     const villager = this.villagers[index];
-    if (villager.currentJob == null) return;
-    const job = this.jobs.find((entry) => entry.id === villager.currentJob);
-    if (job && job.claimedBy === villager.id) job.claimedBy = null;
-    villager.currentJob = null;
+    if (villager.currentJob != null) {
+      const job = this.jobs.find((entry) => entry.id === villager.currentJob);
+      if (job && job.claimedBy === villager.id) job.claimedBy = null;
+      villager.currentJob = null;
+    }
+    if (villager.carrying) {
+      this.depositToStockpile(villager.carrying.resource, villager.carrying.amount);
+      villager.carrying = null;
+    }
   }
 
   private computePath(start: [number, number], goal: [number, number]): Array<[number, number]> | null {

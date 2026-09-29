@@ -314,3 +314,45 @@ fn fence_on_a_diagonal_flank_forces_a_repath() {
     // Legal route goes via (0,1): x must not advance before y does.
     assert!(pos.0 <= start.0 + 0.01, "villager cut the corner: {pos:?}");
 }
+
+fn carrying_hauler_after_site_removed(demolish_site: bool) -> World {
+    let mut world = open_world(32);
+    let granary = complete(&mut world, "granary", 20, 20);
+    complete(&mut world, "farm", 2, 2);
+    let (haul_job, site) = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|job| job.kind == JobKind::Haul)
+        .map(|job| (job.id, job.site))
+        .expect("a haul job");
+    world.villagers[0].carrying = Some(CarryStack {
+        resource: "grain".into(),
+        amount: 3,
+        dest: HaulEndpoint::Building(granary),
+    });
+    world.begin_work(0, Some(haul_job));
+    assert!(matches!(world.villagers[0].state, AgentState::MovingTo { .. }));
+    let grain_before = world.resources.grain;
+    if demolish_site {
+        world.demolish(site).unwrap();
+    } else {
+        let released = world.job_board.remove_site(site);
+        world.clear_released_work_claims(released);
+    }
+    assert_eq!(world.villagers[0].current_job, None);
+    assert!(world.resources.grain >= grain_before);
+    world
+}
+
+#[test]
+fn demolishing_the_haul_site_returns_carried_cargo() {
+    let world = carrying_hauler_after_site_removed(true);
+    assert!(world.villagers[0].carrying.is_none(), "cargo stranded on worker");
+}
+
+#[test]
+fn cleared_work_claim_returns_carried_cargo() {
+    let world = carrying_hauler_after_site_removed(false);
+    assert!(world.villagers[0].carrying.is_none(), "cargo stranded on worker");
+}
