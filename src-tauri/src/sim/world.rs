@@ -1544,6 +1544,15 @@ impl World {
             }
             return;
         };
+        // Haulers roam between endpoints; every other job is worked in place, so
+        // a building placed on the worker's tile ends the shift.
+        let (vx, vy) = self.pos_to_tile(self.villagers[index].pos);
+        if job_record.kind != JobKind::Haul && !self.is_passable(vx, vy) {
+            self.release_job_at(index);
+            self.villagers[index].clear_path_to_idle();
+            self.villagers[index].current_action = None;
+            return;
+        }
         match job_record.kind {
             JobKind::TendCrops => self.tick_tend_crops(job, ticks_remaining),
             JobKind::Gather => self.tick_gather(job, ticks_remaining),

@@ -793,4 +793,29 @@ describe('simulation review regressions', () => {
     expect(villager.carrying).toBeNull();
     expect(world.resources.grain).toBeGreaterThanOrEqual(grainBefore + 3);
   });
+  it('ends a worked-in-place job when a building covers the worker tile', () => {
+    const world = new DemoWorld(grassTerrain(16, 16));
+    const internals = world as unknown as {
+      villagers: Array<{ id: number; x: number; y: number; currentJob: number | null; state: string }>;
+      jobs: Array<{ id: number; kind: string; tile: [number, number]; claimedBy: number | null }>;
+      refreshGatherJobs(): void;
+      tickWorking(index: number): void;
+    };
+    world.nodes = [{ tile: [8, 8], resource: 'wood', amount: 5, max: 5, regenAcc: 0 }];
+    internals.refreshGatherJobs();
+    const job = internals.jobs.find((entry) => entry.kind === 'gather')!;
+    const villager = internals.villagers[0];
+    const tile = 32;
+    villager.x = job.tile[0] * tile + tile / 2;
+    villager.y = job.tile[1] * tile + tile / 2;
+    villager.currentJob = job.id;
+    job.claimedBy = villager.id;
+    villager.state = 'working';
+
+    completeBuilding(world, 'fence', job.tile[0], job.tile[1]);
+    internals.tickWorking(0);
+
+    expect(villager.currentJob).toBeNull();
+    expect(villager.state).toBe('idle');
+  });
 });

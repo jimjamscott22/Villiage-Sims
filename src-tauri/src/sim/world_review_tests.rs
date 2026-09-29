@@ -356,3 +356,28 @@ fn cleared_work_claim_returns_carried_cargo() {
     let world = carrying_hauler_after_site_removed(false);
     assert!(world.villagers[0].carrying.is_none(), "cargo stranded on worker");
 }
+
+#[test]
+fn worker_standing_where_a_building_is_placed_stops_working_there() {
+    let mut world = open_world(16);
+    world.nodes.push(ResourceNode::forest((8, 8)));
+    world.refresh_gather_jobs();
+    let job = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|job| job.kind == JobKind::Gather)
+        .expect("a gather job");
+    let stand = job.tile;
+    let job_id = job.id;
+    world.villagers[0].pos = world.tile_center(stand.0, stand.1);
+    world.begin_work(0, Some(job_id));
+    assert!(matches!(world.villagers[0].state, AgentState::Working { .. }));
+
+    complete(&mut world, "fence", stand.0, stand.1);
+    world.advance();
+
+    let v = &world.villagers[0];
+    assert_ne!(v.current_job, Some(job_id), "still working inside the fence");
+    assert!(!matches!(v.state, AgentState::Working { .. }));
+}

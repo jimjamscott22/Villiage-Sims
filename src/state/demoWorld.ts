@@ -2066,6 +2066,15 @@ export class DemoWorld {
       }
       return;
     }
+    // Haulers roam between endpoints; every other job is worked in place, so a
+    // building placed on the worker's tile ends the shift.
+    const [vx, vy] = this.posToTile(villager.x, villager.y);
+    if (job.kind !== 'haul' && !this.isPassable(vx, vy)) {
+      this.releaseJobAt(index);
+      this.clearToIdle(villager);
+      villager.currentAction = null;
+      return;
+    }
     switch (job.kind) {
       case 'tend_crops':
         this.tickTendCrops(job.id, villager.workTicksRemaining);
