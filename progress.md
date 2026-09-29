@@ -102,6 +102,24 @@ npm run dev
 
 The focused social/leisure Rust scenarios passed during implementation. The full Rust and browser suites, frontend build, and browser interaction pass are intentionally deferred for a later run.
 
+## Simulation review follow-ups (handoff, 2026-09-29)
+
+Branch `fix/sim-review-followups` works through `docs/rust-simulation-review-2026-09-02.md`; the
+"Resolution status" table there is the source of truth. Resolved: R2, R3, R5, R6, R7. Partly resolved:
+R1 (nearest pickup, cargo resume; still needs an explicit pickup/delivery phase and reservations) and
+R4 (in-place workers end when built over; still needs reachable stand tiles, haul entrances, gate
+pass-through). Open: R8. Each fix has a Rust regression in `src-tauri/src/sim/world_review_tests.rs`
+and a mirrored case in `src/state/demoWorld.test.ts`.
+
+State at handoff: working tree clean; Rust lib tests 163, Vitest 265, `tsc -b` and `cargo check`
+pass. Not run: `npm run build` (the review notes an unrelated `tools/genart/app-icon.test.ts`
+TS2554 error) and any live Tauri or browser session. The branch is not pushed and has no PR.
+
+Suggested next: decision-explanation diagnostics (current action, job id, pickup/delivery endpoint,
+scores, interruption reason) before tuning utility curves; then the R1 and R4 remainders. Gate
+behaviour (can villagers walk through gates?) needs a product decision first, as does R8. Also open:
+replay/determinism coverage across seasons and player commands.
+
 ## Next up
 
 Milestone 11 is implemented. The next engineering priority is running the deferred full checks and
