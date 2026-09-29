@@ -467,3 +467,34 @@ fn finished_recipe_holds_its_output_until_there_is_room() {
     assert_eq!(b.recipe_ticks, 0);
     assert_eq!(inventory_get(&b.inventory, "food"), 2);
 }
+
+#[test]
+fn natural_day_rollover_autosave_holds_the_completed_tick() {
+    let dir = std::env::temp_dir().join(format!(
+        "villagesim-r6-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut world = World::generate(16, 16, 32, 5);
+    world.set_autosave_dir(Some(dir.clone()));
+
+    let mut guard = 0;
+    while world.last_autosave_slot.is_none() {
+        world.advance();
+        guard += 1;
+        assert!(guard < 100_000, "no autosave within a day");
+    }
+    let slot = world.last_autosave_slot.unwrap();
+    let mut saved = crate::persist::load_world(&dir.join(format!("slot-{slot}.vsav"))).unwrap();
+    // The slot marker is bookkeeping written after the file; ignore it.
+    saved.last_autosave_slot = world.last_autosave_slot;
+
+    let live = crate::persist::encode_world(&world).unwrap();
+    let from_disk = crate::persist::encode_world(&saved).unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+    assert!(live == from_disk, "autosave captured a partially processed tick");
+}

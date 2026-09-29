@@ -89,7 +89,8 @@ Updated 2026-09-28 on branch `fix/sim-review-followups`.
 | R7 | Resolved | `release_job_at` is now the single abandonment path (path failure, storm, demolition, player order, unactionable job) and returns any carried cargo to the stockpile. Policy chosen: return, not retarget. Rust and demo. |
 | R4 | Partly resolved | A worker doing in-place work (tend, gather, produce) is released when a building is placed on its tile. Still open: reachable stand-tile selection, gate pass-through rules (needs a design decision), and haul endpoint entrances. |
 | R5 | Resolved | A ripe crop is harvested only when the farm buffer fits the whole yield (and a full farm no longer advertises tending work). A finished recipe holds at its last tick until the whole output fits, so nothing is truncated. Rust and demo. |
-| R6, R8 | Open | |
+| R6 | Resolved | Natural day-rollover autosave now runs at the end of `World::advance`, after the whole tick is committed; `advance_clock` autosaves after each forced day's processing. Regression compares the written slot with the live world. The browser demo has no autosave. |
+| R8 | Open | Product/design decision. |
 
 ## Deferred findings
 

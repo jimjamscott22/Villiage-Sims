@@ -220,6 +220,11 @@ impl World {
         self.cancel_invalid_encounters();
         self.check_unlocks();
         self.check_objectives();
+        // Save only once the whole tick is committed, so loading a daily
+        // autosave resumes at a tick boundary rather than mid-tick.
+        if rollover.day {
+            self.maybe_autosave();
+        }
     }
 
     pub fn housing_capacity(&self) -> u32 {
@@ -1989,6 +1994,7 @@ impl World {
             if rollover.season {
                 self.record_season_turn();
             }
+            self.maybe_autosave();
         }
         if let Some(value) = season {
             self.clock.set_season(value)?;
@@ -1996,11 +2002,11 @@ impl World {
         Ok(())
     }
 
-    /// Shared day-boundary effects: reset crop water, apply today's weather, autosave.
+    /// Shared day-boundary effects: reset crop water and apply today's weather.
+    /// Autosaving is left to the caller, after its own processing has finished.
     fn on_day_rollover(&mut self) {
         self.clear_all_crop_water();
         self.apply_daily_weather();
-        self.maybe_autosave();
     }
 
     fn apply_daily_weather(&mut self) {
