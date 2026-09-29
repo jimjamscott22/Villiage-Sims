@@ -1662,18 +1662,17 @@ impl World {
             return;
         }
 
-        self.buildings[index].recipe_ticks -= 1;
-        if self.buildings[index].recipe_ticks == 0 {
-            let mut free = production_free_capacity(&self.buildings[index].inventory);
+        if self.buildings[index].recipe_ticks == 1 {
+            // Finishing: hold the completed batch until the whole output fits.
+            let total: u32 = recipe.outputs.values().sum();
+            if production_free_capacity(&self.buildings[index].inventory) < total {
+                return;
+            }
             for (resource, amount) in &recipe.outputs {
-                if free == 0 {
-                    break;
-                }
-                let added = (*amount).min(free);
-                inventory_add(&mut self.buildings[index].inventory, resource, added);
-                free -= added;
+                inventory_add(&mut self.buildings[index].inventory, resource, *amount);
             }
         }
+        self.buildings[index].recipe_ticks -= 1;
     }
 
     fn tick_haul(&mut self, index: usize) {
@@ -2282,9 +2281,22 @@ impl World {
                 return can_plant;
             };
             self.catalog.get_crop(crop.kind_index).is_some_and(|def| {
-                crop.stage >= def.max_stage() || (!crop.watered && def.grows_in(self.clock.season))
+                (crop.stage >= def.max_stage() && self.harvest_fits(building_id, def))
+                    || (crop.stage < def.max_stage()
+                        && !crop.watered
+                        && def.grows_in(self.clock.season))
             })
         })
+    }
+
+    /// A harvest commits the crop, so it only happens when the farm buffer can
+    /// take the whole yield; otherwise the ripe crop waits for room.
+    fn harvest_fits(&self, building_id: u32, def: &crate::sim::crops::CropDef) -> bool {
+        let Some(building) = self.buildings.iter().find(|b| b.id == building_id) else {
+            return false;
+        };
+        let total: u32 = def.r#yield.values().sum();
+        production_free_capacity(&building.inventory) >= total
     }
 
     fn tend_water_crops(&mut self, job_id: u32) {
@@ -2306,10 +2318,9 @@ impl World {
         let tiles = self.farm_footprint_tiles(job.site);
         let Some(crop_index) = self.crops.iter().position(|crop| {
             tiles.contains(&crop.tile)
-                && self
-                    .catalog
-                    .get_crop(crop.kind_index)
-                    .is_some_and(|def| crop.stage >= def.max_stage())
+                && self.catalog.get_crop(crop.kind_index).is_some_and(|def| {
+                    crop.stage >= def.max_stage() && self.harvest_fits(job.site, def)
+                })
         }) else {
             return;
         };

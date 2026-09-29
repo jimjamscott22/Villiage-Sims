@@ -1974,9 +1974,18 @@ export class DemoWorld {
       const crop = this.crops.find((entry) => entry.x === x && entry.y === y);
       if (!crop) return canPlant;
       const def = DEMO_CROPS[crop.kindIndex];
-      return crop.stage >= def.stages - 1
-        || (!crop.watered && def.seasons.includes(season));
+      const ripe = crop.stage >= def.stages - 1;
+      return (ripe && this.harvestFits(buildingId, def))
+        || (!ripe && !crop.watered && def.seasons.includes(season));
     });
+  }
+
+  /** A harvest commits the crop, so it waits until the whole yield fits the farm buffer. */
+  private harvestFits(buildingId: number, def: (typeof DEMO_CROPS)[number]): boolean {
+    const building = this.buildings.find((entry) => entry.id === buildingId);
+    if (!building) return false;
+    const total = Object.values(def.yield ?? {}).reduce((sum, amount) => sum + amount, 0);
+    return productionFreeCapacity(building.inventory) >= total;
   }
 
   private claimId(jobId: number, villagerId: number): boolean {
@@ -2213,7 +2222,8 @@ export class DemoWorld {
     const cropIndex = this.crops.findIndex((crop) => {
       const def = DEMO_CROPS[crop.kindIndex];
       return tiles.some(([tx, ty]) => crop.x === tx && crop.y === ty)
-        && crop.stage >= def.stages - 1;
+        && crop.stage >= def.stages - 1
+        && this.harvestFits(job.site, def);
     });
     if (cropIndex < 0) return;
     const crop = this.crops[cropIndex];
@@ -2588,16 +2598,15 @@ export class DemoWorld {
       }
       return;
     }
-    building.recipeTicks -= 1;
-    if (building.recipeTicks === 0) {
-      let free = productionFreeCapacity(building.inventory);
+    if (building.recipeTicks === 1) {
+      // Finishing: hold the completed batch until the whole output fits.
+      const total = Object.values(recipe.outputs).reduce((sum, amount) => sum + amount, 0);
+      if (productionFreeCapacity(building.inventory) < total) return;
       for (const [resource, amount] of Object.entries(recipe.outputs)) {
-        if (free === 0) break;
-        const added = Math.min(amount, free);
-        inventoryAdd(building.inventory, resource, added);
-        free -= added;
+        inventoryAdd(building.inventory, resource, amount);
       }
     }
+    building.recipeTicks -= 1;
   }
 
   private tickHaul(index: number): void {

@@ -818,4 +818,41 @@ describe('simulation review regressions', () => {
     expect(villager.currentJob).toBeNull();
     expect(villager.state).toBe('idle');
   });
+  it('holds a ripe crop and a finished recipe until the buffer has room', () => {
+    const world = new DemoWorld(grassTerrain(16, 16));
+    const internals = world as unknown as {
+      crops: Array<{ kindIndex: number; stage: number; x: number; y: number; watered: boolean }>;
+      jobs: Array<{ id: number; kind: string; site: number }>;
+      tendHarvestReadyCrop(jobId: number): void;
+      tickProduce(jobId: number): void;
+      farmNeedsTending(id: number): boolean;
+      farmFootprintTiles(id: number): Array<[number, number]>;
+    };
+    const farm = completeBuilding(world, 'farm', 4, 4);
+    const farmJob = internals.jobs.find((job) => job.site === farm && job.kind === 'tend_crops')!;
+    const farmInv = world.buildings.find((b) => b.id === farm)!.inventory;
+    const tiles = internals.farmFootprintTiles(farm);
+    internals.crops = tiles.map(([x, y]) => ({ kindIndex: 0, stage: 99, x, y, watered: true }));
+    inventoryAdd(farmInv, 'grain', 30);
+    expect(internals.farmNeedsTending(farm)).toBe(false);
+    internals.tendHarvestReadyCrop(farmJob.id);
+    expect(internals.crops).toHaveLength(tiles.length);
+    expect(inventoryGet(farmInv, 'grain')).toBe(30);
+    farmInv.grain = 20;
+    internals.tendHarvestReadyCrop(farmJob.id);
+    expect(internals.crops).toHaveLength(tiles.length - 1);
+
+    const bakery = completeBuilding(world, 'bakery', 10, 10);
+    const bakeJob = internals.jobs.find((job) => job.site === bakery && job.kind === 'produce')!;
+    const building = world.buildings.find((b) => b.id === bakery)!;
+    inventoryAdd(building.inventory, 'flour', 30);
+    building.recipeTicks = 1;
+    internals.tickProduce(bakeJob.id);
+    expect(building.recipeTicks).toBe(1);
+    expect(inventoryGet(building.inventory, 'food')).toBe(0);
+    building.inventory.flour = 20;
+    internals.tickProduce(bakeJob.id);
+    expect(building.recipeTicks).toBe(0);
+    expect(inventoryGet(building.inventory, 'food')).toBe(2);
+  });
 });

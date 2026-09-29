@@ -1,5 +1,6 @@
 //! Focused regression scenarios from the September 2026 simulation review.
 use super::*;
+use crate::sim::economy::PRODUCTION_BUFFER_CAP;
 use crate::sim::needs::HEALTH_DAMAGE;
 use crate::sim::utility::EAT_TICKS;
 
@@ -380,4 +381,89 @@ fn worker_standing_where_a_building_is_placed_stops_working_there() {
     let v = &world.villagers[0];
     assert_ne!(v.current_job, Some(job_id), "still working inside the fence");
     assert!(!matches!(v.state, AgentState::Working { .. }));
+}
+
+fn ripen_all_crops(world: &mut World) {
+    for crop in &mut world.crops {
+        let max = world.catalog.get_crop(crop.kind_index).unwrap().max_stage();
+        crop.stage = max;
+    }
+}
+
+fn keep_only_one_crop(world: &mut World) {
+    world.crops.truncate(1);
+}
+
+#[test]
+fn ripe_crop_waits_for_room_instead_of_vanishing() {
+    let mut world = open_world(16);
+    let farm = complete(&mut world, "farm", 4, 4);
+    plant_and_water_farm(&mut world, farm);
+    keep_only_one_crop(&mut world);
+    ripen_all_crops(&mut world);
+    let job = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|job| job.site == farm && job.kind == JobKind::TendCrops)
+        .map(|job| job.id)
+        .unwrap();
+    add_inventory(&mut world, farm, "grain", PRODUCTION_BUFFER_CAP);
+
+    world.tend_harvest_ready_crop(job);
+    assert_eq!(world.crops.len(), 1, "crop harvested into a full buffer");
+    let full = world.buildings.iter().find(|b| b.id == farm).unwrap();
+    assert_eq!(inventory_get(&full.inventory, "grain"), PRODUCTION_BUFFER_CAP);
+
+    // Partial room is not enough for the whole yield either.
+    let building = world.buildings.iter_mut().find(|b| b.id == farm).unwrap();
+    inventory_take(&mut building.inventory, "grain", 1);
+    world.tend_harvest_ready_crop(job);
+    assert_eq!(world.crops.len(), 1, "yield would have been truncated");
+
+    let building = world.buildings.iter_mut().find(|b| b.id == farm).unwrap();
+    inventory_take(&mut building.inventory, "grain", 10);
+    world.tend_harvest_ready_crop(job);
+    assert!(world.crops.is_empty());
+}
+
+#[test]
+fn ripe_crop_does_not_make_a_farm_look_workable_when_full() {
+    let mut world = open_world(16);
+    let farm = complete(&mut world, "farm", 4, 4);
+    plant_and_water_farm(&mut world, farm);
+    ripen_all_crops(&mut world);
+    add_inventory(&mut world, farm, "grain", PRODUCTION_BUFFER_CAP);
+    assert!(!world.farm_needs_tending(farm));
+}
+
+#[test]
+fn finished_recipe_holds_its_output_until_there_is_room() {
+    let mut world = open_world(16);
+    let bakery = complete(&mut world, "bakery", 4, 4);
+    let job = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|job| job.site == bakery && job.kind == JobKind::Produce)
+        .map(|job| job.id)
+        .unwrap();
+    add_inventory(&mut world, bakery, "flour", PRODUCTION_BUFFER_CAP);
+    let b = world.buildings.iter_mut().find(|b| b.id == bakery).unwrap();
+    b.recipe_ticks = 1;
+    inventory_take(&mut b.inventory, "flour", 1);
+    // Buffer is one short of full: the 2-food output does not fit.
+    add_inventory(&mut world, bakery, "flour", 1);
+
+    world.tick_produce(job);
+    let b = world.buildings.iter().find(|b| b.id == bakery).unwrap();
+    assert_eq!(b.recipe_ticks, 1, "recipe completed into a full buffer");
+    assert_eq!(inventory_get(&b.inventory, "food"), 0);
+
+    let b = world.buildings.iter_mut().find(|b| b.id == bakery).unwrap();
+    inventory_take(&mut b.inventory, "flour", 5);
+    world.tick_produce(job);
+    let b = world.buildings.iter().find(|b| b.id == bakery).unwrap();
+    assert_eq!(b.recipe_ticks, 0);
+    assert_eq!(inventory_get(&b.inventory, "food"), 2);
 }
