@@ -1054,7 +1054,9 @@ export class DemoWorld {
     this.clock.tick += 1;
     this.clock.minuteAccum += MINUTES_PER_TICK;
     this.clock.minute = Math.floor(this.clock.minuteAccum);
+    let dayRolled = false;
     if (this.clock.minuteAccum >= MINUTES_PER_DAY) {
+      dayRolled = true;
       this.clock.minuteAccum -= MINUTES_PER_DAY;
       this.clock.minute = Math.floor(this.clock.minuteAccum);
       this.rollDay();
@@ -1103,6 +1105,8 @@ export class DemoWorld {
     this.social.tick();
     this.checkUnlocks();
     this.checkObjectives();
+    // Save only once the whole tick is committed (mirrors Rust `World::advance`).
+    if (dayRolled) this.maybeAutosave();
     return this.snapshot();
   }
 
@@ -1466,6 +1470,7 @@ export class DemoWorld {
       this.clock.minute = 0;
       this.rollDay();
       this.onDayRollover();
+      this.maybeAutosave();
     }
     if (season != null) {
       if (season < 0 || season > 3) throw new Error(`invalid season ${season}`);
@@ -1476,7 +1481,6 @@ export class DemoWorld {
   private onDayRollover(): void {
     this.clearAllCropWater();
     this.applyDailyWeather();
-    this.maybeAutosave();
   }
 
   private applyDailyWeather(): void {
