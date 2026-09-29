@@ -2767,7 +2767,19 @@ export class DemoWorld {
 
   private pathIsBlocked(index: number, target: [number, number]): boolean {
     if (!this.isPassable(target[0], target[1])) return true;
-    return (this.villagers[index].path ?? []).some(([x, y]) => !this.isPassable(x, y));
+    const villager = this.villagers[index];
+    let from = this.posToTile(villager.x, villager.y);
+    for (const to of villager.path ?? []) {
+      if (!this.isPassable(to[0], to[1]) || !this.edgeIsLegal(from, to)) return true;
+      from = to;
+    }
+    return false;
+  }
+
+  /** Diagonal steps need both orthogonal flanks walkable (no corner-cutting). */
+  private edgeIsLegal(from: [number, number], to: [number, number]): boolean {
+    const diagonal = from[0] !== to[0] && from[1] !== to[1];
+    return !diagonal || (this.isPassable(to[0], from[1]) && this.isPassable(from[0], to[1]));
   }
 
   private clearToIdle(villager: DemoVillager): void {

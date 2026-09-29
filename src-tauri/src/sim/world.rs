@@ -1768,10 +1768,22 @@ impl World {
         if !self.is_passable(target.0, target.1) {
             return true;
         }
-        match &self.villagers[index].path {
-            Some(path) => path.iter().any(|&(x, y)| !self.is_passable(x, y)),
-            None => false,
-        }
+        let Some(path) = &self.villagers[index].path else {
+            return false;
+        };
+        let mut from = self.pos_to_tile(self.villagers[index].pos);
+        path.iter().any(|&to| {
+            let blocked = !self.is_passable(to.0, to.1) || !self.edge_is_legal(from, to);
+            from = to;
+            blocked
+        })
+    }
+
+    /// A diagonal step is only legal while both orthogonal flanks are walkable
+    /// (mirrors the no-corner-cutting rule in `pathfind::successors`).
+    fn edge_is_legal(&self, from: (i32, i32), to: (i32, i32)) -> bool {
+        let diagonal = from.0 != to.0 && from.1 != to.1;
+        !diagonal || (self.is_passable(to.0, from.1) && self.is_passable(from.0, to.1))
     }
 
     fn invalidate_paths_if_needed(&mut self) {

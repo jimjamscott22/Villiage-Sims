@@ -754,4 +754,20 @@ describe('simulation review regressions', () => {
     inventoryAdd(world.buildings.find((b) => b.id === farm)!.inventory, 'grain', 5);
     expect(internals.findHaulTask([8, 0])).toMatchObject({ from: farm, to: reachable, resource: 'grain' });
   });
+  it('repaths when a new building blocks a flank of a diagonal step', () => {
+    const world = new DemoWorld(grassTerrain());
+    const internals = world as unknown as {
+      villagers: Array<{ id: number; x: number; y: number; path: Array<[number, number]> | null }>;
+      invalidatePathsIfNeeded(): void;
+    };
+    const villager = internals.villagers[0];
+    const tile = 32;
+    villager.x = tile / 2;
+    villager.y = tile / 2;
+    world.moveVillagerTo(1, 1, villager.id);
+    expect(villager.path).toEqual([[1, 1]]);
+    completeBuilding(world, 'fence', 1, 0);
+    internals.invalidatePathsIfNeeded();
+    expect(villager.path).not.toEqual([[1, 1]]);
+  });
 });

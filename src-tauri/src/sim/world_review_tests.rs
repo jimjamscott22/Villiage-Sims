@@ -297,3 +297,20 @@ fn stale_claim_with_no_alternative_falls_through_to_another_action() {
         "villager must take another action in the same decision"
     );
 }
+
+#[test]
+fn fence_on_a_diagonal_flank_forces_a_repath() {
+    let mut world = open_world(8);
+    world.order_move_villager(1, 1, Some(1)).unwrap();
+    let start = world.villagers[0].pos;
+    // (1,0) flanks the (0,0) -> (1,1) diagonal; the path's own tiles stay free.
+    complete(&mut world, "fence", 1, 0);
+    world.invalidate_paths_if_needed();
+    world.advance();
+
+    let path = world.villagers[0].path.clone().unwrap_or_default();
+    assert_ne!(path, vec![(1, 1)], "diagonal corner cut survived");
+    let pos = world.villagers[0].pos;
+    // Legal route goes via (0,1): x must not advance before y does.
+    assert!(pos.0 <= start.0 + 0.01, "villager cut the corner: {pos:?}");
+}
