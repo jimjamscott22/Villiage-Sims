@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateDemoTerrain } from './demoTerrain';
-import { DEMO_CATALOG, DemoWorld, demoWeatherFor } from './demoWorld';
+import { DEMO_CATALOG, DemoWorld, demoWeatherFor, type DemoVillager } from './demoWorld';
 
 function grassTerrain(width = 16, height = 16) {
   return {
@@ -793,6 +793,84 @@ describe('simulation review regressions', () => {
     expect(villager.carrying).toBeNull();
     expect(world.resources.grain).toBeGreaterThanOrEqual(grainBefore + 3);
   });
+  it.each(['working', 'moving', 'eating'] as const)(
+    'returns cargo exactly once when a storm removes a %s hauler claim',
+    (state) => {
+      const world = new DemoWorld(grassTerrain(32, 32));
+      const internals = world as unknown as {
+        villagers: DemoVillager[];
+        jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+        clock: { day: number };
+        applyDailyWeather(): void;
+      };
+      const granary = completeBuilding(world, 'granary', 20, 20);
+      const otherGranary = completeBuilding(world, 'granary', 6, 6);
+      const haul = internals.jobs.find((job) => job.site === granary && job.kind === 'haul')!;
+      const otherHaul = internals.jobs.find((job) => job.site === otherGranary && job.kind === 'haul')!;
+      const villager = internals.villagers[0];
+      const otherVillager = internals.villagers[1];
+      haul.claimedBy = villager.id;
+      Object.assign(villager, {
+        currentJob: haul.id,
+        carrying: { resource: 'grain', amount: 3, dest: granary },
+        state,
+        currentAction: state === 'eating' ? 'eat' : 'work',
+        purpose: state === 'moving' ? 'work' : null,
+        target: state === 'moving' ? [19, 20] : null,
+        path: state === 'moving' ? [[19, 20]] : null,
+        activityTicks: 20,
+      });
+      otherHaul.claimedBy = otherVillager.id;
+      Object.assign(otherVillager, {
+        currentJob: otherHaul.id,
+        carrying: { resource: 'flour', amount: 4, dest: otherGranary },
+        state: 'moving',
+        currentAction: 'work',
+        purpose: 'work',
+        target: [5, 6],
+        path: [[5, 6]],
+      });
+      const otherBefore = structuredClone(otherVillager);
+      const grainBefore = world.resources.grain;
+      const flourBefore = world.resources.flour;
+
+      // Seed 42, spring day 16 is a storm that damages the first of two buildings.
+      internals.clock.day = 15;
+      world.advanceClock(1, null);
+
+      expect(world.snapshot().clock).toMatchObject({ day: 16, weather: 2 });
+      expect(world.buildings.find((building) => building.id === granary)).toMatchObject({
+        complete: false,
+        progressTicks: DEMO_CATALOG.buildings.find((def) => def.id === 'granary')!.buildTicks / 2,
+      });
+      expect(world.buildings.find((building) => building.id === otherGranary)?.complete).toBe(true);
+      expect(internals.jobs.some((job) => job.site === granary)).toBe(false);
+      expect(villager.currentJob).toBeNull();
+      expect(villager.carrying).toBeNull();
+      expect(world.resources.grain).toBe(grainBefore + 3);
+      expect(world.resources.flour).toBe(flourBefore);
+      expect(villager).toMatchObject({
+        state: state === 'eating' ? 'eating' : 'idle',
+        currentAction: state === 'eating' ? 'eat' : null,
+        purpose: null,
+        target: null,
+        path: null,
+        activityTicks: 20,
+      });
+      expect(otherVillager).toEqual(otherBefore);
+      expect(otherHaul.claimedBy).toBe(otherVillager.id);
+
+      // Reapplying weather on the same date cannot deposit the abandoned cargo twice.
+      internals.applyDailyWeather();
+      expect(villager.currentJob).toBeNull();
+      expect(villager.carrying).toBeNull();
+      expect(world.resources.grain).toBe(grainBefore + 3);
+      expect(world.resources.flour).toBe(flourBefore);
+      expect(otherVillager).toEqual(otherBefore);
+      expect(otherHaul.claimedBy).toBe(otherVillager.id);
+    },
+  );
+
   it('ends a worked-in-place job when a building covers the worker tile', () => {
     const world = new DemoWorld(grassTerrain(16, 16));
     const internals = world as unknown as {

@@ -1512,17 +1512,7 @@ export class DemoWorld {
       .filter((job) => job.site === buildingId && job.claimedBy != null)
       .map((job) => job.claimedBy!);
     this.jobs = this.jobs.filter((job) => job.site !== buildingId);
-    for (const villager of this.villagers) {
-      if (!released.includes(villager.id)) continue;
-      villager.currentJob = null;
-      if (
-        villager.state === 'working'
-        || (villager.state === 'moving' && villager.purpose === 'work')
-      ) {
-        this.clearToIdle(villager);
-        if (villager.currentAction === 'work') villager.currentAction = null;
-      }
-    }
+    this.clearReleasedWorkClaims(released);
   }
 
   private maybeAutosave(): void {
