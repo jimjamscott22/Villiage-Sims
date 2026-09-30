@@ -754,6 +754,81 @@ describe('simulation review regressions', () => {
     inventoryAdd(world.buildings.find((b) => b.id === farm)!.inventory, 'grain', 5);
     expect(internals.findHaulTask([8, 0])).toMatchObject({ from: farm, to: reachable, resource: 'grain' });
   });
+  it('releases a stale farm claim when selecting other work so another villager can take it', () => {
+    const world = new DemoWorld(grassTerrain(24, 24));
+    const internals = world as unknown as {
+      villagers: DemoVillager[];
+      crops: Array<{ watered: boolean }>;
+      jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+      farmFootprintTiles(site: number): Array<[number, number]>;
+      maybeDecide(index: number): void;
+      beginWork(index: number, jobId: number): void;
+    };
+    world.resources.grain = 20;
+    const farm = completeBuilding(world, 'farm', 8, 8);
+    const otherFarm = completeBuilding(world, 'farm', 14, 14);
+    for (const [x, y] of internals.farmFootprintTiles(farm)) world.plantCrop('wheat', x, y);
+    for (const crop of internals.crops) crop.watered = true;
+    const stale = internals.jobs.find((job) => job.site === farm && job.kind === 'tend_crops')!;
+    const worker = internals.villagers[0];
+    stale.claimedBy = worker.id;
+    Object.assign(worker, {
+      x: 16, y: 16, state: 'idle', currentJob: stale.id, currentAction: 'work',
+    });
+
+    internals.maybeDecide(0);
+
+    const selected = internals.jobs.find((job) => job.id === worker.currentJob)!;
+    expect(selected.site).toBe(otherFarm);
+    expect(selected.claimedBy).toBe(worker.id);
+    expect(stale.claimedBy).toBeNull();
+    expect(internals.jobs.filter((job) => job.claimedBy === worker.id)).toHaveLength(1);
+
+    // Make the previous farm actionable again: its original slot must be available.
+    internals.crops[0].watered = false;
+    internals.beginWork(1, stale.id);
+    expect(internals.villagers[1].currentJob).toBe(stale.id);
+    expect(stale.claimedBy).toBe(internals.villagers[1].id);
+    expect(selected.claimedBy).toBe(worker.id);
+    internals.beginWork(0, selected.id);
+    expect(selected.claimedBy).toBe(worker.id);
+    expect(internals.jobs.filter((job) => job.claimedBy === worker.id)).toHaveLength(1);
+  });
+
+  it('retains cargo when switching an unreachable haul claim to a reachable work slot', () => {
+    const terrain = grassTerrain(24, 24);
+    const world = new DemoWorld(terrain);
+    const internals = world as unknown as {
+      villagers: DemoVillager[];
+      jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+      beginWork(index: number, jobId: number): void;
+    };
+    const blocked = completeBuilding(world, 'granary', 3, 3);
+    const reachable = completeBuilding(world, 'granary', 14, 3);
+    for (let y = 1; y <= 6; y += 1) {
+      for (let x = 1; x <= 6; x += 1) {
+        if (x === 1 || x === 6 || y === 1 || y === 6) terrain.tiles[y * 24 + x] = 5;
+      }
+    }
+    const previous = internals.jobs.find((job) => job.site === blocked && job.kind === 'haul')!;
+    const next = internals.jobs.find((job) => job.site === reachable && job.kind === 'haul')!;
+    const worker = internals.villagers[0];
+    previous.claimedBy = worker.id;
+    const cargo = { resource: 'grain', amount: 3, dest: reachable };
+    Object.assign(worker, {
+      x: 16, y: 16, state: 'idle', currentJob: previous.id, carrying: cargo,
+    });
+    const grainBefore = world.resources.grain;
+
+    internals.beginWork(0, next.id);
+
+    expect(previous.claimedBy).toBeNull();
+    expect(next.claimedBy).toBe(worker.id);
+    expect(worker.currentJob).toBe(next.id);
+    expect(worker.carrying).toEqual(cargo);
+    expect(world.resources.grain).toBe(grainBefore);
+  });
+
   it('repaths when a new building blocks a flank of a diagonal step', () => {
     const world = new DemoWorld(grassTerrain());
     const internals = world as unknown as {

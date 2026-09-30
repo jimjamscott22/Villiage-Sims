@@ -1925,6 +1925,12 @@ export class DemoWorld {
       return;
     }
 
+    // Match Rust: changing work slots releases the old reservation while retaining haul cargo.
+    if (existing != null && existing !== claimed) {
+      const previousJob = this.jobs.find((entry) => entry.id === existing);
+      if (previousJob?.claimedBy === villager.id) previousJob.claimedBy = null;
+    }
+
     villager.currentJob = claimed;
     villager.currentAction = 'work';
     const job = this.jobs.find((entry) => entry.id === claimed)!;
