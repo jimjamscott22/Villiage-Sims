@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-09-13 (M11 socializing and purposeful movement implemented; tests deferred by request).
+Last updated: 2026-09-30 (PR #56 demo storm cargo cleanup fixed and automated checks verified; live interaction testing remains unrun).
 
 ## Status
 
@@ -100,7 +100,7 @@ npm run dev
 
 ## Verification status
 
-The focused social/leisure Rust scenarios passed during implementation. The full Rust and browser suites, frontend build, and browser interaction pass are intentionally deferred for a later run.
+The original M11 handoff deferred the full checks. PR #56 now has passing automated checks; see the follow-up validation below. Live Tauri/browser interaction verification remains unrun.
 
 ## Simulation review follow-ups (handoff, 2026-09-29)
 
@@ -111,14 +111,32 @@ R4 (in-place workers end when built over; still needs reachable stand tiles, hau
 pass-through). Open: R8. Each fix has a Rust regression in `src-tauri/src/sim/world_review_tests.rs`
 and a mirrored case in `src/state/demoWorld.test.ts`.
 
-State at handoff: working tree clean; Rust lib tests 163, Vitest 265, `tsc -b` and `cargo check`
-pass. Not run: `npm run build` (the review notes an unrelated `tools/genart/app-icon.test.ts`
+State at the original local handoff, before opening PR #56: working tree clean; Rust lib tests 163,
+Vitest 265, `tsc -b` and `cargo check` pass. Not run: `npm run build` (the review notes an unrelated `tools/genart/app-icon.test.ts`
 TS2554 error) and any live Tauri or browser session. The branch is not pushed and has no PR.
 
 Suggested next: decision-explanation diagnostics (current action, job id, pickup/delivery endpoint,
 scores, interruption reason) before tuning utility curves; then the R1 and R4 remainders. Gate
 behaviour (can villagers walk through gates?) needs a product decision first, as does R8. Also open:
 replay/determinism coverage across seasons and player commands.
+
+## PR #56 storm cargo follow-up (2026-09-30)
+
+`ad73f48` routes demo `applyStormDamage()` through `clearReleasedWorkClaims` and `releaseJobAt`.
+The September 29 Codex finding was valid: clearing only `currentJob` stranded carried cargo.
+Three cases in `demoWorld.test.ts` now cover working, moving and eating haulers, returning the
+exact cargo once, clearing removed claims, stopping affected work travel, preserving meals and
+unrelated haulers, and preventing double refunds. The existing Rust implementation is unchanged.
+
+[CI run 36764387607](https://github.com/jimjamscott22/Villiage-Sims/actions/runs/36764387607)
+passed on that code commit: Rust lib tests **163**, Vitest **268** (30 files), Rust Clippy
+with `--all-targets -- -D warnings`, and `npm run build` (`tsc -b && vite build`).
+The app-icon error from the September 2 review did not recur in CI.
+Standalone `cargo check` and `npx tsc -b` were previously reported passing; they were not
+separately rerun here. Local `npm run build` and live Tauri/browser verification remain unrun.
+
+R7 is resolved in Rust and the demo. The scoped fixes are ready to merge on automated evidence;
+the R1/R4 remainders, R8 decisions and live interaction checks remain outstanding.
 
 ## Next up
 
