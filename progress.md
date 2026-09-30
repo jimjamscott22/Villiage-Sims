@@ -126,15 +126,21 @@ replay/determinism coverage across seasons and player commands.
 The September 29 Codex finding was valid: clearing only `currentJob` stranded carried cargo.
 Three cases in `demoWorld.test.ts` now cover working, moving and eating haulers, returning the
 exact cargo once, clearing removed claims, stopping affected work travel, preserving meals and
-unrelated haulers, and preventing double refunds. The existing Rust implementation is unchanged.
+unrelated haulers, and preventing double refunds. The existing Rust fixes are preserved; later R1/R5 refinements are described below.
 
 `8c279fa` also fixes a new Codex R2 finding: `beginWork` now releases the previous job's
 reservation when selecting a different job, without returning cargo during a haul-slot switch.
-Two regressions verify that another villager can reclaim the old farm slot and that a haul-slot
-switch retains cargo, matching Rust.
+A regression verifies that another villager can reclaim the old farm slot.
 
-[CI run 36765582012](https://github.com/jimjamscott22/Villiage-Sims/actions/runs/36765582012)
-passed on code commit `8c279fa` (including both follow-ups): Rust lib tests **163**, Vitest **270** (30 files), Rust Clippy
+`171eda1` addresses two later Rust review findings, mirrored in the demo: carrying haulers are
+admitted and moved using the delivery endpoint, and failed resumption returns cargo through the
+central cleanup. A finished recipe without room retains its pending batch but becomes
+non-actionable so its producer can haul and then resume. Rust and demo regressions cover reachable
+delivery despite a blocked job tile, failed-delivery cargo return, and single-worker production
+recovery with exact output conservation. Earlier Rust fixes remain in place.
+
+[CI run 36767376700](https://github.com/jimjamscott22/Villiage-Sims/actions/runs/36767376700)
+passed on code commit `171eda1` (including all four review fixes): Rust lib tests **166**, Vitest **273** (30 files), Rust Clippy
 with `--all-targets -- -D warnings`, and `npm run build` (`tsc -b && vite build`).
 The app-icon error from the September 2 review did not recur in CI.
 Standalone `cargo check` and `npx tsc -b` were previously reported passing; they were not
