@@ -86,7 +86,7 @@ Updated 2026-09-30 on branch `fix/sim-review-followups` ([PR #56](https://github
 | Finding | Status | Commit / notes |
 |---|---|---|
 | R1 | Partly resolved | `4a0300d`: haul pickup is now the nearest to the worker, and a resuming carrier heads for its delivery endpoint instead of the job tile. Still open: an explicit pickup/delivery phase and reservation of goods and destinations. |
-| R2 | Resolved | `a138d20`: stale work claims are re-scored so unusable jobs fall through to a usable job or another action. |
+| R2 | Resolved | `a138d20`: stale work claims are re-scored so unusable jobs fall through to a usable job or another action. Demo job switches now release the previous slot while retaining haul cargo (`8c279fa`), matching Rust; regressions cover reusing the old slot and carrying cargo across a switch. |
 | R3 | Resolved | Path invalidation now revalidates every edge, including both flanks of diagonal steps, in Rust and the browser demo. A step already past its midpoint still finishes. |
 | R7 | Resolved | Rust retains centralized `release_job_at` cargo return. Demo storms now use `clearReleasedWorkClaims` → `releaseJobAt` after removing site jobs (`ad73f48`), matching demolition. Three storm regressions cover working, moving and eating haulers: exact cargo return, cleared claims, preserved unrelated work, and no duplicate refund. Policy: return cargo to the stockpile. |
 | R4 | Partly resolved | A worker doing in-place work (tend, gather, produce) is released when a building is placed on its tile. Still open: reachable stand-tile selection, gate pass-through rules (needs a design decision), and haul endpoint entrances. |
@@ -96,19 +96,19 @@ Updated 2026-09-30 on branch `fix/sim-review-followups` ([PR #56](https://github
 
 ### PR #56 follow-up validation (2026-09-30)
 
-[CI run 36764387607](https://github.com/jimjamscott22/Villiage-Sims/actions/runs/36764387607) passed for code commit `ad73f485cc9bd6b5ecdcb2b89d4242fe27ce0ecc`, using GitHub's PR merge checkout. This follow-up changes only demo storm cleanup and its tests; existing Rust fixes are preserved.
+[CI run 36765582012](https://github.com/jimjamscott22/Villiage-Sims/actions/runs/36765582012) passed for code commit `8c279fae15120000e5a87de10c5fd2389325b06c`, using GitHub's PR merge checkout. The follow-ups change demo storm cleanup and job-switch claim release, with regressions for both; existing Rust fixes are preserved.
 
 | Check | Current evidence |
 |---|---|
 | `cargo test --manifest-path src-tauri/Cargo.toml --lib` | Rerun in CI: 163 passed |
-| `npm test` | Rerun in CI: 268 passed across 30 files, including all three new storm cases |
+| `npm test` | Rerun in CI: 270 passed across 30 files, including three new storm cases and two job-switch regressions |
 | `tsc -b` | Passed in CI as the first stage of `npm run build`; standalone `npx tsc -b` was previously reported passing |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Rerun in CI: passed, including Rust type-checking |
 | `cargo check --manifest-path src-tauri/Cargo.toml` | Previously reported passing; not separately rerun during this follow-up |
 | `npm run build` | Rerun in CI: passed (`tsc -b && vite build`). Local build remains unrun; the September 2 app-icon error did not recur in CI |
 | Live Tauri/browser interaction | Unrun; no desktop launch, webview/IPC or visual interaction claim |
 
-The R7 merge blocker is fixed and regression-covered. Automated checks support merging the scoped simulation fixes; live verification and the explicitly deferred R1/R4/R8 work remain outstanding.
+The R7 storm cargo blocker and the newly reviewed demo R2 claim leak are fixed and regression-covered. Automated checks support merging the scoped simulation fixes; live verification and the explicitly deferred R1/R4/R8 work remain outstanding.
 
 ## Deferred findings
 

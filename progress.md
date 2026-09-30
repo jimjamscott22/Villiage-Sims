@@ -120,7 +120,7 @@ scores, interruption reason) before tuning utility curves; then the R1 and R4 re
 behaviour (can villagers walk through gates?) needs a product decision first, as does R8. Also open:
 replay/determinism coverage across seasons and player commands.
 
-## PR #56 storm cargo follow-up (2026-09-30)
+## PR #56 storm cargo and claim follow-ups (2026-09-30)
 
 `ad73f48` routes demo `applyStormDamage()` through `clearReleasedWorkClaims` and `releaseJobAt`.
 The September 29 Codex finding was valid: clearing only `currentJob` stranded carried cargo.
@@ -128,8 +128,13 @@ Three cases in `demoWorld.test.ts` now cover working, moving and eating haulers,
 exact cargo once, clearing removed claims, stopping affected work travel, preserving meals and
 unrelated haulers, and preventing double refunds. The existing Rust implementation is unchanged.
 
-[CI run 36764387607](https://github.com/jimjamscott22/Villiage-Sims/actions/runs/36764387607)
-passed on that code commit: Rust lib tests **163**, Vitest **268** (30 files), Rust Clippy
+`8c279fa` also fixes a new Codex R2 finding: `beginWork` now releases the previous job's
+reservation when selecting a different job, without returning cargo during a haul-slot switch.
+Two regressions verify that another villager can reclaim the old farm slot and that a haul-slot
+switch retains cargo, matching Rust.
+
+[CI run 36765582012](https://github.com/jimjamscott22/Villiage-Sims/actions/runs/36765582012)
+passed on code commit `8c279fa` (including both follow-ups): Rust lib tests **163**, Vitest **270** (30 files), Rust Clippy
 with `--all-targets -- -D warnings`, and `npm run build` (`tsc -b && vite build`).
 The app-icon error from the September 2 review did not recur in CI.
 Standalone `cargo check` and `npx tsc -b` were previously reported passing; they were not
