@@ -795,7 +795,7 @@ describe('simulation review regressions', () => {
     expect(internals.jobs.filter((job) => job.claimedBy === worker.id)).toHaveLength(1);
   });
 
-  it('retains cargo when switching an unreachable haul claim to a reachable work slot', () => {
+  it('resumes cargo delivery when the original haul job tile is unreachable', () => {
     const terrain = grassTerrain(24, 24);
     const world = new DemoWorld(terrain);
     const internals = world as unknown as {
@@ -822,11 +822,94 @@ describe('simulation review regressions', () => {
 
     internals.beginWork(0, next.id);
 
-    expect(previous.claimedBy).toBeNull();
-    expect(next.claimedBy).toBe(worker.id);
-    expect(worker.currentJob).toBe(next.id);
+    expect(previous.claimedBy).toBe(worker.id);
+    expect(next.claimedBy).toBeNull();
+    expect(worker.currentJob).toBe(previous.id);
     expect(worker.carrying).toEqual(cargo);
     expect(world.resources.grain).toBe(grainBefore);
+  });
+
+  it.each([false, true])('returns cargo when delivery is unreachable (existing claim: %s)', (claimed) => {
+    const terrain = grassTerrain(24, 24);
+    const world = new DemoWorld(terrain);
+    const internals = world as unknown as {
+      villagers: DemoVillager[];
+      jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+      beginWork(index: number, jobId: number): void;
+    };
+    const granary = completeBuilding(world, 'granary', 3, 3);
+    for (let y = 1; y <= 6; y += 1) {
+      for (let x = 1; x <= 6; x += 1) {
+        if (x === 1 || x === 6 || y === 1 || y === 6) terrain.tiles[y * 24 + x] = 5;
+      }
+    }
+    const haul = internals.jobs.find((job) => job.site === granary && job.kind === 'haul')!;
+    const worker = internals.villagers[0];
+    haul.claimedBy = claimed ? worker.id : null;
+    Object.assign(worker, {
+      x: 16, y: 16, state: 'idle', currentJob: claimed ? haul.id : null,
+      carrying: { resource: 'grain', amount: 3, dest: granary },
+    });
+    const before = world.resources.grain;
+
+    internals.beginWork(0, haul.id);
+
+    expect(worker.currentJob).toBeNull();
+    expect(haul.claimedBy).toBeNull();
+    expect(worker.carrying).toBeNull();
+    expect(world.resources.grain).toBe(before + 3);
+    internals.beginWork(0, haul.id);
+    expect(world.resources.grain).toBe(before + 3);
+  });
+
+  it('releases a blocked producer so the only worker can haul and finish the pending batch', () => {
+    const world = new DemoWorld(grassTerrain(16, 16));
+    const internals = world as unknown as {
+      villagers: DemoVillager[];
+      jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+      buildingStandTile(site: number): [number, number];
+      jobActionable(job: unknown, index: number): boolean;
+      tickVillagerAt(index: number): void;
+    };
+    internals.villagers.splice(1);
+    const bakery = completeBuilding(world, 'bakery', 4, 4);
+    const building = world.buildings.find((entry) => entry.id === bakery)!;
+    const produce = internals.jobs.find((job) => job.site === bakery && job.kind === 'produce')!;
+    const haul = internals.jobs.find((job) => job.site === bakery && job.kind === 'haul')!;
+    building.inventory.food = 30;
+    building.recipeTicks = 2;
+    expect(internals.jobActionable(produce, 0)).toBe(true);
+    building.recipeTicks = 1;
+    expect(internals.jobActionable(produce, 0)).toBe(false);
+    building.inventory.food = 29;
+    expect(internals.jobActionable(produce, 0)).toBe(false);
+    building.inventory.food = 28;
+    expect(internals.jobActionable(produce, 0)).toBe(true);
+    building.inventory.food = 30;
+    const worker = internals.villagers[0];
+    const [x, y] = internals.buildingStandTile(bakery);
+    produce.claimedBy = worker.id;
+    Object.assign(worker, {
+      x: x * 32 + 16, y: y * 32 + 16, state: 'working',
+      currentJob: produce.id, currentAction: 'work', workTicksRemaining: 40,
+    });
+
+    internals.tickVillagerAt(0);
+
+    expect(worker.currentJob).toBeNull();
+    expect(produce.claimedBy).toBeNull();
+    expect(building.recipeTicks).toBe(1);
+    const before = world.resources.food;
+    let hauled = false;
+    for (let i = 0; i < 2000 && building.recipeTicks !== 0; i += 1) {
+      internals.tickVillagerAt(0);
+      hauled ||= worker.currentJob === haul.id;
+    }
+    expect(hauled).toBe(true);
+    expect(building.recipeTicks).toBe(0);
+    const carried = worker.carrying?.resource === 'food' ? worker.carrying.amount : 0;
+    expect(world.resources.food + (building.inventory.food ?? 0) + carried).toBe(before + 32);
+    expect(internals.villagers).toHaveLength(1);
   });
 
   it('repaths when a new building blocks a flank of a diagonal step', () => {

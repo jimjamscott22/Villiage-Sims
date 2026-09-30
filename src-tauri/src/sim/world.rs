@@ -1294,13 +1294,11 @@ impl World {
             };
             (job.claimed_by.is_none() || job.claimed_by == Some(villager_id))
                 && self.job_actionable(job, index)
-                && self.compute_path(from, job.tile).is_some()
+                && self.work_target(job, index)
+                    .is_some_and(|tile| self.compute_path(from, tile).is_some())
         });
         let Some(job_id) = reachable else {
-            if let Some(existing) = existing {
-                self.job_board.release(existing, villager_id);
-                self.villagers[index].current_job = None;
-            }
+            self.release_job_at(index);
             self.villagers[index].current_action = None;
             return;
         };
@@ -1317,18 +1315,18 @@ impl World {
         self.villagers[index].current_action = Some(ActionKind::Work);
         let job = self.job_board.get(job_id).expect("claimed job");
         self.villagers[index].set_thought(job.kind.thought(), 40);
-        let mut tile = job.tile;
-        // A hauler resuming with cargo goes straight to the delivery, not the job's stand tile.
+        let tile = self.work_target(job, index).expect("reachable work target");
+        self.begin_move_to_job(index, tile, job_id);
+    }
+
+    /// Validate and start resumed hauling at its delivery, not the advertised job tile.
+    fn work_target(&self, job: &crate::sim::jobs::Job, index: usize) -> Option<(i32, i32)> {
         if job.kind == JobKind::Haul {
-            if let Some(stand) = self.villagers[index]
-                .carrying
-                .as_ref()
-                .and_then(|carry| self.endpoint_stand_tile(carry.dest))
-            {
-                tile = stand;
+            if let Some(carrying) = &self.villagers[index].carrying {
+                return self.endpoint_stand_tile(carrying.dest);
             }
         }
-        self.begin_move_to_job(index, tile, job_id);
+        Some(job.tile)
     }
 
     fn job_actionable(&self, job: &crate::sim::jobs::Job, villager_index: usize) -> bool {
@@ -1356,9 +1354,6 @@ impl World {
                 if building.state != BuildState::Complete {
                     return false;
                 }
-                if building.recipe_ticks > 0 {
-                    return true;
-                }
                 let Some(recipe) = self
                     .catalog
                     .get(building.kind_index)
@@ -1366,6 +1361,14 @@ impl World {
                 else {
                     return false;
                 };
+                if building.recipe_ticks == 1 {
+                    // Keep the pending batch, but free the worker to haul until output fits.
+                    return production_free_capacity(&building.inventory)
+                        >= recipe.outputs.values().sum();
+                }
+                if building.recipe_ticks > 1 {
+                    return true;
+                }
                 recipe.inputs.iter().all(|(resource, amount)| {
                     inventory_get(&building.inventory, resource) >= *amount
                 })

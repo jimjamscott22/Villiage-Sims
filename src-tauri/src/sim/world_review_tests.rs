@@ -498,3 +498,115 @@ fn natural_day_rollover_autosave_holds_the_completed_tick() {
     let _ = std::fs::remove_dir_all(dir);
     assert!(live == from_disk, "autosave captured a partially processed tick");
 }
+
+#[test]
+fn carrying_hauler_resumes_delivery_when_its_job_tile_is_unreachable() {
+    let mut world = open_world(24);
+    let granary = complete(&mut world, "granary", 3, 3);
+    let haul = world.job_board.jobs().iter()
+        .find(|job| job.site == granary && job.kind == JobKind::Haul).unwrap().id;
+    let id = world.villagers[0].id;
+    assert!(world.job_board.claim_id(haul, id));
+    world.villagers[0].current_job = Some(haul);
+    world.villagers[0].carrying = Some(CarryStack {
+        resource: "grain".into(), amount: 3, dest: HaulEndpoint::Stockpile,
+    });
+    enclose(&mut world, 1, 6);
+    let target = world.stockpile_stand().unwrap();
+    assert!(world.compute_path((0, 0), world.job_board.get(haul).unwrap().tile).is_none());
+    assert!(world.compute_path((0, 0), target).is_some());
+
+    world.begin_work(0, Some(haul));
+
+    assert_eq!(world.villagers[0].current_job, Some(haul));
+    assert_eq!(world.job_board.get(haul).unwrap().claimed_by, Some(id));
+    assert!(matches!(world.villagers[0].state,
+        AgentState::MovingTo { target: actual, purpose: MovePurpose::Work } if actual == target));
+    let before = world.resources.grain;
+    for _ in 0..600 {
+        world.tick_villager_at(0);
+        if world.villagers[0].carrying.is_none() { break; }
+    }
+    assert!(world.villagers[0].carrying.is_none());
+    assert_eq!(world.resources.grain, before + 3);
+}
+
+#[test]
+fn failed_cargo_resumption_returns_cargo_with_or_without_an_existing_claim() {
+    for claimed in [false, true] {
+        for missing_destination in [false, true] {
+            let mut world = open_world(24);
+            let granary = complete(&mut world, "granary", 3, 3);
+            let haul = world.job_board.jobs().iter()
+                .find(|job| job.site == granary && job.kind == JobKind::Haul).unwrap().id;
+            let id = world.villagers[0].id;
+            if claimed {
+                assert!(world.job_board.claim_id(haul, id));
+                world.villagers[0].current_job = Some(haul);
+            }
+            world.villagers[0].carrying = Some(CarryStack {
+                resource: "grain".into(), amount: 3,
+                dest: HaulEndpoint::Building(if missing_destination { u32::MAX } else { granary }),
+            });
+            enclose(&mut world, 1, 6);
+            let before = world.resources.grain;
+
+            world.begin_work(0, Some(haul));
+
+            assert_eq!(world.villagers[0].current_job, None);
+            assert_eq!(world.job_board.get(haul).unwrap().claimed_by, None);
+            assert!(world.villagers[0].carrying.is_none());
+            assert_eq!(world.resources.grain, before + 3);
+            world.begin_work(0, Some(haul));
+            assert_eq!(world.resources.grain, before + 3, "cargo returned twice");
+        }
+    }
+}
+
+#[test]
+fn blocked_completed_recipe_releases_the_only_worker_to_haul_then_finish() {
+    let mut world = open_world(16);
+    let bakery = complete(&mut world, "bakery", 4, 4);
+    let produce = world.job_board.jobs().iter()
+        .find(|job| job.site == bakery && job.kind == JobKind::Produce).unwrap().id;
+    let haul = world.job_board.jobs().iter()
+        .find(|job| job.site == bakery && job.kind == JobKind::Haul).unwrap().id;
+    add_inventory(&mut world, bakery, "food", PRODUCTION_BUFFER_CAP);
+    let building_index = world.buildings.iter().position(|b| b.id == bakery).unwrap();
+    world.buildings[building_index].recipe_ticks = 2;
+    assert!(world.job_actionable(world.job_board.get(produce).unwrap(), 0));
+    world.buildings[building_index].recipe_ticks = 1;
+    assert!(!world.job_actionable(world.job_board.get(produce).unwrap(), 0));
+    inventory_take(&mut world.buildings[building_index].inventory, "food", 1);
+    assert!(!world.job_actionable(world.job_board.get(produce).unwrap(), 0));
+    inventory_take(&mut world.buildings[building_index].inventory, "food", 1);
+    assert!(world.job_actionable(world.job_board.get(produce).unwrap(), 0));
+    add_inventory(&mut world, bakery, "food", 2);
+    let id = world.villagers[0].id;
+    world.villagers[0].pos = { let (x, y) = world.building_stand_tile(bakery).unwrap(); world.tile_center(x, y) };
+    assert!(world.job_board.claim_id(produce, id));
+    world.villagers[0].current_job = Some(produce);
+    world.villagers[0].current_action = Some(ActionKind::Work);
+    world.villagers[0].state = AgentState::Working { job: produce, ticks_remaining: WORK_CYCLE_TICKS };
+
+    world.tick_villager_at(0);
+
+    assert_eq!(world.villagers[0].current_job, None);
+    assert_eq!(world.job_board.get(produce).unwrap().claimed_by, None);
+    assert_eq!(world.buildings[building_index].recipe_ticks, 1, "pending output lost");
+    let before = world.resources.food;
+    let mut hauled = false;
+    for _ in 0..2000 {
+        world.tick_villager_at(0);
+        hauled |= world.villagers[0].current_job == Some(haul);
+        if world.buildings[building_index].recipe_ticks == 0 { break; }
+    }
+    assert!(hauled, "the only worker never switched to hauling");
+    assert_eq!(world.buildings[building_index].recipe_ticks, 0);
+    let carried = world.villagers[0].carrying.as_ref()
+        .filter(|cargo| cargo.resource == "food").map_or(0, |cargo| cargo.amount);
+    assert_eq!(world.resources.food
+        + inventory_get(&world.buildings[building_index].inventory, "food") + carried,
+        before + PRODUCTION_BUFFER_CAP + 2);
+    assert_eq!(world.villagers.len(), 1);
+}

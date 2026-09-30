@@ -1913,14 +1913,15 @@ export class DemoWorld {
       const job = this.jobs.find((entry) => entry.id === candidate);
       if (!job || (job.claimedBy != null && job.claimedBy !== villager.id)) continue;
       if (!this.jobActionable(job, index)) continue;
-      if (!this.computePath(from, job.tile)) continue;
+      const target = this.workTarget(job, index);
+      if (!target || !this.computePath(from, target)) continue;
       if (this.claimId(candidate, villager.id)) {
         claimed = candidate;
         break;
       }
     }
     if (claimed == null) {
-      if (existing != null) this.releaseJobAt(index);
+      this.releaseJobAt(index);
       villager.currentAction = null;
       return;
     }
@@ -1935,12 +1936,14 @@ export class DemoWorld {
     villager.currentAction = 'work';
     const job = this.jobs.find((entry) => entry.id === claimed)!;
     this.setThought(index, jobThought(job.kind));
-    let tile = job.tile;
-    // A hauler resuming with cargo goes straight to the delivery, not the job's stand tile.
-    if (job.kind === 'haul' && villager.carrying) {
-      tile = this.endpointStandTile(villager.carrying.dest) ?? tile;
-    }
+    const tile = this.workTarget(job, index)!;
     this.beginMoveToJob(index, tile, claimed);
+  }
+
+  /** Use the delivery endpoint for both admission and movement when resuming cargo. */
+  private workTarget(job: DemoJob, index: number): [number, number] | null {
+    const carrying = this.villagers[index].carrying;
+    return job.kind === 'haul' && carrying ? this.endpointStandTile(carrying.dest) : job.tile;
   }
 
   private jobActionable(job: DemoJob, villagerIndex: number): boolean {
@@ -1956,9 +1959,15 @@ export class DemoWorld {
       case 'produce': {
         const building = this.buildings.find((entry) => entry.id === job.site);
         if (!building || !building.complete) return false;
-        if (building.recipeTicks > 0) return true;
         const recipe = DEMO_CATALOG.buildings[building.kindIndex]?.recipe;
-        return recipe != null && Object.entries(recipe.inputs).every(
+        if (!recipe) return false;
+        if (building.recipeTicks === 1) {
+          // Keep the pending batch, but free the worker to haul until output fits.
+          return productionFreeCapacity(building.inventory)
+            >= Object.values(recipe.outputs).reduce((sum, amount) => sum + amount, 0);
+        }
+        if (building.recipeTicks > 1) return true;
+        return Object.entries(recipe.inputs).every(
           ([resource, amount]) => inventoryGet(building.inventory, resource) >= amount,
         );
       }
