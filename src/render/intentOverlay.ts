@@ -4,6 +4,8 @@ import type { BuildingView, VillagerDetail, VillagerView } from '../state/types'
 export const STATE_MOVING = 1;
 /** AgentState::Working */
 export const STATE_WORKING = 2;
+/** AgentState::Sleeping */
+export const STATE_SLEEPING = 4;
 
 /** MovePurpose wire labels — mirror AgentState::label for MovingTo. */
 export const PURPOSE_LABELS = [
@@ -11,6 +13,7 @@ export const PURPOSE_LABELS = [
   'Going to work',
   'Wandering',
   'Fetching water',
+  'Going home',
 ] as const;
 
 const ACTIVITY_LABELS: Record<string, string> = {
@@ -53,6 +56,9 @@ export function intentLabel(villager: VillagerView, detail?: VillagerDetail | nu
   }
   if (villager.state === STATE_MOVING && villager.purpose != null) {
     return PURPOSE_LABELS[villager.purpose] ?? 'Moving';
+  }
+  if (villager.state === STATE_SLEEPING && detail?.homeTile) {
+    return 'Home — Sleeping';
   }
   if (villager.state === STATE_WORKING) {
     if (detail?.jobKind) {
@@ -106,6 +112,32 @@ export function planIntentOverlay(input: PlanIntentInput): IntentPlan | null {
       tileY: building.y,
       footprintW: width,
       footprintH: height,
+      label: intentLabel(villager, detail),
+      showLine: false,
+    };
+  }
+
+  // Resting at home: mark the residence even though the villager is already
+  // there, so the home link stays visible for the whole sleep.
+  if (state === STATE_SLEEPING && detail?.homeTile) {
+    const [tileX, tileY] = detail.homeTile;
+    const home = detail.home != null
+      ? buildings.find((entry) => entry.id === detail.home)
+      : undefined;
+    let footprintW = 1;
+    let footprintH = 1;
+    if (home) {
+      const [fw, fh] = footprints?.[home.kind] ?? [1, 1];
+      footprintW = home.rot % 2 === 0 ? fw : fh;
+      footprintH = home.rot % 2 === 0 ? fh : fw;
+    }
+    return {
+      fromX: villager.x,
+      fromY: villager.y,
+      tileX,
+      tileY,
+      footprintW,
+      footprintH,
       label: intentLabel(villager, detail),
       showLine: false,
     };

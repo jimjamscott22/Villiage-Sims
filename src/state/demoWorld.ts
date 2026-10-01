@@ -303,7 +303,7 @@ function demoStormDamageIndex(
 }
 
 type ActionKind = 'eat' | 'sleep' | 'work' | 'socialize' | 'wander' | 'drink';
-type MovePurpose = 'player' | 'work' | 'wander' | 'drink';
+type MovePurpose = 'player' | 'work' | 'wander' | 'drink' | 'home';
 type AgentStateName =
   | 'idle' | 'moving' | 'working' | 'eating' | 'sleeping' | 'socializing' | 'drinking';
 type DemoJobKind = 'tend_crops' | 'gather' | 'haul' | 'produce';
@@ -567,6 +567,8 @@ export interface DemoVillager {
   traits: string[];
   thought: string | null;
   thoughtTtl: number;
+  /** Assigned residence building id; null means homeless (sleeps in place). */
+  home: number | null;
   /** Ticks before searching for water again after none was reachable (Rust: runtime-only). */
   waterSearchCooldown?: number;
 }
@@ -637,6 +639,7 @@ function purposeByte(v: DemoVillager): number | undefined {
     case 'work': return 1;
     case 'wander': return 2;
     case 'drink': return 3;
+    case 'home': return 4;
   }
 }
 
@@ -659,6 +662,7 @@ function stateLabel(v: DemoVillager): string {
       if (v.purpose === 'work') return 'Going to work';
       if (v.purpose === 'wander') return 'Wandering';
       if (v.purpose === 'drink') return 'Fetching water';
+      if (v.purpose === 'home') return 'Going home';
       return 'Moving';
     case 'working': return 'Working';
     case 'eating': return 'Eating';
@@ -879,6 +883,7 @@ export class DemoWorld {
         traits: i === 0 ? ['fast_walker'] : i === 1 ? ['green_thumb'] : ['strong_back'],
         thought: null,
         thoughtTtl: 0,
+        home: null,
       });
     }
   }
@@ -1016,6 +1021,10 @@ export class DemoWorld {
     world.nextJobId = state.nextJobId;
     world.nextVillagerId = state.nextVillagerId;
     world.villagers = state.villagers;
+    // Saves predate assigned residences: start homeless; ticks refill beds.
+    for (const v of world.villagers) {
+      if (typeof v.home !== 'number') v.home = null;
+    }
     if (state.version < 3) {
       // Versions 1–2 predate thirst and health: start both full.
       for (const v of world.villagers) {
@@ -1103,6 +1112,8 @@ export class DemoWorld {
     this.social.tick();
     this.checkUnlocks();
     this.checkObjectives();
+    // New beds (completed huts) settle here so Sleep journeys read fresh homes.
+    this.assignHomes();
     return this.snapshot();
   }
 
@@ -1116,6 +1127,122 @@ export class DemoWorld {
       }
     }
     return base + extra;
+  }
+
+  /** Beds a building offers; only completed housing counts (mirrors Rust). */
+  private homeCapacityOf(building: DemoBuilding): number {
+    if (!building.complete) return 0;
+    return DEMO_CATALOG.buildings[building.kindIndex]?.houses ?? 0;
+  }
+
+  private validHome(buildingId: number): boolean {
+    const building = this.buildings.find((b) => b.id === buildingId);
+    return building != null && this.homeCapacityOf(building) > 0;
+  }
+
+  /** Drop links to lost residences; release interrupted walks home. */
+  private clearInvalidHomes(): void {
+    const live = new Set(
+      this.buildings.filter((b) => this.homeCapacityOf(b) > 0).map((b) => b.id),
+    );
+    for (const villager of this.villagers) {
+      if (villager.home != null && !live.has(villager.home)) villager.home = null;
+      if (
+        villager.home == null
+        && villager.state === 'moving'
+        && villager.purpose === 'home'
+      ) {
+        this.clearToIdle(villager);
+        if (villager.currentAction === 'sleep') villager.currentAction = null;
+      }
+    }
+  }
+
+  /** Fill free beds in villager-id onto building-id order (mirrors Rust). */
+  private assignHomes(): void {
+    this.clearInvalidHomes();
+    const occupancy = new Map<number, number>();
+    for (const v of this.villagers) {
+      if (v.home != null) occupancy.set(v.home, (occupancy.get(v.home) ?? 0) + 1);
+    }
+    const homes = this.buildings
+      .filter((b) => this.homeCapacityOf(b) > 0)
+      .map((b) => b.id)
+      .sort((a, b) => a - b);
+    const homeless = [...this.villagers].sort((a, b) => a.id - b.id).filter((v) => v.home == null);
+    for (const villager of homeless) {
+      const choice = homes.find((id) => {
+        const building = this.buildings.find((b) => b.id === id)!;
+        return (occupancy.get(id) ?? 0) < this.homeCapacityOf(building);
+      });
+      if (choice == null) return;
+      villager.home = choice;
+      occupancy.set(choice, (occupancy.get(choice) ?? 0) + 1);
+    }
+  }
+
+  /**
+   * Player reassignment among completed residences (`null` clears).
+   * Mirrors Rust `assign_home`, including the mid-journey repath release.
+   */
+  assignHome(villagerId: number, buildingId: number | null): void {
+    const villager = this.villagers.find((v) => v.id === villagerId);
+    if (!villager) throw new Error(`unknown villager ${villagerId}`);
+    if (buildingId != null) {
+      const building = this.buildings.find((b) => b.id === buildingId);
+      if (!building || this.homeCapacityOf(building) === 0) {
+        throw new Error(`building ${buildingId} is not a completed residence`);
+      }
+      const used = this.villagers.filter(
+        (v) => v.home === buildingId && v.id !== villagerId,
+      ).length;
+      if (used >= this.homeCapacityOf(building)) {
+        throw new Error(`building ${buildingId} has no free bed`);
+      }
+      villager.home = buildingId;
+    } else {
+      villager.home = null;
+    }
+    if (villager.state === 'moving' && villager.purpose === 'home') {
+      this.clearToIdle(villager);
+      if (villager.currentAction === 'sleep') villager.currentAction = null;
+    }
+  }
+
+  private homeStandTile(buildingId: number): [number, number] | null {
+    return this.buildingStandTile(buildingId);
+  }
+
+  private homeResidents(buildingId: number): number[] {
+    return this.villagers
+      .filter((v) => v.home === buildingId)
+      .map((v) => v.id)
+      .sort((a, b) => a - b);
+  }
+
+  private siteWorkers(buildingId: number): number[] {
+    const workers = this.jobs
+      .filter((job) => job.site === buildingId && job.claimedBy != null)
+      .map((job) => job.claimedBy!);
+    return [...new Set(workers)].sort((a, b) => a - b);
+  }
+
+  private homeView(v: DemoVillager): { id: number; name: string; tile: [number, number] } | null {
+    if (v.home == null || !this.validHome(v.home)) return null;
+    const building = this.buildings.find((b) => b.id === v.home)!;
+    const def = DEMO_CATALOG.buildings[building.kindIndex];
+    return { id: building.id, name: def.id, tile: [building.x, building.y] };
+  }
+
+  private jobSiteView(v: DemoVillager): { id: number; name: string; tile: [number, number] } | null {
+    if (v.currentJob == null) return null;
+    const job = this.jobs.find((j) => j.id === v.currentJob);
+    if (!job) return null;
+    const building = this.buildings.find((b) => b.id === job.site);
+    if (!building) return null;
+    const def = DEMO_CATALOG.buildings[building.kindIndex];
+    if (!def) return null;
+    return { id: building.id, name: def.id, tile: [building.x, building.y] };
   }
 
   private winterWarning(): boolean {
@@ -1168,6 +1295,7 @@ export class DemoWorld {
         partnerId: this.social.pair(v.id) ? (this.social.pair(v.id)!.a === v.id ? this.social.pair(v.id)!.b : this.social.pair(v.id)!.a) : undefined,
         destination: this.viewDestination(v),
         purpose: purposeByte(v),
+        home: v.home != null && this.validHome(v.home) ? v.home : undefined,
         social: v.needs.social,
       })),
       buildings: this.buildingViews(),
@@ -1189,6 +1317,8 @@ export class DemoWorld {
     const job = villager.currentJob != null
       ? this.jobs.find((entry) => entry.id === villager.currentJob) ?? null
       : null;
+    const jobSite = this.jobSiteView(villager);
+    const home = this.homeView(villager);
     return {
       id: villager.id,
       name: villager.name,
@@ -1202,6 +1332,11 @@ export class DemoWorld {
       happiness: villager.needs.happiness,
       jobKind: job?.kind ?? null,
       jobSite: job?.site ?? null,
+      jobSiteName: jobSite?.name ?? null,
+      jobSiteTile: jobSite?.tile ?? null,
+      home: home?.id ?? null,
+      homeBuilding: home?.name ?? null,
+      homeTile: home?.tile ?? null,
       traits: villager.traits ?? [],
       tile: this.posToTile(villager.x, villager.y),
       thought: villager.thought ?? undefined,
@@ -1435,6 +1570,16 @@ export class DemoWorld {
       .map((job) => job.claimedBy!);
     this.jobs = this.jobs.filter((job) => job.site !== entityId);
     for (const villager of this.villagers) {
+      // Residence links die with the building; walks home are released.
+      if (villager.home === entityId) villager.home = null;
+      if (
+        villager.home == null
+        && villager.state === 'moving'
+        && villager.purpose === 'home'
+      ) {
+        this.clearToIdle(villager);
+        if (villager.currentAction === 'sleep') villager.currentAction = null;
+      }
       if (released.includes(villager.id)) {
         villager.currentJob = null;
         if (
@@ -1519,6 +1664,9 @@ export class DemoWorld {
       .filter((job) => job.site === buildingId && job.claimedBy != null)
       .map((job) => job.claimedBy!);
     this.jobs = this.jobs.filter((job) => job.site !== buildingId);
+    // A storm-damaged residence stops housing until repaired (mirrors Rust:
+    // the next assignHomes clears the link and releases walks home).
+    this.clearInvalidHomes();
     for (const villager of this.villagers) {
       if (!released.includes(villager.id)) continue;
       villager.currentJob = null;
@@ -1889,14 +2037,41 @@ export class DemoWorld {
   }
 
   private beginSleep(index: number): void {
+    // Mirrors Rust `begin_sleep_at`: walk home when housed and reachable,
+    // otherwise rest in place.
     const villager = this.villagers[index];
+    const start = this.posToTile(villager.x, villager.y);
+    if (villager.home != null && this.validHome(villager.home)) {
+      const tile = this.homeStandTile(villager.home);
+      if (tile != null) {
+        if (tile[0] === start[0] && tile[1] === start[1]) {
+          this.startSleeping(villager);
+          return;
+        }
+        const path = this.computePath(start, tile);
+        if (path) {
+          villager.state = 'moving';
+          villager.purpose = 'home';
+          villager.target = tile;
+          villager.path = path;
+          villager.currentAction = 'sleep';
+          this.setThought(index, 'Going home...');
+          return;
+        }
+      }
+    }
+    this.startSleeping(villager);
+  }
+
+  private startSleeping(villager: DemoVillager): void {
     villager.path = null;
     villager.target = null;
     villager.purpose = null;
     villager.state = 'sleeping';
     villager.activityTicks = SLEEP_TICKS;
     villager.currentAction = 'sleep';
-    this.setThought(index, actionThought('sleep'));
+    villager.thought = actionThought('sleep');
+    villager.thoughtTtl = 40;
   }
 
   private beginSocialize(index: number): void {
@@ -2684,6 +2859,10 @@ export class DemoWorld {
       villager.state = 'idle';
       return;
     }
+    if (purpose === 'home') {
+      this.startSleeping(villager);
+      return;
+    }
     if (villager.currentJob != null && this.jobs.some((job) => job.id === villager.currentJob)) {
       villager.purpose = null;
       villager.state = 'working';
@@ -2891,6 +3070,8 @@ export class DemoWorld {
         state: building.complete ? 2 : 1,
         progress,
         status: this.buildingStatus(building),
+        residents: this.homeResidents(building.id),
+        workers: this.siteWorkers(building.id),
       };
     });
   }

@@ -1,4 +1,4 @@
-import type { Catalog, TickSnapshot, VillagerView } from '../state/types';
+import type { BuildingView, Catalog, TickSnapshot, VillagerView } from '../state/types';
 import { intentLabel } from './intentOverlay';
 
 const VILLAGER_STATE_LABELS = [
@@ -40,10 +40,23 @@ function rotatedFootprint(footprint: [number, number], rotation: number): [numbe
 }
 
 function villagerHoverDetail(villager: VillagerView): string {
+  let label: string;
   if (villager.state === 1 && (villager.purpose != null || villager.activity != null || villager.destination)) {
-    return intentLabel(villager);
+    label = intentLabel(villager);
+  } else {
+    label = VILLAGER_STATE_LABELS[villager.state ?? 0] ?? 'Unknown activity';
   }
-  return VILLAGER_STATE_LABELS[villager.state ?? 0] ?? 'Unknown activity';
+  return villager.home != null ? `${label} · Home #${villager.home}` : label;
+}
+
+function buildingHoverDetail(building: BuildingView): string {
+  const residents = building.residents?.length ?? 0;
+  const workers = building.workers?.length ?? 0;
+  const occupants = [
+    residents === 1 ? '1 resident' : residents > 0 ? `${residents} residents` : '',
+    workers === 1 ? '1 worker' : workers > 0 ? `${workers} workers` : '',
+  ].filter((part) => part !== '');
+  return occupants.length > 0 ? ` · ${occupants.join(' · ')}` : '';
 }
 
 /** Return the visually topmost inspectable entity under a world-space pointer. */
@@ -101,7 +114,7 @@ export function hoverTargetAt({
     const definition = catalog.buildings[building.kind];
     const statusLabel = BUILDING_STATUS_LABELS[building.status ?? 0] ?? 'Working';
     const detail = building.state === 2
-      ? statusLabel
+      ? `${statusLabel}${buildingHoverDetail(building)}`
       : `Building · ${building.progress}%`;
     return {
       kind: 'building',

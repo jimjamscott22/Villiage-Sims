@@ -59,6 +59,16 @@ describe('intentLabel', () => {
     expect(intentLabel(villager({ id: 1, state: STATE_MOVING, purpose: 1 }))).toBe(PURPOSE_LABELS[1]);
     expect(intentLabel(villager({ id: 1, state: STATE_MOVING, purpose: 2 }))).toBe(PURPOSE_LABELS[2]);
     expect(intentLabel(villager({ id: 1, state: STATE_MOVING, purpose: 3 }))).toBe(PURPOSE_LABELS[3]);
+    expect(intentLabel(villager({ id: 1, state: STATE_MOVING, purpose: 4 }))).toBe('Going home');
+  });
+
+  it('labels sleep at home as a residence rest', () => {
+    expect(
+      intentLabel(
+        villager({ id: 1, state: 4 }),
+        detail({ id: 1, home: 7, homeBuilding: 'hut', homeTile: [4, 4] }),
+      ),
+    ).toBe('Home — Sleeping');
   });
 });
 
@@ -168,5 +178,39 @@ describe('planIntentOverlay', () => {
         tileSize: 32,
       }),
     ).toBeNull();
+  });
+
+  it('plans a walk home with a dashed line', () => {
+    const plan = planIntentOverlay({
+      selectedId: 1,
+      villagers: [
+        villager({ id: 1, x: 16, y: 16, state: STATE_MOVING, destination: [4, 4], purpose: 4 }),
+      ],
+      buildings: [],
+      tileSize: 32,
+    });
+    expect(plan).toMatchObject({
+      tileX: 4,
+      tileY: 4,
+      label: 'Going home',
+      showLine: true,
+    });
+  });
+
+  it('marks the residence while sleeping at home', () => {
+    const plan = planIntentOverlay({
+      selectedId: 1,
+      villagers: [villager({ id: 1, x: 4 * 32 + 16, y: 4 * 32 + 16, state: 4, home: 7 })],
+      buildings: [building({ id: 7, kind: 0, x: 4, y: 5, rot: 0 })],
+      footprints: [[1, 1]],
+      detail: detail({ id: 1, state: 4, stateLabel: 'Sleeping', home: 7, homeBuilding: 'hut', homeTile: [4, 5] }),
+      tileSize: 32,
+    });
+    expect(plan).toMatchObject({
+      tileX: 4,
+      tileY: 5,
+      label: 'Home — Sleeping',
+      showLine: false,
+    });
   });
 });

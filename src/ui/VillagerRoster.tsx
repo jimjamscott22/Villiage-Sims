@@ -128,6 +128,12 @@ export function VillagerRoster({
                   </button>
                 </th>
               ))}
+              <th className="px-1.5 py-1" title="Assigned residence building">
+                Home
+              </th>
+              <th className="px-1.5 py-1" title="Claimed job">
+                Job
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -159,6 +165,12 @@ export function VillagerRoster({
                   {ROSTER_STATS.map((stat) => (
                     <StatCell key={stat.key} label={stat.label} value={detail[stat.key]} />
                   ))}
+                  <td className="max-w-[9rem] truncate px-1.5 py-1 text-[10px] text-white/55" title={detail.home != null ? `Home: ${detail.homeBuilding ?? 'hut'} #${detail.home}` : 'Homeless'}>
+                    {detail.home != null ? `#${detail.home}` : '—'}
+                  </td>
+                  <td className="max-w-[11rem] truncate px-1.5 py-1 text-[10px] text-white/55" title={detail.jobKind ? (detail.jobSiteName && detail.jobSite != null ? `${detail.jobKind.replace(/_/g, ' ')} @ ${detail.jobSiteName} #${detail.jobSite}` : detail.jobKind.replace(/_/g, ' ')) : 'No job'}>
+                    {detail.jobKind ? detail.jobKind.replace(/_/g, ' ') : '—'}
+                  </td>
                 </tr>
               );
             })}
