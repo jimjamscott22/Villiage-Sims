@@ -12,6 +12,8 @@ Here, **Critical / P1** means an avoidable loss of villagers or a blockage of es
 
 ## Verification and limits
 
+These results describe the September 2 baseline. Current PR #56 checks are recorded under **Resolution status** below; the historical build blocker is not reproduced by the current CI build.
+
 | Check | Result |
 |---|---|
 | Existing Rust suite before edits | 115 passed |
@@ -76,6 +78,37 @@ There is no journey to a home, food store, or social partner for those need acti
 **Verification:** The end-to-end regression starts with no food and produces/delivers usable food despite the enclosed farm. Additional Rust cases cover an enclosed nearest store, an inaccessible recipe destination, and an inaccessible storage source. Browser regressions cover the matching behavior.
 
 **Remaining limits:** This does not reserve inventory or pickup tasks, choose alternative entrances, or replan an already-carried shipment after a topology change. Checks use the existing A* budget. Additional path searches add cost, so larger settlements need profiling before considering cached reachability.
+
+## Resolution status
+
+Updated 2026-09-30 on branch `fix/sim-review-followups` ([PR #56](https://github.com/jimjamscott22/Villiage-Sims/pull/56)).
+
+| Finding | Status | Commit / notes |
+|---|---|---|
+| R1 | Partly resolved | `4a0300d`: nearest haul pickup and direct cargo resumption. `171eda1`: Rust and demo validate the delivery route before admitting a carrying hauler; a blocked job tile no longer hides a reachable delivery, and failed resumption returns cargo through centralized cleanup. Still open: an explicit pickup/delivery phase and reservation of goods and destinations. |
+| R2 | Resolved | `a138d20`: stale work claims are re-scored so unusable jobs fall through to a usable job or another action. Demo job switches now release the previous slot while retaining haul cargo (`8c279fa`), matching Rust; a regression covers another villager reusing the old slot. |
+| R3 | Resolved | Path invalidation now revalidates every edge, including both flanks of diagonal steps, in Rust and the browser demo. A step already past its midpoint still finishes. |
+| R7 | Resolved | Rust retains centralized `release_job_at` cargo return. Demo storms now use `clearReleasedWorkClaims` → `releaseJobAt` after removing site jobs (`ad73f48`), matching demolition. Three storm regressions cover working, moving and eating haulers: exact cargo return, cleared claims, preserved unrelated work, and no duplicate refund. Policy: return cargo to the stockpile. |
+| R4 | Partly resolved | A worker doing in-place work (tend, gather, produce) is released when a building is placed on its tile. Still open: reachable stand-tile selection, gate pass-through rules (needs a design decision), and haul endpoint entrances. |
+| R5 | Resolved | Whole-yield harvest and recipe capacity guards remain. `171eda1`: a capacity-blocked final recipe tick is non-actionable, freeing its worker to haul while preserving the pending batch. Rust and demo regressions verify that a single worker clears room, resumes production and conserves the output. |
+| R6 | Resolved | Natural day-rollover autosave now runs at the end of `World::advance`, after the whole tick is committed; `advance_clock` autosaves after each forced day's processing. Regression compares the written slot with the live world. The demo mirrors the ordering. |
+| R8 | Open | Product/design decision. |
+
+### PR #56 follow-up validation (2026-09-30)
+
+[CI run 36767376700](https://github.com/jimjamscott22/Villiage-Sims/actions/runs/36767376700) passed for code commit `171eda198ca31ba2d09818747a2ac40b1b06f572`, using GitHub's PR merge checkout. The follow-ups fix demo storm cleanup and job-switch claims, then refine Rust/demo delivery admission and producer actionability. The prior Rust fixes, cargo-return policy and pending-output capacity guards are preserved.
+
+| Check | Current evidence |
+|---|---|
+| `cargo test --manifest-path src-tauri/Cargo.toml --lib` | Rerun in CI: 166 passed |
+| `npm test` | Rerun in CI: 273 passed across 30 files, including storm cargo, stale-claim reuse, delivery resumption/failure, and single-worker production recovery |
+| `tsc -b` | Passed in CI as the first stage of `npm run build`; standalone `npx tsc -b` was previously reported passing |
+| `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Rerun in CI: passed, including Rust type-checking |
+| `cargo check --manifest-path src-tauri/Cargo.toml` | Previously reported passing; not separately rerun during this follow-up |
+| `npm run build` | Rerun in CI: passed (`tsc -b && vite build`). Local build remains unrun; the September 2 app-icon error did not recur in CI |
+| Live Tauri/browser interaction | Unrun; no desktop launch, webview/IPC or visual interaction claim |
+
+All four reviewed blockers are fixed and regression-covered: demo storm cargo, demo claim switching, delivery-route admission and capacity-blocked producer recovery. Automated checks support merging the scoped simulation fixes; live verification and the explicitly deferred R1/R4/R8 work remain outstanding.
 
 ## Deferred findings
 
@@ -171,4 +204,4 @@ A separate probe resumed a worker carrying grain to the stockpile after a needs 
 3. Address R5/R6 with conservation and completed-tick autosave checks, then extend replay coverage across seasons and representative player commands.
 4. Decide which traits and home/food/social routines to implement. Add explanations of villager decisions before tuning utility curves blindly.
 
-The simulation changes are limited to the two critical behaviors and their browser counterparts, with regression coverage and this review document. The CI workflow also removes the Rust formatting check; Rust unit tests and Clippy remain enabled. All deferred findings remain open.
+The simulation changes are limited to the two critical behaviors and their browser counterparts, with regression coverage and this review document. The CI workflow also removes the Rust formatting check; Rust unit tests and Clippy remain enabled. That September 2 review left all deferred findings open; the Resolution status table above tracks the subsequent fixes in PR #56.
