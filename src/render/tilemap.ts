@@ -199,6 +199,13 @@ const DRIFTWOOD_CHANCE = 0.08;
 const CACTUS_CHANCE = 0.03;
 const CAMPFIRE_CHANCE = 0.015;
 const LILYPAD_CHANCE = 0.05;
+const LEAVES_CHANCE = 0.12;
+const PINE_CHANCE = 0.2;
+const STANDING_STONE_CHANCE = 0.004;
+const SNOW_DRIFT_CHANCE = 0.06;
+const PEBBLE_CHANCE = 0.08;
+const CRYSTAL_CHANCE = 0.06;
+const CATTAIL_CHANCE = 0.14;
 
 function neighbourTerrain(
   tiles: ArrayLike<number>,
@@ -240,15 +247,34 @@ function decorFor(tiles: ArrayLike<number>, width: number, height: number, x: nu
         return { key: edgeRoll < FOREST_EDGE_CHANCE / 2 ? 'prop.stump' : 'prop.deadfall' };
       }
       if (edgeRoll < FOREST_EDGE_CHANCE + MUSHROOM_CHANCE) return { key: 'prop.mushroom' };
+      if (edgeRoll < FOREST_EDGE_CHANCE + MUSHROOM_CHANCE + LEAVES_CHANCE) {
+        return { key: 'prop.fallenLeaves', season: 2 };
+      }
+    }
+    // Foothills: small pines soften the jump from grass to peak.
+    if (touchesTerrain(tiles, width, height, x, y, [6]) && hash01(x, y, DECOR_SALT + 6) < PINE_CHANCE) {
+      return { key: 'prop.pine' };
     }
     if (hash01(x, y, DECOR_SALT + 2) < FLOWER_CHANCE) return { key: 'prop.flowers', season: 0 };
     if (!nearForest && hash01(x, y, DECOR_SALT + 4) < CAMPFIRE_CHANCE) return { key: 'prop.campfire' };
-    return roll < BUSH_CHANCE ? { key: 'prop.bush' } : null;
+    if (!nearForest && hash01(x, y, DECOR_SALT + 7) < STANDING_STONE_CHANCE) return { key: 'prop.standingStone' };
+    if (roll < BUSH_CHANCE) return { key: 'prop.bush' };
+    return hash01(x, y, DECOR_SALT + 8) < SNOW_DRIFT_CHANCE ? { key: 'prop.snowDrift', season: 3 } : null;
   }
-  if (t === 5) return roll < BOULDER_CHANCE ? { key: 'prop.boulder' } : null;
+  if (t === 5) {
+    if (touchesTerrain(tiles, width, height, x, y, [6]) && hash01(x, y, DECOR_SALT + 9) < CRYSTAL_CHANCE) {
+      return { key: 'prop.crystal' };
+    }
+    if (roll < BOULDER_CHANCE) return { key: 'prop.boulder' };
+    if (roll < BOULDER_CHANCE + PEBBLE_CHANCE) return { key: 'prop.pebbles' };
+    return hash01(x, y, DECOR_SALT + 8) < SNOW_DRIFT_CHANCE ? { key: 'prop.snowDrift', season: 3 } : null;
+  }
   if (t === 1) {
-    // Calm open water only — the shoreline is already busy with reeds/rocks/driftwood.
-    const touchesLand = touchesTerrain(tiles, width, height, x, y, [2, 3, 4, 5, 6]);
+    // Cattails fringe the soft banks; calm open water gets lily pads instead.
+    if (touchesTerrain(tiles, width, height, x, y, [2, 3, 4])) {
+      return hash01(x, y, DECOR_SALT + 10) < CATTAIL_CHANCE ? { key: 'prop.cattail' } : null;
+    }
+    const touchesLand = touchesTerrain(tiles, width, height, x, y, [5, 6]);
     if (touchesLand) return null;
     return hash01(x, y, DECOR_SALT + 5) < LILYPAD_CHANCE ? { key: 'prop.lilypad' } : null;
   }
@@ -268,7 +294,8 @@ function decorFor(tiles: ArrayLike<number>, width: number, height: number, x: nu
 
 /**
  * Standing props for Forest (4) and Mountain (6), plus a deterministic decor
- * scatter (bushes, boulders, palms, reeds) on the open terrains. Not baked —
+ * scatter (bushes, boulders, palms, reeds, foothill pines, seasonal leaves and
+ * snow, …) on the open terrains. Not baked —
  * they y-sort on the entity layer.
  */
 export function terrainProps(terrain: TerrainSnapshot): TerrainProp[] {

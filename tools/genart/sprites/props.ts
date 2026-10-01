@@ -388,6 +388,161 @@ function campfire(phase: number): SpriteGrid {
 
 export const CAMPFIRE_FRAMES: SpriteGrid[] = [campfire(0), campfire(1)];
 
+/** Loose scree for bare rock — a lighter alternative to the boulder. 16×16, anchorY 0. */
+export const PEBBLES: SpriteGrid = grid(16, 16, {
+  l: P.stoneLight,
+  m: P.stoneMid,
+  s: P.stoneShadow,
+  i: P.ink,
+}, (set) => {
+  const stones: Array<[number, number, number]> = [
+    [3, 10, 3],
+    [8, 11, 4],
+    [11, 8, 2],
+    [6, 7, 2],
+  ];
+  for (const [x0, y, w] of stones) {
+    for (let x = x0; x < x0 + w; x += 1) {
+      set(x, y, x === x0 ? 'l' : 'm');
+      set(x, y + 1, 's');
+      set(x, y + 2, 'i');
+    }
+  }
+});
+
+/** Crystal outcrop on rock beside a mountain. 16×16, anchorY 0. */
+export const CRYSTAL: SpriteGrid = grid(16, 16, {
+  w: P.whitewash,
+  f: P.foam,
+  c: P.seaShallow,
+  b: P.shutter,
+  s: P.stoneShadow,
+  m: P.stoneMid,
+  i: P.ink,
+}, (set) => {
+  const shards: Array<[number, number]> = [[5, 5], [7, 8], [10, 6]];
+  for (const [cx, h] of shards) {
+    for (let t = 0; t < h; t += 1) {
+      const y = 12 - t;
+      set(cx, y, t === h - 1 ? 'w' : 'f');
+      set(cx + 1, y, t === h - 1 ? 'c' : t % 3 === 0 ? 'b' : 'c');
+    }
+  }
+  for (let x = 3; x <= 12; x += 1) set(x, 13, x % 3 === 0 ? 'm' : 's');
+  for (let x = 4; x <= 11; x += 1) set(x, 14, 'i');
+});
+
+/** Small foothill pine for grass beside mountains. 16×24, anchorY 8. */
+export const PINE: SpriteGrid = grid(16, 24, {
+  d: P.vegDarkest,
+  v: P.vegDark,
+  m: P.vegMid,
+  s: P.stoneShadow,
+  i: P.ink,
+}, (set) => {
+  // Three stacked tiers, each wider than the one above.
+  for (let tier = 0; tier < 3; tier += 1) {
+    const top = 2 + tier * 5;
+    for (let dy = 0; dy <= 6; dy += 1) {
+      const half = 1 + Math.floor(dy * 0.6) + tier;
+      for (let x = 8 - half; x <= 7 + half; x += 1) {
+        const edge = x === 8 - half || x === 7 + half || dy === 6;
+        set(x, top + dy, edge ? 'd' : x < 8 ? 'm' : 'v');
+      }
+    }
+  }
+  for (let y = 19; y <= 20; y += 1) {
+    set(7, y, 's');
+    set(8, y, 's');
+  }
+  for (let x = 4; x <= 11; x += 1) set(x, 21, 'i');
+});
+
+/** Cattails in shallow water at the land's edge. 16×16, anchorY 0, two sway frames. */
+function cattail(sway: number): SpriteGrid {
+  return grid(16, 16, {
+    m: P.vegMid,
+    l: P.vegLight,
+    b: P.terraDeep,
+    f: P.foam,
+  }, (set) => {
+    const stalks: Array<[number, number]> = [[4, 8], [7, 10], [10, 7], [12, 9]];
+    stalks.forEach(([baseX, height], index) => {
+      const lean = sway === 0 ? 0 : index % 2 === 0 ? 1 : -1;
+      for (let t = 0; t < height; t += 1) {
+        const x = baseX + (t > height - 4 ? lean : 0);
+        const head = t >= height - 3 && t < height - 1;
+        set(x, 13 - t, head ? 'b' : t === height - 1 ? 'l' : 'm');
+      }
+    });
+    for (let x = 3; x <= 13; x += 2) set(x, 14, 'f');
+  });
+}
+
+export const CATTAIL_SWAY: SpriteGrid[] = [cattail(0), cattail(1)];
+
+/** Autumn leaf litter near the forest edge. 16×16, anchorY 0. */
+export const FALLEN_LEAVES: SpriteGrid = grid(16, 16, {
+  t: P.terraMid,
+  d: P.terraDark,
+  l: P.terraLight,
+  w: P.wheat,
+}, (set) => {
+  const leaves: Array<[number, number, string]> = [
+    [3, 9, 't'], [4, 9, 'd'], [6, 12, 'w'], [7, 12, 'w'], [9, 8, 'l'],
+    [10, 10, 't'], [11, 10, 'd'], [12, 13, 'w'], [5, 14, 'd'], [8, 14, 't'],
+    [13, 9, 'w'], [2, 12, 'l'], [10, 13, 'l'],
+  ];
+  for (const [x, y, c] of leaves) set(x, y, c);
+});
+
+/** Winter snow drift on grass or rock. 16×16, anchorY 0. */
+export const SNOW_DRIFT: SpriteGrid = grid(16, 16, {
+  w: P.whitewash,
+  p: P.stonePale,
+  l: P.stoneLight,
+}, (set) => {
+  for (let y = 9; y <= 12; y += 1) {
+    const half = 2 + Math.floor((y - 9) * 1.7);
+    for (let x = 8 - half; x <= 7 + half; x += 1) {
+      const shade = x >= 9 && y >= 11;
+      set(x, y, x === 8 - half || x === 7 + half ? 'p' : shade ? 'p' : 'w');
+    }
+  }
+  for (let x = 2; x <= 13; x += 1) set(x, 13, 'l');
+  set(3, 7, 'w');
+  set(12, 6, 'w');
+});
+
+/** Ancient standing stones — a rare landmark on open grass. 16×24, anchorY 8. */
+export const STANDING_STONE: SpriteGrid = grid(16, 24, {
+  p: P.stonePale,
+  l: P.stoneLight,
+  m: P.stoneMid,
+  s: P.stoneShadow,
+  g: P.vegMid,
+  i: P.ink,
+}, (set) => {
+  for (let y = 3; y <= 19; y += 1) {
+    const inset = y === 3 ? 1 : 0;
+    for (let x = 5 + inset; x <= 9 - inset; x += 1) {
+      const edge = x === 9 - inset || y === 3;
+      set(x, y, edge ? 's' : x === 5 ? 'p' : x === 6 ? 'l' : 'm');
+    }
+  }
+  // Moss creeping up the shaded base, and a chiselled notch.
+  for (const [mx, my] of [[8, 17], [7, 18], [8, 18], [6, 19], [7, 19]]) set(mx, my, 'g');
+  set(7, 8, 's');
+  set(7, 9, 's');
+  // Smaller companion stone.
+  for (let y = 13; y <= 19; y += 1) {
+    for (let x = 11; x <= 13; x += 1) {
+      set(x, y, x === 13 || y === 13 ? 's' : x === 11 ? 'l' : 'm');
+    }
+  }
+  for (let x = 4; x <= 14; x += 1) set(x, 20, 'i');
+});
+
 export interface PropSprite {
   grid: SpriteGrid;
   anchorY: number;
@@ -410,4 +565,11 @@ export const PROP_SPRITES: Record<string, PropSprite> = {
   'prop.lilypad': { grid: LILYPAD, anchorY: 0 },
   'prop.cactus': { grid: CACTUS, anchorY: 0 },
   'prop.campfire': { grid: CAMPFIRE_FRAMES[0], anchorY: 0, frames: CAMPFIRE_FRAMES },
+  'prop.pebbles': { grid: PEBBLES, anchorY: 0 },
+  'prop.crystal': { grid: CRYSTAL, anchorY: 0 },
+  'prop.pine': { grid: PINE, anchorY: 8 },
+  'prop.cattail': { grid: CATTAIL_SWAY[0], anchorY: 0, frames: CATTAIL_SWAY },
+  'prop.fallenLeaves': { grid: FALLEN_LEAVES, anchorY: 0 },
+  'prop.snowDrift': { grid: SNOW_DRIFT, anchorY: 0 },
+  'prop.standingStone': { grid: STANDING_STONE, anchorY: 8 },
 };

@@ -145,7 +145,7 @@
     "semantic_hash": ""
   },
   "src-tauri/src/sim/world.rs": {
-    "mtime": 1790543172.2354121,
+    "mtime": 1790809629.3129244,
     "ast_hash": "152a2e6599f860830ce955252e89febb",
     "semantic_hash": ""
   },
@@ -210,9 +210,9 @@
     "semantic_hash": "c6576b2b1452a08ee5deb293527f877e"
   },
   "src/render/perfBaseline.test.ts": {
-    "mtime": 1786153241.3869057,
-    "ast_hash": "a430d8ea7fbf90c05770340e5cc844d6",
-    "semantic_hash": "a430d8ea7fbf90c05770340e5cc844d6"
+    "mtime": 1790820897.4606452,
+    "ast_hash": "0a3de947069e4676b37db0dffb93a001",
+    "semantic_hash": ""
   },
   "src/render/perfStats.test.ts": {
     "mtime": 1786153241.3869057,
@@ -245,13 +245,13 @@
     "semantic_hash": "9c312861aa6f6f5d65c5a2ba2076a104"
   },
   "src/render/tilemap.test.ts": {
-    "mtime": 1789599606.8114252,
-    "ast_hash": "c256814c5c1223c52256e1aa1a50b2db",
+    "mtime": 1790820875.9554987,
+    "ast_hash": "da42dc7c2d43bca6e241f237d3c58c82",
     "semantic_hash": ""
   },
   "src/render/tilemap.ts": {
-    "mtime": 1789599606.8114252,
-    "ast_hash": "3881dca69eb35a4c7b8c258c63303259",
+    "mtime": 1790820862.3190649,
+    "ast_hash": "1fafd869d7b2cdc373d9ab51741482d9",
     "semantic_hash": ""
   },
   "src/state/chronicle.test.ts": {
@@ -275,12 +275,12 @@
     "semantic_hash": "56900a443c46563a398f45a190befae5"
   },
   "src/state/demoWorld.test.ts": {
-    "mtime": 1790543172.2354121,
+    "mtime": 1790809629.3129244,
     "ast_hash": "e13c3e51de12abab73d484373b79768d",
     "semantic_hash": ""
   },
   "src/state/demoWorld.ts": {
-    "mtime": 1790543172.236412,
+    "mtime": 1790809629.3129244,
     "ast_hash": "715433af9db58fbae007b1c89dca8e99",
     "semantic_hash": ""
   },
@@ -470,8 +470,8 @@
     "semantic_hash": ""
   },
   "tools/genart/sprites/props.ts": {
-    "mtime": 1789599606.8124251,
-    "ast_hash": "63751a040579838777501da3ddf442f8",
+    "mtime": 1790820932.1409452,
+    "ast_hash": "bbdb9447de3a64680d5d3aebdcfd00f6",
     "semantic_hash": ""
   },
   "tools/genart/sprites/terrain.test.ts": {
@@ -565,12 +565,12 @@
     "semantic_hash": "95784521b49bc6fa387d4d27a7f78830"
   },
   "progress.md": {
-    "mtime": 1790383678.4992626,
+    "mtime": 1790809629.3119245,
     "ast_hash": "d07cee2445a60b530cfaa3f80c392418",
     "semantic_hash": ""
   },
   "app-icon.png": {
-    "mtime": 1788052402.2795546,
+    "mtime": 1790820932.5855005,
     "ast_hash": "4729969c8476b9c25e1328cd2e0f62ca",
     "semantic_hash": ""
   },
@@ -620,42 +620,42 @@
     "semantic_hash": "0140a3dc1aa9d00c8a5973e6406ed076"
   },
   "public/art/entities.png": {
-    "mtime": 1790383678.4992626,
-    "ast_hash": "d4a7c54f43e0b3222dc604bb69daa798",
+    "mtime": 1790820932.5495002,
+    "ast_hash": "0da8f7c2addedae3bff8b0469220a38e",
     "semantic_hash": ""
   },
   "public/art/panel.png": {
-    "mtime": 1788052402.2515547,
+    "mtime": 1790820932.5515003,
     "ast_hash": "2645886fbccc3e86b1fe043c61d6bb9e",
     "semantic_hash": "2645886fbccc3e86b1fe043c61d6bb9e"
   },
   "public/art/tiles.png": {
-    "mtime": 1788052402.2425547,
-    "ast_hash": "bcc5a17210370ad3cef97ba45ca20de8",
-    "semantic_hash": "bcc5a17210370ad3cef97ba45ca20de8"
+    "mtime": 1790820932.5415003,
+    "ast_hash": "45cd77a762d38a965dc553f4b4c137d8",
+    "semantic_hash": ""
   },
   "public/art/ui.png": {
-    "mtime": 1788677566.7700768,
-    "ast_hash": "68aac3f89980e3169c32e123f4b772aa",
+    "mtime": 1790820932.5515003,
+    "ast_hash": "5f44f0cd785257659f74a4e56c51f08e",
     "semantic_hash": ""
   },
   "src-tauri/icons/128x128.png": {
-    "mtime": 1788677566.7700768,
+    "mtime": 1790820932.6025004,
     "ast_hash": "8376f805d9a90904528d138cccf57898",
     "semantic_hash": ""
   },
   "src-tauri/icons/128x128@2x.png": {
-    "mtime": 1788677566.7700768,
+    "mtime": 1790820932.6105006,
     "ast_hash": "939451b33653c38964aa7f7867c7a584",
     "semantic_hash": ""
   },
   "src-tauri/icons/32x32.png": {
-    "mtime": 1788677566.7700768,
+    "mtime": 1790820932.5905006,
     "ast_hash": "e9cf84694e079b4bd5a6aac3922f03ec",
     "semantic_hash": ""
   },
   "src-tauri/icons/64x64.png": {
-    "mtime": 1788677566.7700768,
+    "mtime": 1790820932.5965004,
     "ast_hash": "509fc0483cc739327ddf321d8fb6c3ac",
     "semantic_hash": ""
   },
@@ -710,7 +710,7 @@
     "semantic_hash": ""
   },
   "src-tauri/icons/icon.png": {
-    "mtime": 1788677566.7700768,
+    "mtime": 1790820932.6205006,
     "ast_hash": "8028077530e7f6c86f4f310e4b96c612",
     "semantic_hash": ""
   },
@@ -785,7 +785,7 @@
     "semantic_hash": ""
   },
   "src-tauri/src/sim/world/commands_handler.rs": {
-    "mtime": 1790383678.5002625,
+    "mtime": 1790809629.3129244,
     "ast_hash": "d5517725ccedea0673d3a8b870a7274a",
     "semantic_hash": ""
   },
@@ -805,7 +805,7 @@
     "semantic_hash": ""
   },
   "src-tauri/src/sim/world_review_tests.rs": {
-    "mtime": 1790383678.5013118,
+    "mtime": 1790809629.3129244,
     "ast_hash": "452e345bea4216bf81f7b4ff3e0a47c2",
     "semantic_hash": ""
   },
@@ -885,7 +885,7 @@
     "semantic_hash": ""
   },
   "docs/rust-simulation-review-2026-09-02.md": {
-    "mtime": 1788677566.7700768,
+    "mtime": 1790809629.3119245,
     "ast_hash": "62c7ded8bcbc4ca306453682d95aa574",
     "semantic_hash": ""
   },

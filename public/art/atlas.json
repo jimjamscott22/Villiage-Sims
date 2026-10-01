@@ -15,57 +15,57 @@
     },
     "bubble.fork": {
       "sheet": "entities",
-      "x": 208,
-      "y": 560,
+      "x": 128,
+      "y": 576,
       "w": 8,
       "h": 8
     },
     "bubble.speech": {
       "sheet": "entities",
-      "x": 216,
-      "y": 560,
+      "x": 136,
+      "y": 576,
       "w": 8,
       "h": 8
     },
     "bubble.tool": {
       "sheet": "entities",
-      "x": 224,
-      "y": 560,
+      "x": 144,
+      "y": 576,
       "w": 8,
       "h": 8
     },
     "bubble.zzz": {
       "sheet": "entities",
-      "x": 232,
-      "y": 560,
+      "x": 152,
+      "y": 576,
       "w": 8,
       "h": 8
     },
     "carrot.0": {
-      "sheet": "entities",
-      "x": 160,
-      "y": 520,
-      "w": 16,
-      "h": 16
-    },
-    "carrot.1": {
-      "sheet": "entities",
-      "x": 176,
-      "y": 520,
-      "w": 16,
-      "h": 16
-    },
-    "carrot.2": {
       "sheet": "entities",
       "x": 192,
       "y": 520,
       "w": 16,
       "h": 16
     },
-    "carrot.3": {
+    "carrot.1": {
       "sheet": "entities",
       "x": 208,
       "y": 520,
+      "w": 16,
+      "h": 16
+    },
+    "carrot.2": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 520,
+      "w": 16,
+      "h": 16
+    },
+    "carrot.3": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 544,
       "w": 16,
       "h": 16,
       "frames": 2
@@ -619,21 +619,21 @@
     },
     "peas.0": {
       "sheet": "entities",
-      "x": 240,
-      "y": 520,
+      "x": 32,
+      "y": 544,
       "w": 16,
       "h": 16
     },
     "peas.1": {
       "sheet": "entities",
-      "x": 0,
+      "x": 48,
       "y": 544,
       "w": 16,
       "h": 16
     },
     "peas.2": {
       "sheet": "entities",
-      "x": 16,
+      "x": 64,
       "y": 544,
       "w": 16,
       "h": 16,
@@ -641,32 +641,47 @@
     },
     "prop.boulder": {
       "sheet": "entities",
-      "x": 48,
+      "x": 96,
       "y": 544,
       "w": 16,
       "h": 16
     },
     "prop.bush": {
       "sheet": "entities",
-      "x": 64,
+      "x": 112,
       "y": 544,
       "w": 16,
       "h": 16
     },
     "prop.cactus": {
       "sheet": "entities",
-      "x": 80,
+      "x": 128,
       "y": 544,
       "w": 16,
       "h": 16
     },
     "prop.campfire": {
       "sheet": "entities",
-      "x": 96,
+      "x": 144,
       "y": 544,
       "w": 16,
       "h": 16,
       "frames": 2
+    },
+    "prop.cattail": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 544,
+      "w": 16,
+      "h": 16,
+      "frames": 2
+    },
+    "prop.crystal": {
+      "sheet": "entities",
+      "x": 208,
+      "y": 544,
+      "w": 16,
+      "h": 16
     },
     "prop.cypress": {
       "sheet": "entities",
@@ -678,36 +693,43 @@
     },
     "prop.deadfall": {
       "sheet": "entities",
-      "x": 128,
+      "x": 224,
       "y": 544,
       "w": 16,
       "h": 16
     },
     "prop.driftwood": {
       "sheet": "entities",
-      "x": 144,
+      "x": 240,
       "y": 544,
+      "w": 16,
+      "h": 16
+    },
+    "prop.fallenLeaves": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 560,
       "w": 16,
       "h": 16
     },
     "prop.flowers": {
       "sheet": "entities",
-      "x": 160,
-      "y": 544,
+      "x": 16,
+      "y": 560,
       "w": 16,
       "h": 16
     },
     "prop.lilypad": {
       "sheet": "entities",
-      "x": 176,
-      "y": 544,
+      "x": 32,
+      "y": 560,
       "w": 16,
       "h": 16
     },
     "prop.mushroom": {
       "sheet": "entities",
-      "x": 192,
-      "y": 544,
+      "x": 48,
+      "y": 560,
       "w": 16,
       "h": 16
     },
@@ -727,32 +749,62 @@
       "h": 24,
       "anchorY": 8
     },
+    "prop.pebbles": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 560,
+      "w": 16,
+      "h": 16
+    },
+    "prop.pine": {
+      "sheet": "entities",
+      "x": 224,
+      "y": 64,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
     "prop.reeds": {
       "sheet": "entities",
-      "x": 208,
-      "y": 544,
+      "x": 80,
+      "y": 560,
       "w": 16,
       "h": 16,
       "frames": 2
     },
     "prop.shoreRock": {
       "sheet": "entities",
-      "x": 240,
-      "y": 544,
+      "x": 112,
+      "y": 560,
       "w": 16,
       "h": 16
     },
+    "prop.snowDrift": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 560,
+      "w": 16,
+      "h": 16
+    },
+    "prop.standingStone": {
+      "sheet": "entities",
+      "x": 240,
+      "y": 64,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
     "prop.stump": {
       "sheet": "entities",
-      "x": 0,
+      "x": 144,
       "y": 560,
       "w": 16,
       "h": 16
     },
     "scaffold.1": {
       "sheet": "entities",
-      "x": 224,
-      "y": 64,
+      "x": 0,
+      "y": 112,
       "w": 16,
       "h": 24,
       "anchorY": 8
@@ -775,8 +827,8 @@
     },
     "signpost": {
       "sheet": "entities",
-      "x": 240,
-      "y": 64,
+      "x": 16,
+      "y": 112,
       "w": 16,
       "h": 24,
       "anchorY": 8
@@ -791,21 +843,21 @@
     },
     "strawberry.0": {
       "sheet": "entities",
-      "x": 16,
+      "x": 160,
       "y": 560,
       "w": 16,
       "h": 16
     },
     "strawberry.1": {
       "sheet": "entities",
-      "x": 32,
+      "x": 176,
       "y": 560,
       "w": 16,
       "h": 16
     },
     "strawberry.2": {
       "sheet": "entities",
-      "x": 48,
+      "x": 192,
       "y": 560,
       "w": 16,
       "h": 16,
@@ -1107,8 +1159,8 @@
     },
     "vfx.dust": {
       "sheet": "entities",
-      "x": 80,
-      "y": 560,
+      "x": 0,
+      "y": 576,
       "w": 16,
       "h": 16,
       "frames": 3,
@@ -1116,7 +1168,7 @@
     },
     "vfx.smoke": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1124,7 +1176,7 @@
     },
     "villager.e.carry.idle.0": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1132,7 +1184,7 @@
     },
     "villager.e.carry.idle.1": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1140,7 +1192,7 @@
     },
     "villager.e.carry.idle.2": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1148,7 +1200,7 @@
     },
     "villager.e.carry.idle.3": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1156,7 +1208,7 @@
     },
     "villager.e.carry.idle.4": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1164,7 +1216,7 @@
     },
     "villager.e.carry.idle.5": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1172,7 +1224,7 @@
     },
     "villager.e.carry.idle.6": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1180,7 +1232,7 @@
     },
     "villager.e.carry.idle.7": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1188,7 +1240,7 @@
     },
     "villager.e.carry.idle.8": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1196,7 +1248,7 @@
     },
     "villager.e.carry.walk0.0": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1204,7 +1256,7 @@
     },
     "villager.e.carry.walk0.1": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 112,
       "w": 16,
       "h": 24,
@@ -1212,23 +1264,23 @@
     },
     "villager.e.carry.walk0.2": {
       "sheet": "entities",
-      "x": 224,
-      "y": 112,
+      "x": 0,
+      "y": 136,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.carry.walk0.3": {
       "sheet": "entities",
-      "x": 240,
-      "y": 112,
+      "x": 16,
+      "y": 136,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.carry.walk0.4": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1236,7 +1288,7 @@
     },
     "villager.e.carry.walk0.5": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1244,7 +1296,7 @@
     },
     "villager.e.carry.walk0.6": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1252,7 +1304,7 @@
     },
     "villager.e.carry.walk0.7": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1260,7 +1312,7 @@
     },
     "villager.e.carry.walk0.8": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1268,7 +1320,7 @@
     },
     "villager.e.carry.walk1.0": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1276,7 +1328,7 @@
     },
     "villager.e.carry.walk1.1": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1284,7 +1336,7 @@
     },
     "villager.e.carry.walk1.2": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1292,7 +1344,7 @@
     },
     "villager.e.carry.walk1.3": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1300,7 +1352,7 @@
     },
     "villager.e.carry.walk1.4": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1308,7 +1360,7 @@
     },
     "villager.e.carry.walk1.5": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1316,7 +1368,7 @@
     },
     "villager.e.carry.walk1.6": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1324,7 +1376,7 @@
     },
     "villager.e.carry.walk1.7": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1332,7 +1384,7 @@
     },
     "villager.e.carry.walk1.8": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 136,
       "w": 16,
       "h": 24,
@@ -1340,23 +1392,23 @@
     },
     "villager.e.carry.walk2.0": {
       "sheet": "entities",
-      "x": 224,
-      "y": 136,
+      "x": 0,
+      "y": 160,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.carry.walk2.1": {
       "sheet": "entities",
-      "x": 240,
-      "y": 136,
+      "x": 16,
+      "y": 160,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.carry.walk2.2": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1364,7 +1416,7 @@
     },
     "villager.e.carry.walk2.3": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1372,7 +1424,7 @@
     },
     "villager.e.carry.walk2.4": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1380,7 +1432,7 @@
     },
     "villager.e.carry.walk2.5": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1388,7 +1440,7 @@
     },
     "villager.e.carry.walk2.6": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1396,7 +1448,7 @@
     },
     "villager.e.carry.walk2.7": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1404,7 +1456,7 @@
     },
     "villager.e.carry.walk2.8": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1412,7 +1464,7 @@
     },
     "villager.e.carry.walk3.0": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1420,7 +1472,7 @@
     },
     "villager.e.carry.walk3.1": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1428,7 +1480,7 @@
     },
     "villager.e.carry.walk3.2": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1436,7 +1488,7 @@
     },
     "villager.e.carry.walk3.3": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1444,7 +1496,7 @@
     },
     "villager.e.carry.walk3.4": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1452,7 +1504,7 @@
     },
     "villager.e.carry.walk3.5": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1460,7 +1512,7 @@
     },
     "villager.e.carry.walk3.6": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 160,
       "w": 16,
       "h": 24,
@@ -1468,23 +1520,23 @@
     },
     "villager.e.carry.walk3.7": {
       "sheet": "entities",
-      "x": 224,
-      "y": 160,
+      "x": 0,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.carry.walk3.8": {
       "sheet": "entities",
-      "x": 240,
-      "y": 160,
+      "x": 16,
+      "y": 184,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.idle.0": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1492,7 +1544,7 @@
     },
     "villager.e.idle.1": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1500,7 +1552,7 @@
     },
     "villager.e.idle.2": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1508,7 +1560,7 @@
     },
     "villager.e.idle.3": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1516,7 +1568,7 @@
     },
     "villager.e.idle.4": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1524,7 +1576,7 @@
     },
     "villager.e.idle.5": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1532,7 +1584,7 @@
     },
     "villager.e.idle.6": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1540,7 +1592,7 @@
     },
     "villager.e.idle.7": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1548,7 +1600,7 @@
     },
     "villager.e.idle.8": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1556,7 +1608,7 @@
     },
     "villager.e.walk0.0": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1564,7 +1616,7 @@
     },
     "villager.e.walk0.1": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1572,7 +1624,7 @@
     },
     "villager.e.walk0.2": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1580,7 +1632,7 @@
     },
     "villager.e.walk0.3": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1588,7 +1640,7 @@
     },
     "villager.e.walk0.4": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 184,
       "w": 16,
       "h": 24,
@@ -1596,23 +1648,23 @@
     },
     "villager.e.walk0.5": {
       "sheet": "entities",
-      "x": 224,
-      "y": 184,
+      "x": 0,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk0.6": {
       "sheet": "entities",
-      "x": 240,
-      "y": 184,
+      "x": 16,
+      "y": 208,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk0.7": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1620,7 +1672,7 @@
     },
     "villager.e.walk0.8": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1628,7 +1680,7 @@
     },
     "villager.e.walk1.0": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1636,7 +1688,7 @@
     },
     "villager.e.walk1.1": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1644,7 +1696,7 @@
     },
     "villager.e.walk1.2": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1652,7 +1704,7 @@
     },
     "villager.e.walk1.3": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1660,7 +1712,7 @@
     },
     "villager.e.walk1.4": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1668,7 +1720,7 @@
     },
     "villager.e.walk1.5": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1676,7 +1728,7 @@
     },
     "villager.e.walk1.6": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1684,7 +1736,7 @@
     },
     "villager.e.walk1.7": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1692,7 +1744,7 @@
     },
     "villager.e.walk1.8": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1700,7 +1752,7 @@
     },
     "villager.e.walk2.0": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1708,7 +1760,7 @@
     },
     "villager.e.walk2.1": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1716,7 +1768,7 @@
     },
     "villager.e.walk2.2": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 208,
       "w": 16,
       "h": 24,
@@ -1724,23 +1776,23 @@
     },
     "villager.e.walk2.3": {
       "sheet": "entities",
-      "x": 224,
-      "y": 208,
+      "x": 0,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk2.4": {
       "sheet": "entities",
-      "x": 240,
-      "y": 208,
+      "x": 16,
+      "y": 232,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.e.walk2.5": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1748,7 +1800,7 @@
     },
     "villager.e.walk2.6": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1756,7 +1808,7 @@
     },
     "villager.e.walk2.7": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1764,7 +1816,7 @@
     },
     "villager.e.walk2.8": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1772,7 +1824,7 @@
     },
     "villager.e.walk3.0": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1780,7 +1832,7 @@
     },
     "villager.e.walk3.1": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1788,7 +1840,7 @@
     },
     "villager.e.walk3.2": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1796,7 +1848,7 @@
     },
     "villager.e.walk3.3": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1804,7 +1856,7 @@
     },
     "villager.e.walk3.4": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1812,7 +1864,7 @@
     },
     "villager.e.walk3.5": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1820,7 +1872,7 @@
     },
     "villager.e.walk3.6": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1828,7 +1880,7 @@
     },
     "villager.e.walk3.7": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1836,7 +1888,7 @@
     },
     "villager.e.walk3.8": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1844,7 +1896,7 @@
     },
     "villager.lie.0": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 232,
       "w": 16,
       "h": 24,
@@ -1852,23 +1904,23 @@
     },
     "villager.lie.1": {
       "sheet": "entities",
-      "x": 224,
-      "y": 232,
+      "x": 0,
+      "y": 256,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.lie.2": {
       "sheet": "entities",
-      "x": 240,
-      "y": 232,
+      "x": 16,
+      "y": 256,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.lie.3": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1876,7 +1928,7 @@
     },
     "villager.lie.4": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1884,7 +1936,7 @@
     },
     "villager.lie.5": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1892,7 +1944,7 @@
     },
     "villager.lie.6": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1900,7 +1952,7 @@
     },
     "villager.lie.7": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1908,7 +1960,7 @@
     },
     "villager.lie.8": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1916,7 +1968,7 @@
     },
     "villager.n.carry.idle.0": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1924,7 +1976,7 @@
     },
     "villager.n.carry.idle.1": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1932,7 +1984,7 @@
     },
     "villager.n.carry.idle.2": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1940,7 +1992,7 @@
     },
     "villager.n.carry.idle.3": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1948,7 +2000,7 @@
     },
     "villager.n.carry.idle.4": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1956,7 +2008,7 @@
     },
     "villager.n.carry.idle.5": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1964,7 +2016,7 @@
     },
     "villager.n.carry.idle.6": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1972,7 +2024,7 @@
     },
     "villager.n.carry.idle.7": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 256,
       "w": 16,
       "h": 24,
@@ -1980,23 +2032,23 @@
     },
     "villager.n.carry.idle.8": {
       "sheet": "entities",
-      "x": 224,
-      "y": 256,
+      "x": 0,
+      "y": 280,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.carry.walk0.0": {
       "sheet": "entities",
-      "x": 240,
-      "y": 256,
+      "x": 16,
+      "y": 280,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.carry.walk0.1": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2004,7 +2056,7 @@
     },
     "villager.n.carry.walk0.2": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2012,7 +2064,7 @@
     },
     "villager.n.carry.walk0.3": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2020,7 +2072,7 @@
     },
     "villager.n.carry.walk0.4": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2028,7 +2080,7 @@
     },
     "villager.n.carry.walk0.5": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2036,7 +2088,7 @@
     },
     "villager.n.carry.walk0.6": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2044,7 +2096,7 @@
     },
     "villager.n.carry.walk0.7": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2052,7 +2104,7 @@
     },
     "villager.n.carry.walk0.8": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2060,7 +2112,7 @@
     },
     "villager.n.carry.walk1.0": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2068,7 +2120,7 @@
     },
     "villager.n.carry.walk1.1": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2076,7 +2128,7 @@
     },
     "villager.n.carry.walk1.2": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2084,7 +2136,7 @@
     },
     "villager.n.carry.walk1.3": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2092,7 +2144,7 @@
     },
     "villager.n.carry.walk1.4": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2100,7 +2152,7 @@
     },
     "villager.n.carry.walk1.5": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 280,
       "w": 16,
       "h": 24,
@@ -2108,23 +2160,23 @@
     },
     "villager.n.carry.walk1.6": {
       "sheet": "entities",
-      "x": 224,
-      "y": 280,
+      "x": 0,
+      "y": 304,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.carry.walk1.7": {
       "sheet": "entities",
-      "x": 240,
-      "y": 280,
+      "x": 16,
+      "y": 304,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.carry.walk1.8": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2132,7 +2184,7 @@
     },
     "villager.n.carry.walk2.0": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2140,7 +2192,7 @@
     },
     "villager.n.carry.walk2.1": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2148,7 +2200,7 @@
     },
     "villager.n.carry.walk2.2": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2156,7 +2208,7 @@
     },
     "villager.n.carry.walk2.3": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2164,7 +2216,7 @@
     },
     "villager.n.carry.walk2.4": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2172,7 +2224,7 @@
     },
     "villager.n.carry.walk2.5": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2180,7 +2232,7 @@
     },
     "villager.n.carry.walk2.6": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2188,7 +2240,7 @@
     },
     "villager.n.carry.walk2.7": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2196,7 +2248,7 @@
     },
     "villager.n.carry.walk2.8": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2204,7 +2256,7 @@
     },
     "villager.n.carry.walk3.0": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2212,7 +2264,7 @@
     },
     "villager.n.carry.walk3.1": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2220,7 +2272,7 @@
     },
     "villager.n.carry.walk3.2": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2228,7 +2280,7 @@
     },
     "villager.n.carry.walk3.3": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 304,
       "w": 16,
       "h": 24,
@@ -2236,23 +2288,23 @@
     },
     "villager.n.carry.walk3.4": {
       "sheet": "entities",
-      "x": 224,
-      "y": 304,
+      "x": 0,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.carry.walk3.5": {
       "sheet": "entities",
-      "x": 240,
-      "y": 304,
+      "x": 16,
+      "y": 328,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.carry.walk3.6": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2260,7 +2312,7 @@
     },
     "villager.n.carry.walk3.7": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2268,7 +2320,7 @@
     },
     "villager.n.carry.walk3.8": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2276,7 +2328,7 @@
     },
     "villager.n.idle.0": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2284,7 +2336,7 @@
     },
     "villager.n.idle.1": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2292,7 +2344,7 @@
     },
     "villager.n.idle.2": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2300,7 +2352,7 @@
     },
     "villager.n.idle.3": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2308,7 +2360,7 @@
     },
     "villager.n.idle.4": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2316,7 +2368,7 @@
     },
     "villager.n.idle.5": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2324,7 +2376,7 @@
     },
     "villager.n.idle.6": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2332,7 +2384,7 @@
     },
     "villager.n.idle.7": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2340,7 +2392,7 @@
     },
     "villager.n.idle.8": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2348,7 +2400,7 @@
     },
     "villager.n.walk0.0": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2356,7 +2408,7 @@
     },
     "villager.n.walk0.1": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 328,
       "w": 16,
       "h": 24,
@@ -2364,23 +2416,23 @@
     },
     "villager.n.walk0.2": {
       "sheet": "entities",
-      "x": 224,
-      "y": 328,
+      "x": 0,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk0.3": {
       "sheet": "entities",
-      "x": 240,
-      "y": 328,
+      "x": 16,
+      "y": 352,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk0.4": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2388,7 +2440,7 @@
     },
     "villager.n.walk0.5": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2396,7 +2448,7 @@
     },
     "villager.n.walk0.6": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2404,7 +2456,7 @@
     },
     "villager.n.walk0.7": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2412,7 +2464,7 @@
     },
     "villager.n.walk0.8": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2420,7 +2472,7 @@
     },
     "villager.n.walk1.0": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2428,7 +2480,7 @@
     },
     "villager.n.walk1.1": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2436,7 +2488,7 @@
     },
     "villager.n.walk1.2": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2444,7 +2496,7 @@
     },
     "villager.n.walk1.3": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2452,7 +2504,7 @@
     },
     "villager.n.walk1.4": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2460,7 +2512,7 @@
     },
     "villager.n.walk1.5": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2468,7 +2520,7 @@
     },
     "villager.n.walk1.6": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2476,7 +2528,7 @@
     },
     "villager.n.walk1.7": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2484,7 +2536,7 @@
     },
     "villager.n.walk1.8": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 352,
       "w": 16,
       "h": 24,
@@ -2492,23 +2544,23 @@
     },
     "villager.n.walk2.0": {
       "sheet": "entities",
-      "x": 224,
-      "y": 352,
+      "x": 0,
+      "y": 376,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk2.1": {
       "sheet": "entities",
-      "x": 240,
-      "y": 352,
+      "x": 16,
+      "y": 376,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk2.2": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2516,7 +2568,7 @@
     },
     "villager.n.walk2.3": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2524,7 +2576,7 @@
     },
     "villager.n.walk2.4": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2532,7 +2584,7 @@
     },
     "villager.n.walk2.5": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2540,7 +2592,7 @@
     },
     "villager.n.walk2.6": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2548,7 +2600,7 @@
     },
     "villager.n.walk2.7": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2556,7 +2608,7 @@
     },
     "villager.n.walk2.8": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2564,7 +2616,7 @@
     },
     "villager.n.walk3.0": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2572,7 +2624,7 @@
     },
     "villager.n.walk3.1": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2580,7 +2632,7 @@
     },
     "villager.n.walk3.2": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2588,7 +2640,7 @@
     },
     "villager.n.walk3.3": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2596,7 +2648,7 @@
     },
     "villager.n.walk3.4": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2604,7 +2656,7 @@
     },
     "villager.n.walk3.5": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2612,7 +2664,7 @@
     },
     "villager.n.walk3.6": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 376,
       "w": 16,
       "h": 24,
@@ -2620,23 +2672,23 @@
     },
     "villager.n.walk3.7": {
       "sheet": "entities",
-      "x": 224,
-      "y": 376,
+      "x": 0,
+      "y": 400,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.n.walk3.8": {
       "sheet": "entities",
-      "x": 240,
-      "y": 376,
+      "x": 16,
+      "y": 400,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.carry.idle.0": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2644,7 +2696,7 @@
     },
     "villager.s.carry.idle.1": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2652,7 +2704,7 @@
     },
     "villager.s.carry.idle.2": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2660,7 +2712,7 @@
     },
     "villager.s.carry.idle.3": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2668,7 +2720,7 @@
     },
     "villager.s.carry.idle.4": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2676,7 +2728,7 @@
     },
     "villager.s.carry.idle.5": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2684,7 +2736,7 @@
     },
     "villager.s.carry.idle.6": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2692,7 +2744,7 @@
     },
     "villager.s.carry.idle.7": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2700,7 +2752,7 @@
     },
     "villager.s.carry.idle.8": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2708,7 +2760,7 @@
     },
     "villager.s.carry.walk0.0": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2716,7 +2768,7 @@
     },
     "villager.s.carry.walk0.1": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2724,7 +2776,7 @@
     },
     "villager.s.carry.walk0.2": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2732,7 +2784,7 @@
     },
     "villager.s.carry.walk0.3": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2740,7 +2792,7 @@
     },
     "villager.s.carry.walk0.4": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 400,
       "w": 16,
       "h": 24,
@@ -2748,23 +2800,23 @@
     },
     "villager.s.carry.walk0.5": {
       "sheet": "entities",
-      "x": 224,
-      "y": 400,
+      "x": 0,
+      "y": 424,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.carry.walk0.6": {
       "sheet": "entities",
-      "x": 240,
-      "y": 400,
+      "x": 16,
+      "y": 424,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.carry.walk0.7": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2772,7 +2824,7 @@
     },
     "villager.s.carry.walk0.8": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2780,7 +2832,7 @@
     },
     "villager.s.carry.walk1.0": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2788,7 +2840,7 @@
     },
     "villager.s.carry.walk1.1": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2796,7 +2848,7 @@
     },
     "villager.s.carry.walk1.2": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2804,7 +2856,7 @@
     },
     "villager.s.carry.walk1.3": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2812,7 +2864,7 @@
     },
     "villager.s.carry.walk1.4": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2820,7 +2872,7 @@
     },
     "villager.s.carry.walk1.5": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2828,7 +2880,7 @@
     },
     "villager.s.carry.walk1.6": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2836,7 +2888,7 @@
     },
     "villager.s.carry.walk1.7": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2844,7 +2896,7 @@
     },
     "villager.s.carry.walk1.8": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2852,7 +2904,7 @@
     },
     "villager.s.carry.walk2.0": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2860,7 +2912,7 @@
     },
     "villager.s.carry.walk2.1": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2868,7 +2920,7 @@
     },
     "villager.s.carry.walk2.2": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 424,
       "w": 16,
       "h": 24,
@@ -2876,23 +2928,23 @@
     },
     "villager.s.carry.walk2.3": {
       "sheet": "entities",
-      "x": 224,
-      "y": 424,
+      "x": 0,
+      "y": 448,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.carry.walk2.4": {
       "sheet": "entities",
-      "x": 240,
-      "y": 424,
+      "x": 16,
+      "y": 448,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.carry.walk2.5": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2900,7 +2952,7 @@
     },
     "villager.s.carry.walk2.6": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2908,7 +2960,7 @@
     },
     "villager.s.carry.walk2.7": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2916,7 +2968,7 @@
     },
     "villager.s.carry.walk2.8": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2924,7 +2976,7 @@
     },
     "villager.s.carry.walk3.0": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2932,7 +2984,7 @@
     },
     "villager.s.carry.walk3.1": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2940,7 +2992,7 @@
     },
     "villager.s.carry.walk3.2": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2948,7 +3000,7 @@
     },
     "villager.s.carry.walk3.3": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2956,7 +3008,7 @@
     },
     "villager.s.carry.walk3.4": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2964,7 +3016,7 @@
     },
     "villager.s.carry.walk3.5": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2972,7 +3024,7 @@
     },
     "villager.s.carry.walk3.6": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2980,7 +3032,7 @@
     },
     "villager.s.carry.walk3.7": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2988,7 +3040,7 @@
     },
     "villager.s.carry.walk3.8": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -2996,7 +3048,7 @@
     },
     "villager.s.idle.0": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 448,
       "w": 16,
       "h": 24,
@@ -3004,23 +3056,23 @@
     },
     "villager.s.idle.1": {
       "sheet": "entities",
-      "x": 224,
-      "y": 448,
+      "x": 0,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.idle.2": {
       "sheet": "entities",
-      "x": 240,
-      "y": 448,
+      "x": 16,
+      "y": 472,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.idle.3": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3028,7 +3080,7 @@
     },
     "villager.s.idle.4": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3036,7 +3088,7 @@
     },
     "villager.s.idle.5": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3044,7 +3096,7 @@
     },
     "villager.s.idle.6": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3052,7 +3104,7 @@
     },
     "villager.s.idle.7": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3060,7 +3112,7 @@
     },
     "villager.s.idle.8": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3068,7 +3120,7 @@
     },
     "villager.s.walk0.0": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3076,7 +3128,7 @@
     },
     "villager.s.walk0.1": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3084,7 +3136,7 @@
     },
     "villager.s.walk0.2": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3092,7 +3144,7 @@
     },
     "villager.s.walk0.3": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3100,7 +3152,7 @@
     },
     "villager.s.walk0.4": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3108,7 +3160,7 @@
     },
     "villager.s.walk0.5": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3116,7 +3168,7 @@
     },
     "villager.s.walk0.6": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3124,7 +3176,7 @@
     },
     "villager.s.walk0.7": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 472,
       "w": 16,
       "h": 24,
@@ -3132,23 +3184,23 @@
     },
     "villager.s.walk0.8": {
       "sheet": "entities",
-      "x": 224,
-      "y": 472,
+      "x": 0,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk1.0": {
       "sheet": "entities",
-      "x": 240,
-      "y": 472,
+      "x": 16,
+      "y": 496,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
     "villager.s.walk1.1": {
       "sheet": "entities",
-      "x": 0,
+      "x": 32,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3156,7 +3208,7 @@
     },
     "villager.s.walk1.2": {
       "sheet": "entities",
-      "x": 16,
+      "x": 48,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3164,7 +3216,7 @@
     },
     "villager.s.walk1.3": {
       "sheet": "entities",
-      "x": 32,
+      "x": 64,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3172,7 +3224,7 @@
     },
     "villager.s.walk1.4": {
       "sheet": "entities",
-      "x": 48,
+      "x": 80,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3180,7 +3232,7 @@
     },
     "villager.s.walk1.5": {
       "sheet": "entities",
-      "x": 64,
+      "x": 96,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3188,7 +3240,7 @@
     },
     "villager.s.walk1.6": {
       "sheet": "entities",
-      "x": 80,
+      "x": 112,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3196,7 +3248,7 @@
     },
     "villager.s.walk1.7": {
       "sheet": "entities",
-      "x": 96,
+      "x": 128,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3204,7 +3256,7 @@
     },
     "villager.s.walk1.8": {
       "sheet": "entities",
-      "x": 112,
+      "x": 144,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3212,7 +3264,7 @@
     },
     "villager.s.walk2.0": {
       "sheet": "entities",
-      "x": 128,
+      "x": 160,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3220,7 +3272,7 @@
     },
     "villager.s.walk2.1": {
       "sheet": "entities",
-      "x": 144,
+      "x": 176,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3228,7 +3280,7 @@
     },
     "villager.s.walk2.2": {
       "sheet": "entities",
-      "x": 160,
+      "x": 192,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3236,7 +3288,7 @@
     },
     "villager.s.walk2.3": {
       "sheet": "entities",
-      "x": 176,
+      "x": 208,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3244,7 +3296,7 @@
     },
     "villager.s.walk2.4": {
       "sheet": "entities",
-      "x": 192,
+      "x": 224,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3252,7 +3304,7 @@
     },
     "villager.s.walk2.5": {
       "sheet": "entities",
-      "x": 208,
+      "x": 240,
       "y": 496,
       "w": 16,
       "h": 24,
@@ -3260,29 +3312,13 @@
     },
     "villager.s.walk2.6": {
       "sheet": "entities",
-      "x": 224,
-      "y": 496,
-      "w": 16,
-      "h": 24,
-      "anchorY": 8
-    },
-    "villager.s.walk2.7": {
-      "sheet": "entities",
-      "x": 240,
-      "y": 496,
-      "w": 16,
-      "h": 24,
-      "anchorY": 8
-    },
-    "villager.s.walk2.8": {
-      "sheet": "entities",
       "x": 0,
       "y": 520,
       "w": 16,
       "h": 24,
       "anchorY": 8
     },
-    "villager.s.walk3.0": {
+    "villager.s.walk2.7": {
       "sheet": "entities",
       "x": 16,
       "y": 520,
@@ -3290,7 +3326,7 @@
       "h": 24,
       "anchorY": 8
     },
-    "villager.s.walk3.1": {
+    "villager.s.walk2.8": {
       "sheet": "entities",
       "x": 32,
       "y": 520,
@@ -3298,7 +3334,7 @@
       "h": 24,
       "anchorY": 8
     },
-    "villager.s.walk3.2": {
+    "villager.s.walk3.0": {
       "sheet": "entities",
       "x": 48,
       "y": 520,
@@ -3306,7 +3342,7 @@
       "h": 24,
       "anchorY": 8
     },
-    "villager.s.walk3.3": {
+    "villager.s.walk3.1": {
       "sheet": "entities",
       "x": 64,
       "y": 520,
@@ -3314,7 +3350,7 @@
       "h": 24,
       "anchorY": 8
     },
-    "villager.s.walk3.4": {
+    "villager.s.walk3.2": {
       "sheet": "entities",
       "x": 80,
       "y": 520,
@@ -3322,7 +3358,7 @@
       "h": 24,
       "anchorY": 8
     },
-    "villager.s.walk3.5": {
+    "villager.s.walk3.3": {
       "sheet": "entities",
       "x": 96,
       "y": 520,
@@ -3330,7 +3366,7 @@
       "h": 24,
       "anchorY": 8
     },
-    "villager.s.walk3.6": {
+    "villager.s.walk3.4": {
       "sheet": "entities",
       "x": 112,
       "y": 520,
@@ -3338,7 +3374,7 @@
       "h": 24,
       "anchorY": 8
     },
-    "villager.s.walk3.7": {
+    "villager.s.walk3.5": {
       "sheet": "entities",
       "x": 128,
       "y": 520,
@@ -3346,9 +3382,25 @@
       "h": 24,
       "anchorY": 8
     },
-    "villager.s.walk3.8": {
+    "villager.s.walk3.6": {
       "sheet": "entities",
       "x": 144,
+      "y": 520,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk3.7": {
+      "sheet": "entities",
+      "x": 160,
+      "y": 520,
+      "w": 16,
+      "h": 24,
+      "anchorY": 8
+    },
+    "villager.s.walk3.8": {
+      "sheet": "entities",
+      "x": 176,
       "y": 520,
       "w": 16,
       "h": 24,
@@ -3364,29 +3416,29 @@
     },
     "wheat.0": {
       "sheet": "entities",
-      "x": 128,
-      "y": 560,
+      "x": 48,
+      "y": 576,
       "w": 16,
       "h": 16
     },
     "wheat.1": {
       "sheet": "entities",
-      "x": 144,
-      "y": 560,
+      "x": 64,
+      "y": 576,
       "w": 16,
       "h": 16
     },
     "wheat.2": {
       "sheet": "entities",
-      "x": 160,
-      "y": 560,
+      "x": 80,
+      "y": 576,
       "w": 16,
       "h": 16
     },
     "wheat.3": {
       "sheet": "entities",
-      "x": 176,
-      "y": 560,
+      "x": 96,
+      "y": 576,
       "w": 16,
       "h": 16,
       "frames": 2

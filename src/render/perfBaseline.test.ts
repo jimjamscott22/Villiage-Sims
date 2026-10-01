@@ -136,8 +136,10 @@ describe('perf baseline (demo terrain)', () => {
       atlas,
     });
 
+    // Seasonal decor (autumn leaves, winter snow) is skipped in the spring snapshot.
+    const inSeason = (p: typeof props[number]) => p.season == null || p.season === 0;
     expect(props.length).toBeGreaterThan(800);
-    expect(full.propsDrawn).toBe(props.length);
+    expect(full.propsDrawn).toBe(props.filter(inSeason).length);
     // Culled path should keep under half of the full-map prop work for a ~40×25 view.
     expect(culled.propsDrawn).toBeLessThan(props.length / 2);
     expect(culled.propsDrawn).toBeGreaterThan(0);
@@ -145,6 +147,7 @@ describe('perf baseline (demo terrain)', () => {
     // Spatial index query must match a naive filter of the same bounds.
     const naive = props.filter(
       (p) =>
+        inSeason(p) &&
         p.x >= view.minX && p.x <= view.maxX && p.y >= view.minY && p.y <= view.maxY,
     ).length;
     expect(culled.propsDrawn).toBe(naive);

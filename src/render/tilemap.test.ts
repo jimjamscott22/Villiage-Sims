@@ -224,15 +224,17 @@ describe('terrainProps', () => {
     expect(decor.length).toBeGreaterThan(0);
     const grassKeys = new Set([
       'prop.bush', 'prop.flowers', 'prop.stump', 'prop.deadfall', 'prop.mushroom', 'prop.campfire',
+      'prop.fallenLeaves', 'prop.pine', 'prop.standingStone', 'prop.snowDrift',
     ]);
+    const rockKeys = new Set(['prop.boulder', 'prop.pebbles', 'prop.crystal', 'prop.snowDrift']);
     const sandKeys = new Set(['prop.palm', 'prop.reeds', 'prop.shoreRock', 'prop.driftwood', 'prop.cactus']);
     for (const prop of decor) {
       const terrain = rows[prop.y][prop.x];
       expect([GRASS, SAND, ROCK, SHALLOW]).toContain(terrain);
       if (terrain === GRASS) expect(grassKeys.has(prop.key)).toBe(true);
-      if (terrain === ROCK) expect(prop.key).toBe('prop.boulder');
+      if (terrain === ROCK) expect(rockKeys.has(prop.key)).toBe(true);
       if (terrain === SAND) expect(sandKeys.has(prop.key)).toBe(true);
-      if (terrain === SHALLOW) expect(prop.key).toBe('prop.lilypad');
+      if (terrain === SHALLOW) expect(['prop.lilypad', 'prop.cattail']).toContain(prop.key);
     }
   });
 
@@ -245,6 +247,39 @@ describe('terrainProps', () => {
     const lilypads = terrainProps(grid(rows)).filter((prop) => prop.key === 'prop.lilypad');
     expect(lilypads.length).toBeGreaterThan(0);
     for (const pad of lilypads) expect(pad.x).toBeGreaterThan(1);
+  });
+
+  it('puts cattails only on shallow water touching a soft bank', () => {
+    const rows = Array.from({ length: 12 }, () =>
+      Array.from({ length: 12 }, (_, x) => (x === 0 ? GRASS : SHALLOW)),
+    );
+    const cattails = terrainProps(grid(rows)).filter((prop) => prop.key === 'prop.cattail');
+    expect(cattails.length).toBeGreaterThan(0);
+    for (const prop of cattails) expect(prop.x).toBe(1);
+  });
+
+  it('puts foothill pines and crystals only beside mountains', () => {
+    const rows = Array.from({ length: 24 }, (_, y) =>
+      Array.from({ length: 6 }, (_, x) => (x === 0 ? MOUNTAIN : y % 2 === 0 ? GRASS : ROCK)),
+    );
+    const props = terrainProps(grid(rows));
+    const pines = props.filter((prop) => prop.key === 'prop.pine');
+    const crystals = props.filter((prop) => prop.key === 'prop.crystal');
+    expect(pines.length + crystals.length).toBeGreaterThan(0);
+    for (const prop of [...pines, ...crystals]) expect(prop.x).toBe(1);
+  });
+
+  it('tags autumn leaves with season 2 and snow drifts with season 3', () => {
+    const rows = Array.from({ length: 32 }, () =>
+      Array.from({ length: 32 }, (_, x) => (x % 4 === 0 ? FOREST : GRASS)),
+    );
+    const props = terrainProps(grid(rows));
+    const leaves = props.filter((prop) => prop.key === 'prop.fallenLeaves');
+    const snow = props.filter((prop) => prop.key === 'prop.snowDrift');
+    expect(leaves.length).toBeGreaterThan(0);
+    expect(snow.length).toBeGreaterThan(0);
+    expect(leaves.every((prop) => prop.season === 2)).toBe(true);
+    expect(snow.every((prop) => prop.season === 3)).toBe(true);
   });
 
   it('tags spring flowers with season 0', () => {

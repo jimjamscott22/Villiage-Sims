@@ -13,7 +13,7 @@ is in [`progress.md`](../progress.md).
 |---|---|
 | Terrain bases | deep water, shallow water, sand, grass, rock — 4 variants each, plus fringes and animated foam |
 | Standing terrain props | `prop.cypress` (forest tiles), `prop.peak` (mountain tiles) |
-| Decor scatter | `prop.bush`, `prop.boulder`, `prop.palm`, `prop.reeds`, `prop.flowers`, `prop.stump`, `prop.deadfall`, `prop.mushroom`, `prop.shoreRock`, `prop.driftwood`, `prop.lilypad`, `prop.cactus`, `prop.campfire` (animated) |
+| Decor scatter | `prop.bush`, `prop.boulder`, `prop.palm`, `prop.reeds`, `prop.flowers`, `prop.stump`, `prop.deadfall`, `prop.mushroom`, `prop.shoreRock`, `prop.driftwood`, `prop.lilypad`, `prop.cactus`, `prop.campfire` (animated), `prop.pebbles`, `prop.crystal`, `prop.pine`, `prop.cattail` (animated), `prop.standingStone`, seasonal `prop.fallenLeaves` (autumn) and `prop.snowDrift` (winter) |
 | Buildings | hut, farm (+ field), granary, mill (animated), bakery (animated), well, fence, gate, signpost, storehouse, 3 scaffold sizes |
 | Crops | wheat, 4 growth stages, sway animation on the ripe stage |
 | Characters | one villager body in 3 facings × idle/4-frame walk/lie-down, recolored into 6 dyes |
@@ -55,6 +55,11 @@ Roughly what each kind of addition costs, in the order the work happens:
 | Lily pads on open water | **Done.** `prop.lilypad` scatters on calm shallow water that doesn't touch land, keeping the shoreline (reeds/rocks/driftwood) visually distinct from open sea. |
 | Desert cactus | **Done.** `prop.cactus` as a rarer alternative to `prop.palm` on inland sand. |
 | Campfire | **Done.** `prop.campfire` scatters sparsely on open grass (away from forest), two-frame flame flicker using the same animation path as reeds sway. |
+| Rock variety | **Done.** `prop.pebbles` as a lighter alternative to the boulder; rare `prop.crystal` on rock beside mountains. |
+| Foothill pines | **Done.** `prop.pine` on grass touching mountain tiles — the mountain counterpart to forest-edge debris. |
+| Cattails | **Done.** `prop.cattail` (two-frame sway) on shallow water touching sand/grass/forest; lily pads stay on open water. |
+| Autumn leaves, winter snow | **Done.** `prop.fallenLeaves` (season 2) at forest margins and `prop.snowDrift` (season 3) on grass and rock, using the same season gate as flowers. |
+| Standing stones | **Done.** Very rare `prop.standingStone` landmark on open grass. |
 | Depleted-node art | `ResourceNode.amount` is already in the sim but invisible. A stump variant for an exhausted forest tile and a rubble variant for exhausted rock would make gathering readable. Needs nodes on the wire (they aren't in the tick snapshot today). |
 | Dirt paths worn by villagers | Track tile traversal counts in the sim, blend a path fringe over grass. Genuinely nice, genuinely not cheap. |
 
