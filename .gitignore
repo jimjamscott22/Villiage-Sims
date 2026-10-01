@@ -37,3 +37,4 @@ graphify-out/.graphify_*
 graphify-out/[0-9]*/
 .cursor/hooks/state/continual-learning.json
 /.idea
+.run/tauri dev.run.xml
