@@ -40,6 +40,14 @@ pub fn handle_command(&mut self, command: SimCommand) {
                 let result = self.order_move_villager(x, y, villager_id);
                 let _ = reply.send(result);
             }
+            SimCommand::AssignHome {
+                villager_id,
+                building_id,
+                reply,
+            } => {
+                let result = self.assign_home(villager_id, building_id);
+                let _ = reply.send(result);
+            }
             SimCommand::GetVillagerDetail { id, reply } => {
                 let result = self.villager_detail(id);
                 let _ = reply.send(result);
@@ -221,6 +229,8 @@ pub fn demolish(&mut self, entity_id: u32) -> Result<(), String> {
         }
         self.resources.refund(&def.cost);
         let released = self.job_board.remove_site(entity_id);
+        // Residence links die with the building; walks home are released.
+        self.clear_homes_for_building(entity_id);
         for villager in &mut self.villagers {
             if released.contains(&villager.id) {
                 villager.current_job = None;

@@ -43,11 +43,14 @@ mod leisure;
 #[path = "legacy_v3.rs"]
 pub(crate) mod legacy_v3;
 mod commands_handler;
+mod homes;
 mod persistence_validation;
 mod population;
 mod progression;
 #[path = "legacy_v4.rs"]
 pub(crate) mod legacy_v4;
+#[path = "legacy_v5.rs"]
+pub(crate) mod legacy_v5;
 use social::{Encounter, Behavior};
 
 const VIEWPORT_MARGIN_TILES: f32 = 4.0;
@@ -217,6 +220,9 @@ impl World {
         }
         self.tick_encounters();
         self.check_population_dynamics();
+        // New beds (completed huts), newborns, and freed beds (deaths) settle
+        // here so Sleep journeys always read fresh assignments.
+        self.assign_homes();
         self.cancel_invalid_encounters();
         self.check_unlocks();
         self.check_objectives();
@@ -390,6 +396,7 @@ impl World {
                     partner_id: self.encounter_for(v.id).map(|p| if p.a == v.id { p.b } else { p.a }),
                     destination: self.view_destination(v),
                     purpose: self.view_purpose(v),
+                    home: v.home.filter(|id| self.valid_home(*id)),
                     social: v.needs.social,
                     id: v.id,
                     x: v.pos.0,
@@ -442,6 +449,14 @@ impl World {
             .and_then(|job_id| self.job_board.get(job_id))
             .map(|job| (Some(job.kind.as_str().to_string()), Some(job.site)))
             .unwrap_or((None, None));
+        let (job_site_name, job_site_tile) = self
+            .job_site_view(villager)
+            .map(|(_, name, tile)| (Some(name), Some(tile)))
+            .unwrap_or((None, None));
+        let (home, home_building, home_tile) = self
+            .home_view(villager)
+            .map(|(id, name, tile)| (Some(id), Some(name), Some(tile)))
+            .unwrap_or((None, None, None));
         Ok(VillagerDetail {
             id: villager.id,
             name: villager.name.clone(),
@@ -455,6 +470,11 @@ impl World {
             happiness: villager.needs.happiness,
             job_kind,
             job_site,
+            job_site_name,
+            job_site_tile,
+            home,
+            home_building,
+            home_tile,
             traits: villager.traits.clone(),
             tile: self.pos_to_tile(villager.pos),
             thought: villager.thought.clone(),
@@ -1108,10 +1128,7 @@ impl World {
         match kind {
             ActionKind::Eat => self.begin_eat(index),
             ActionKind::Drink => self.begin_drink(index),
-            ActionKind::Sleep => {
-                self.villagers[index].begin_sleeping();
-                self.villagers[index].set_thought(kind.thought(), 40);
-            }
+            ActionKind::Sleep => self.begin_sleep_at(index),
             ActionKind::Socialize => {
                 if !self.begin_encounter(index) { self.behavior.entry(self.villagers[index].id).or_default().cooldown = 100; }
             }
@@ -1450,6 +1467,12 @@ impl World {
     fn on_arrived(&mut self, index: usize, purpose: MovePurpose, _target: (i32, i32)) {
         self.villagers[index].path = None;
         match purpose {
+            MovePurpose::Home => {
+                // Arrived at the hut perimeter: rest there, then emerge back
+                // into normal decisioning when the rest completes.
+                self.villagers[index].begin_sleeping();
+                self.villagers[index].set_thought(ActionKind::Sleep.thought(), 40);
+            }
             MovePurpose::Wander => {
                 self.villagers[index].state = AgentState::Idle;
                 if self.encounter_for(self.villagers[index].id).is_none() { self.arrive_leisure(index); }
@@ -1892,6 +1915,8 @@ impl World {
                     state: building.state.as_u8(),
                     progress: building.state.progress_byte(def.build_ticks),
                     status: self.building_status(building, def).as_u8(),
+                    residents: self.home_residents(building.id),
+                    workers: self.site_workers(building.id),
                 })
             })
             .collect()
@@ -3893,6 +3918,224 @@ mod tests {
         let mut world = grass_world();
         world.advance_clock(1, None).unwrap();
         assert_eq!(world.tick_snapshot().last_autosave_slot, None);
+    }
+
+    #[test]
+    fn free_beds_autofill_up_to_hut_capacity() {
+        let mut world = grass_world();
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(hut));
+        let detail = world.villager_detail(1).unwrap();
+        assert_eq!(detail.home, Some(hut));
+        assert_eq!(detail.home_building.as_deref(), Some("hut"));
+        assert_eq!(detail.home_tile, Some((4, 4)));
+    }
+
+    #[test]
+    fn five_villagers_share_huts_two_beds_each() {
+        let mut world = World::generate(8, 8, 32, 1);
+        world.tiles = vec![Terrain::Grass as u8; 64];
+        world.occupancy = vec![None; 64];
+        assert_eq!(world.villagers.len(), 5);
+        let first = place_complete(&mut world, "hut", 1, 1);
+        let second = place_complete(&mut world, "hut", 5, 5);
+        world.advance();
+        let mut homes: Vec<_> = world.villagers.iter().map(|v| v.home).collect();
+        homes.sort();
+        assert_eq!(homes, vec![None, Some(first), Some(first), Some(second), Some(second)]);
+        // Capacity never overfills, and assignments are stable tick to tick.
+        world.advance();
+        let again: Vec<_> = world.villagers.iter().map(|v| v.home).collect();
+        assert_eq!(homes, {
+            let mut sorted = again.clone();
+            sorted.sort();
+            sorted
+        });
+    }
+
+    #[test]
+    fn exhausted_housed_villager_walks_home_sleeps_then_leaves() {
+        use crate::sim::utility::SLEEP_TICKS;
+
+        let mut world = grass_world();
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(hut));
+
+        world.villagers[0].needs.energy = 0.0;
+        world.villagers[0].needs.hunger = 1.0;
+        world.villagers[0].needs.thirst = 1.0;
+        world.villagers[0].needs.social = 1.0;
+        world.advance();
+        assert!(
+            matches!(
+                world.villagers[0].state,
+                AgentState::MovingTo {
+                    purpose: MovePurpose::Home,
+                    ..
+                }
+            ),
+            "expected a walk home, got {:?}",
+            world.villagers[0].state
+        );
+        let view = world
+            .tick_snapshot()
+            .villagers
+            .into_iter()
+            .find(|v| v.id == 1)
+            .expect("villager in snapshot");
+        assert_eq!(view.home, Some(hut));
+        assert_eq!(view.purpose, Some(MovePurpose::Home.as_u8()));
+
+        advance_until(&mut world, 300, |w| {
+            matches!(w.villagers[0].state, AgentState::Sleeping { .. })
+        });
+        let (hx, hy) = world.pos_to_tile(world.villagers[0].pos);
+        let stand = world.home_stand_tile(hut).expect("hut stand tile");
+        assert_eq!((hx, hy), stand, "rest happens beside the hut");
+
+        advance_until(&mut world, SLEEP_TICKS + 5, |w| {
+            w.villagers[0].state == AgentState::Idle
+        });
+        assert_eq!(world.villagers[0].needs.energy, 1.0);
+        assert_eq!(world.villagers[0].home, Some(hut), "rest keeps the home");
+    }
+
+    #[test]
+    fn homeless_villager_sleeps_in_place() {
+        let mut world = grass_world();
+        assert_eq!(world.villagers[0].home, None);
+        world.villagers[0].needs.energy = 0.0;
+        world.villagers[0].needs.hunger = 1.0;
+        world.villagers[0].needs.thirst = 1.0;
+        world.villagers[0].needs.social = 1.0;
+        let start = world.pos_to_tile(world.villagers[0].pos);
+        world.advance();
+        assert!(
+            matches!(world.villagers[0].state, AgentState::Sleeping { .. }),
+            "expected in-place rest, got {:?}",
+            world.villagers[0].state
+        );
+        assert_eq!(world.pos_to_tile(world.villagers[0].pos), start);
+    }
+
+    #[test]
+    fn player_reassignment_redirects_the_next_sleep() {
+        let mut world = grass_world();
+        let old_hut = place_complete(&mut world, "hut", 1, 1);
+        // Second hut's tile must be free: the first hut occupies (1, 1).
+        let new_hut = place_complete(&mut world, "hut", 5, 5);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(old_hut));
+
+        world.assign_home(1, Some(new_hut)).expect("reassign home");
+        assert_eq!(world.villagers[0].home, Some(new_hut));
+
+        world.villagers[0].needs.energy = 0.0;
+        world.villagers[0].needs.hunger = 1.0;
+        world.villagers[0].needs.thirst = 1.0;
+        world.villagers[0].needs.social = 1.0;
+        world.advance();
+        let AgentState::MovingTo { target, purpose } = world.villagers[0].state.clone() else {
+            panic!("expected a walk to the new home, got {:?}", world.villagers[0].state);
+        };
+        assert_eq!(purpose, MovePurpose::Home);
+        assert_eq!(target, world.home_stand_tile(new_hut).expect("new stand tile"));
+    }
+
+    #[test]
+    fn assign_home_rejects_unknown_full_and_unfinished_huts() {
+        let mut world = grass_world();
+        assert!(world.assign_home(999, None).is_err());
+        assert!(world.assign_home(1, Some(777)).is_err());
+
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        world.unlocked.insert("hut".to_string());
+        let unfinished = world.place_building("hut", 6, 6, 0).unwrap().id;
+        assert!(world.assign_home(1, Some(unfinished)).is_err());
+
+        // Fill both beds with other villagers, then the last claim fails.
+        world.populate_for_test(3);
+        world.advance();
+        let residents = world.home_residents(hut);
+        assert_eq!(residents.len(), 2);
+        let homeless = world.villagers.iter().find(|v| v.home.is_none()).unwrap().id;
+        assert!(world.assign_home(homeless, Some(hut)).is_err());
+        // Clearing is always allowed.
+        world.assign_home(1, None).expect("clear home");
+        assert_eq!(world.villagers.iter().find(|v| v.id == 1).unwrap().home, None);
+    }
+
+    #[test]
+    fn demolished_home_leaves_villager_homeless_until_refilled() {
+        let mut world = grass_world();
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(hut));
+
+        world.demolish(hut).expect("demolish home");
+        assert_eq!(world.villagers[0].home, None);
+
+        world.villagers[0].needs.energy = 0.0;
+        world.villagers[0].needs.hunger = 1.0;
+        world.villagers[0].needs.thirst = 1.0;
+        world.villagers[0].needs.social = 1.0;
+        world.advance();
+        assert!(
+            matches!(world.villagers[0].state, AgentState::Sleeping { .. }),
+            "expected in-place rest after losing home, got {:?}",
+            world.villagers[0].state
+        );
+
+        let replacement = place_complete(&mut world, "hut", 5, 5);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(replacement));
+    }
+
+    #[test]
+    fn homes_survive_a_save_round_trip() {
+        let mut world = grass_world();
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(hut));
+        let bytes = crate::persist::encode_world(&world).expect("encode");
+        let loaded = crate::persist::decode_world(&bytes).expect("decode");
+        assert_eq!(loaded.villagers[0].home, Some(hut));
+        assert_eq!(
+            crate::persist::encode_world(&loaded).expect("re-encode"),
+            bytes
+        );
+    }
+
+    #[test]
+    fn building_views_name_residents_and_workers() {
+        let mut world = grass_world();
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        let farm = place_complete(&mut world, "farm", 5, 1);
+        world.resources.grain = 4;
+        advance_until(&mut world, 200, |w| {
+            matches!(w.villagers[0].state, AgentState::Working { .. })
+                | matches!(
+                    w.villagers[0].state,
+                    AgentState::MovingTo {
+                        purpose: MovePurpose::Work,
+                        ..
+                    }
+                )
+        });
+        let views = world.tick_snapshot().buildings;
+        let hut_view = views.iter().find(|b| b.id == hut).expect("hut view");
+        assert_eq!(hut_view.residents, vec![1]);
+        assert!(hut_view.workers.is_empty());
+        let farm_view = views.iter().find(|b| b.id == farm).expect("farm view");
+        assert!(farm_view.residents.is_empty());
+        let detail = world.villager_detail(1).unwrap();
+        if detail.job_site == Some(farm) {
+            assert_eq!(detail.job_site_name.as_deref(), Some("farm"));
+            assert!(detail.job_site_tile.is_some());
+            assert_eq!(farm_view.workers, vec![1]);
+        }
     }
 }
 

@@ -55,9 +55,14 @@ pub struct VillagerView {
     pub partner_id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination: Option<(i32, i32)>,
-    /// Present while `MovingTo`. 0 PlayerOrder, 1 Work, 2 Wander, 3 Drink.
+    /// Present while `MovingTo`. 0 PlayerOrder, 1 Work, 2 Wander, 3 Drink, 4 Home.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purpose: Option<u8>,
+    /// Assigned residence building id, when the villager has a valid home.
+    /// Carried in the culled tick payload so the map can draw home links
+    /// without an on-demand fetch per villager.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub home: Option<u32>,
     pub social: f32,
     pub id: u32,
     pub x: f32,
@@ -85,6 +90,12 @@ pub struct BuildingView {
     pub progress: u8,
     #[serde(default)]
     pub status: u8,
+    /// Villager ids assigned to this building as their home. Empty when none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub residents: Vec<u32>,
+    /// Villager ids currently holding a claimed job at this building site.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub workers: Vec<u32>,
 }
 
 /// On-demand villager detail for the panel (never in tick payload).
@@ -103,6 +114,20 @@ pub struct VillagerDetail {
     pub happiness: f32,
     pub job_kind: Option<String>,
     pub job_site: Option<u32>,
+    /// Human-readable workplace: building definition id (e.g. "farm") plus
+    /// origin tile, so the panel/roster can name where work happens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub job_site_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub job_site_tile: Option<(i32, i32)>,
+    /// Assigned residence building id, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home: Option<u32>,
+    /// Residence building definition id (e.g. "hut") plus origin tile.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home_building: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home_tile: Option<(i32, i32)>,
     pub traits: Vec<String>,
     /// Tile the villager currently stands on, so the roster can centre the camera.
     pub tile: (i32, i32),

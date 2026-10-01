@@ -131,6 +131,26 @@ pub(crate) async fn move_villager_to(
 }
 
 #[tauri::command]
+pub(crate) async fn assign_home(
+    state: State<'_, AppState>,
+    villager_id: u32,
+    building_id: Option<u32>,
+) -> Result<(), String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::AssignHome {
+            villager_id,
+            building_id,
+            reply,
+        })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped assign_home".to_string())?
+}
+
+#[tauri::command]
 pub(crate) async fn get_villager_detail(
     state: State<'_, AppState>,
     id: u32,

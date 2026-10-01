@@ -124,6 +124,11 @@ pub(crate) fn prepare_after_load(&mut self) -> Result<(), String> {
         self.job_board
             .validate_loaded(&villager_ids, &building_ids)?;
 
+        // Residence links must point at live housing; anything else is dropped
+        // (demolished mid-save is impossible, but storm damage and catalog drift
+        // are not). Auto-fill runs on the next ticks, not here, so a load
+        // round-trips byte-for-byte.
+        self.clear_invalid_homes();
         self.validate_behavior()?;
         self.leisure_cache = Default::default();
         self.viewport = Viewport {

@@ -7,7 +7,7 @@ use crate::sim::world::World;
 const SAVE_MAGIC: [u8; 8] = *b"VILSAVE\0";
 const HEADER_LEN: usize = SAVE_MAGIC.len() + size_of::<u32>() + size_of::<u64>();
 const MAX_SAVE_BYTES: u64 = 64 * 1024 * 1024;
-pub const SAVE_VERSION: u32 = 5;
+pub const SAVE_VERSION: u32 = 6;
 
 fn config() -> impl bincode::config::Config {
     bincode::config::standard().with_limit::<{ MAX_SAVE_BYTES as usize }>()
@@ -54,7 +54,7 @@ pub(crate) fn decode_world(bytes: &[u8]) -> Result<World, String> {
             .try_into()
             .expect("fixed save version header"),
     );
-    if version != SAVE_VERSION && !(3..=4).contains(&version) {
+    if version != SAVE_VERSION && !(3..=5).contains(&version) {
         return Err(format!(
             "unsupported save version {version} (expected {SAVE_VERSION})"
         ));
@@ -73,6 +73,11 @@ pub(crate) fn decode_world(bytes: &[u8]) -> Result<World, String> {
         (legacy.into_world(), consumed)
     } else if version == 4 {
         let (legacy, consumed): (crate::sim::world::legacy_v4::LegacyWorld, usize) =
+            bincode::serde::decode_from_slice(payload, config())
+                .map_err(|error| format!("could not decode legacy save: {error}"))?;
+        (legacy.into_world(), consumed)
+    } else if version == 5 {
+        let (legacy, consumed): (crate::sim::world::legacy_v5::LegacyWorld, usize) =
             bincode::serde::decode_from_slice(payload, config())
                 .map_err(|error| format!("could not decode legacy save: {error}"))?;
         (legacy.into_world(), consumed)
@@ -218,7 +223,46 @@ mod tests {
             assert!((new.needs.health - (1.0 - 150.0 * HEALTH_DAMAGE)).abs() < 1e-5);
         }
         // Re-saving writes the current version, which round-trips byte-for-byte.
-        let resaved = encode_world(&loaded).expect("encode v5");
+        let resaved = encode_world(&loaded).expect("encode v6");
+        assert_eq!(
+            encode_world(&decode_world(&resaved).unwrap()).unwrap(),
+            resaved
+        );
+    }
+
+    #[test]
+    fn version_5_save_migrates_homeless_then_autofills() {
+        use crate::sim::terrain::Terrain;
+        use crate::sim::world::legacy_v5::LegacyWorld;
+
+        let mut world = World::generate(16, 16, 32, 5);
+        world.tiles = vec![Terrain::Grass as u8; 16 * 16];
+        world.occupancy = vec![None; 16 * 16];
+        let placed = world.place_building("hut", 2, 2, 0).expect("place hut");
+        for _ in 0..60 {
+            world.advance();
+        }
+        assert!(world.villager_detail(1).unwrap().home.is_some());
+        let legacy = LegacyWorld::from_world(&world);
+        let payload = bincode::serde::encode_to_vec(&legacy, config()).expect("encode v5");
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&SAVE_MAGIC);
+        bytes.extend_from_slice(&5u32.to_le_bytes());
+        bytes.extend_from_slice(&world.seed().to_le_bytes());
+        bytes.extend_from_slice(&payload);
+
+        let mut loaded = decode_world(&bytes).expect("v5 save loads");
+        assert_eq!(loaded.villagers().len(), world.villagers().len());
+        // Residences did not exist in version 5: everyone starts homeless.
+        for villager in loaded.villagers() {
+            assert_eq!(villager.home, None);
+        }
+        // The hut survived the trip, so the next ticks refill its beds.
+        assert!(loaded.buildings().iter().any(|b| b.id == placed.id));
+        loaded.advance();
+        assert_eq!(loaded.villager_detail(1).unwrap().home, Some(placed.id));
+        // Re-saving writes the current version, which round-trips byte-for-byte.
+        let resaved = encode_world(&loaded).expect("encode v6");
         assert_eq!(
             encode_world(&decode_world(&resaved).unwrap()).unwrap(),
             resaved
@@ -231,7 +275,7 @@ mod tests {
         bytes[SAVE_MAGIC.len()..SAVE_MAGIC.len() + size_of::<u32>()]
             .copy_from_slice(&1u32.to_le_bytes());
         let error = decode_world(&bytes).expect_err("version must be rejected");
-        assert_eq!(error, "unsupported save version 1 (expected 5)");
+        assert_eq!(error, "unsupported save version 1 (expected 6)");
     }
 
     #[test]
