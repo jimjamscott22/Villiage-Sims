@@ -48,6 +48,7 @@ pub fn run() {
             commands::place_building,
             commands::demolish,
             commands::move_villager_to,
+            commands::assign_home,
             commands::get_villager_detail,
             commands::get_villager_roster,
             commands::get_chronicle,

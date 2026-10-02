@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { BuildingDef, Catalog, CropDef, VillagerDetail } from '../state/types';
+import { transport } from '../state/transport';
 import { AtlasThumb } from './AtlasThumb';
 import { PixelText } from './PixelText';
 import { uiIconStyle } from './pixelUi';
@@ -44,6 +46,23 @@ export function BuildMenu({
   onSelectCrop,
   onDemolish,
 }: BuildMenuProps) {
+  const [homeBusy, setHomeBusy] = useState(false);
+  const [homeMsg, setHomeMsg] = useState<string | null>(null);
+  // The snapshot building list isn't plumbed into this menu, so housing-ness
+  // can't be checked up front: the button shows whenever a building and a
+  // villager are both selected, and the sim rejects non-residences (or full
+  // huts) with a readable error below.
+  const canAssignHome = villagerDetail != null && selectedBuildingId != null;
+
+  const onAssignHome = () => {
+    if (villagerDetail == null || selectedBuildingId == null || homeBusy) return;
+    setHomeBusy(true);
+    void transport
+      .assignHome(villagerDetail.id, selectedBuildingId)
+      .then(() => setHomeMsg(`Home set to building #${selectedBuildingId}`))
+      .catch((cause) => setHomeMsg(cause instanceof Error ? cause.message : String(cause)))
+      .finally(() => setHomeBusy(false));
+  };
   return (
     <aside className="pixel-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 text-sm">
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
@@ -146,6 +165,20 @@ export function BuildMenu({
       </div>
 
       <div className="shrink-0 pt-2">
+        {canAssignHome && (
+          <div className="mb-2">
+            <button
+              type="button"
+              disabled={homeBusy}
+              onClick={onAssignHome}
+              title="Assign the selected building as this villager's home"
+              className="pixel-btn pixel-focus w-full bg-emerald-950/60 px-2 py-2 text-xs text-emerald-100 disabled:cursor-wait disabled:opacity-40"
+            >
+              Assign home ({villagerDetail?.name} → #{selectedBuildingId})
+            </button>
+            {homeMsg && <p className="mt-1 text-[11px] text-white/60">{homeMsg}</p>}
+          </div>
+        )}
         <button
           type="button"
           disabled={selectedBuildingId == null}

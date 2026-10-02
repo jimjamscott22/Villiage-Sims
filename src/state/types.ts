@@ -18,8 +18,10 @@ export interface VillagerView {
   activity?: string;
   partnerId?: number;
   destination?: [number, number];
-  /** Present while MovingTo. 0 PlayerOrder, 1 Work, 2 Wander, 3 Drink. */
+  /** Present while MovingTo. 0 PlayerOrder, 1 Work, 2 Wander, 3 Drink, 4 Home. */
   purpose?: number;
+  /** Assigned residence building id, when the villager has a valid home. */
+  home?: number;
   social?: number;
   id: number;
   x: number;
@@ -49,6 +51,14 @@ export interface VillagerDetail {
   happiness: number;
   jobKind: string | null;
   jobSite: number | null;
+  /** Human-readable workplace: building definition id plus origin tile. */
+  jobSiteName?: string | null;
+  jobSiteTile?: [number, number] | null;
+  /** Assigned residence building id, if any. */
+  home?: number | null;
+  /** Residence building definition id plus origin tile. */
+  homeBuilding?: string | null;
+  homeTile?: [number, number] | null;
   traits: string[];
   /** Tile the villager stands on, used by the roster to centre the camera. */
   tile: [number, number];
@@ -66,6 +76,10 @@ export interface BuildingView {
   progress: number;
   /** 0 Working, 1 IdleNoInput, 2 IdleNoWorker, 3 IdleOutputFull, 4 UnderConstruction. */
   status?: number;
+  /** Villager ids assigned to this building as their home. */
+  residents?: number[];
+  /** Villager ids holding a claimed job at this building site. */
+  workers?: number[];
 }
 
 export interface CropView {

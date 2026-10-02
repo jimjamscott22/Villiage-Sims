@@ -1092,3 +1092,110 @@ describe('simulation review regressions', () => {
     expect(inventoryGet(building.inventory, 'food')).toBe(2);
   });
 });
+
+describe('assigned homes and sleep journeys', () => {
+  function tiredWorld() {
+    const world = new DemoWorld(grassTerrain());
+    const internals = world as unknown as {
+      villagers: Array<{
+        id: number;
+        needs: { energy: number; hunger: number; thirst: number; social: number };
+      }>;
+    };
+    for (const v of internals.villagers) {
+      v.needs.energy = 0;
+      v.needs.hunger = 1;
+      v.needs.thirst = 1;
+      v.needs.social = 1;
+    }
+    return { world, internals };
+  }
+
+  it('auto-fills hut beds two per hut', () => {
+    const world = new DemoWorld(grassTerrain());
+    const first = completeBuilding(world, 'hut', 1, 1);
+    const second = completeBuilding(world, 'hut', 10, 10);
+    world.advance();
+    const homes = world.snapshot().villagers.map((v) => v.home);
+    expect(homes.filter((h) => h === first)).toHaveLength(2);
+    expect(homes.filter((h) => h === second)).toHaveLength(2);
+    expect(homes.filter((h) => h == null)).toHaveLength(1);
+  });
+
+  it('walks home to sleep, rests beside the hut, then leaves', () => {
+    const world = new DemoWorld(grassTerrain());
+    const hut = completeBuilding(world, 'hut', 1, 1);
+    world.advance(); // settle auto-fill before anyone gets tired
+    const internals = world as unknown as {
+      villagers: Array<{
+        id: number;
+        x: number;
+        y: number;
+        needs: { energy: number; hunger: number; thirst: number; social: number };
+      }>;
+    };
+    const first = internals.villagers[0];
+    first.needs.energy = 0;
+    first.needs.hunger = 1;
+    first.needs.thirst = 1;
+    first.needs.social = 1;
+    world.advance();
+    let view = villagerById(world, first.id);
+    expect(view.home).toBe(hut);
+    expect(view.purpose).toBe(4); // home
+    expect(view.state).toBe(1);
+
+    for (let i = 0; i < 400 && villagerById(world, first.id).state !== 4; i += 1) world.advance();
+    view = villagerById(world, first.id);
+    expect(view.state).toBe(4);
+    expect(world.getVillagerDetail(first.id).home).toBe(hut);
+
+    for (let i = 0; i < 150 && villagerById(world, first.id).state === 4; i += 1) world.advance();
+    expect(villagerById(world, first.id).state).toBe(0);
+    expect(world.getVillagerDetail(first.id).home).toBe(hut);
+  });
+
+  it('sleeps in place without a home', () => {
+    const { world } = tiredWorld();
+    world.advance();
+    expect(villagerById(world, 1).state).toBe(4);
+    expect(villagerById(world, 1).destination).toBeUndefined();
+  });
+
+  it('reassigns homes and clears them on demolish', () => {
+    const world = new DemoWorld(grassTerrain());
+    const oldHut = completeBuilding(world, 'hut', 1, 1);
+    completeBuilding(world, 'hut', 10, 10);
+    const spareHut = completeBuilding(world, 'hut', 5, 12);
+    world.advance();
+    expect(world.getVillagerDetail(1).home).toBe(oldHut);
+
+    world.assignHome(1, spareHut);
+    expect(world.getVillagerDetail(1).home).toBe(spareHut);
+    expect(world.getVillagerDetail(1).homeBuilding).toBe('hut');
+    expect(() => world.assignHome(999, spareHut)).toThrow();
+    expect(() => world.assignHome(2, 9999)).toThrow();
+
+    world.demolish(spareHut);
+    expect(world.getVillagerDetail(1).home).toBeNull();
+  });
+
+  it('names workplaces and residences on detail and building views', () => {
+    const world = new DemoWorld(grassTerrain());
+    const hut = completeBuilding(world, 'hut', 1, 1);
+    const farm = completeBuilding(world, 'farm', 10, 10);
+    world.resources.grain = 4;
+    for (let i = 0; i < 60; i += 1) world.advance();
+    const detail = world.getVillagerDetail(1);
+    expect(detail.home).toBe(hut);
+    expect(detail.homeBuilding).toBe('hut');
+    expect(detail.homeTile).toEqual([1, 1]);
+    const hutView = world.snapshot().buildings.find((b) => b.id === hut)!;
+    expect(hutView.residents).toContain(1);
+    expect(detail.jobSite).toBe(farm);
+    expect(detail.jobSiteName).toBe('farm');
+    expect(detail.jobSiteTile).toEqual([10, 10]);
+    const farmView = world.snapshot().buildings.find((b) => b.id === farm)!;
+    expect(farmView.workers).toContain(1);
+  });
+});

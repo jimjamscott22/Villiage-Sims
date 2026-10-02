@@ -37,6 +37,12 @@ pub enum SimCommand {
         villager_id: Option<u32>,
         reply: oneshot::Sender<Result<(), String>>,
     },
+    AssignHome {
+        villager_id: u32,
+        /// Residence building id, or `None` to clear the assignment.
+        building_id: Option<u32>,
+        reply: oneshot::Sender<Result<(), String>>,
+    },
     GetVillagerDetail {
         id: u32,
         reply: oneshot::Sender<Result<VillagerDetail, String>>,
