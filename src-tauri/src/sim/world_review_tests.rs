@@ -1,5 +1,6 @@
 //! Focused regression scenarios from the September 2026 simulation review.
 use super::*;
+use crate::sim::economy::PRODUCTION_BUFFER_CAP;
 use crate::sim::needs::HEALTH_DAMAGE;
 use crate::sim::utility::EAT_TICKS;
 
@@ -160,4 +161,452 @@ fn recipe_supply_skips_an_unreachable_storage_source() {
     let task = world.find_haul_task((0, 0)).unwrap();
     assert_eq!(task.from, HaulEndpoint::Building(reachable));
     assert_eq!(task.to, HaulEndpoint::Building(bakery));
+}
+
+#[test]
+fn haul_task_prefers_the_pickup_nearest_the_worker() {
+    let mut world = open_world(32);
+    complete(&mut world, "granary", 20, 20);
+    let far = complete(&mut world, "farm", 2, 2);
+    let near = complete(&mut world, "farm", 11, 2);
+    add_inventory(&mut world, far, "grain", 4);
+    add_inventory(&mut world, near, "grain", 4);
+    let near_stand = world.building_stand_tile(near).unwrap();
+
+    let task = world.find_haul_task(near_stand).expect("haul task");
+    assert_eq!(task.from, HaulEndpoint::Building(near));
+}
+
+#[test]
+fn resuming_hauler_heads_for_delivery_not_job_tile() {
+    let mut world = open_world(32);
+    let granary = complete(&mut world, "granary", 20, 20);
+    complete(&mut world, "farm", 2, 2);
+    let dest_stand = world.building_stand_tile(granary).unwrap();
+    let haul_job = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|job| job.kind == JobKind::Haul)
+        .map(|job| job.id)
+        .expect("a haul job");
+    world.villagers[0].carrying = Some(CarryStack {
+        resource: "grain".into(),
+        amount: 3,
+        dest: HaulEndpoint::Building(granary),
+    });
+
+    world.begin_work(0, Some(haul_job));
+
+    assert_eq!(world.villagers[0].current_job, Some(haul_job));
+    assert!(matches!(
+        world.villagers[0].state,
+        AgentState::MovingTo { target, purpose: MovePurpose::Work } if target == dest_stand
+    ));
+}
+
+fn plant_and_water_farm(world: &mut World, farm: u32) {
+    for (x, y) in world.farm_footprint_tiles(farm) {
+        world.plant_crop("wheat", x, y).unwrap();
+    }
+    for crop in &mut world.crops {
+        crop.watered = true;
+    }
+    world.resources.grain = 0;
+}
+
+#[test]
+fn idle_farm_job_does_not_trap_a_villager_in_place() {
+    let mut world = open_world(24);
+    let farm = complete(&mut world, "farm", 8, 8);
+    plant_and_water_farm(&mut world, farm);
+    let start = world.villagers[0].pos;
+
+    let mut moved = false;
+    for _ in 0..200 {
+        for crop in &mut world.crops {
+            crop.watered = true;
+        }
+        world.advance();
+        moved |= world.villagers[0].pos != start;
+    }
+    assert!(moved, "villager should wander when the only job is unusable");
+}
+
+#[test]
+fn claim_on_a_job_that_became_unusable_is_swapped_for_a_usable_one() {
+    let mut world = open_world(24);
+    let farm = complete(&mut world, "farm", 8, 8);
+    let other = complete(&mut world, "farm", 14, 14);
+    plant_and_water_farm(&mut world, farm);
+    // The second farm is empty, with seed available, so its tending job is usable.
+    world.resources.grain = 20;
+    let stale = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|j| j.site == farm && j.kind == JobKind::TendCrops)
+        .map(|j| j.id)
+        .unwrap();
+    let usable = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|j| j.site == other && j.kind == JobKind::TendCrops)
+        .map(|j| j.id)
+        .unwrap();
+    for crop in world.crops.iter_mut() {
+        crop.watered = true;
+    }
+    // Only the immature-farm job is unusable; make sure the empty farm is not planted.
+    let id = world.villagers[0].id;
+    assert!(world.job_board.claim_id(stale, id));
+    world.villagers[0].current_job = Some(stale);
+    world.villagers[0].current_action = Some(ActionKind::Work);
+    world.villagers[0].state = AgentState::Idle;
+
+    world.maybe_decide(0);
+
+    assert_eq!(world.villagers[0].current_job, Some(usable));
+}
+
+#[test]
+fn stale_claim_with_no_alternative_falls_through_to_another_action() {
+    let mut world = open_world(24);
+    let farm = complete(&mut world, "farm", 8, 8);
+    plant_and_water_farm(&mut world, farm);
+    let stale = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|j| j.site == farm && j.kind == JobKind::TendCrops)
+        .map(|j| j.id)
+        .unwrap();
+    let id = world.villagers[0].id;
+    assert!(world.job_board.claim_id(stale, id));
+    world.villagers[0].current_job = Some(stale);
+    world.villagers[0].current_action = Some(ActionKind::Work);
+    world.villagers[0].state = AgentState::Idle;
+
+    world.maybe_decide(0);
+
+    assert_ne!(world.villagers[0].current_action, Some(ActionKind::Work));
+    assert!(
+        !matches!(world.villagers[0].state, AgentState::Idle)
+            || world.villagers[0].current_action.is_some()
+            || world.has_leisure_intent(0),
+        "villager must take another action in the same decision"
+    );
+}
+
+#[test]
+fn fence_on_a_diagonal_flank_forces_a_repath() {
+    let mut world = open_world(8);
+    world.order_move_villager(1, 1, Some(1)).unwrap();
+    let start = world.villagers[0].pos;
+    // (1,0) flanks the (0,0) -> (1,1) diagonal; the path's own tiles stay free.
+    complete(&mut world, "fence", 1, 0);
+    world.invalidate_paths_if_needed();
+    world.advance();
+
+    let path = world.villagers[0].path.clone().unwrap_or_default();
+    assert_ne!(path, vec![(1, 1)], "diagonal corner cut survived");
+    let pos = world.villagers[0].pos;
+    // Legal route goes via (0,1): x must not advance before y does.
+    assert!(pos.0 <= start.0 + 0.01, "villager cut the corner: {pos:?}");
+}
+
+fn carrying_hauler_after_site_removed(demolish_site: bool) -> World {
+    let mut world = open_world(32);
+    let granary = complete(&mut world, "granary", 20, 20);
+    complete(&mut world, "farm", 2, 2);
+    let (haul_job, site) = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|job| job.kind == JobKind::Haul)
+        .map(|job| (job.id, job.site))
+        .expect("a haul job");
+    world.villagers[0].carrying = Some(CarryStack {
+        resource: "grain".into(),
+        amount: 3,
+        dest: HaulEndpoint::Building(granary),
+    });
+    world.begin_work(0, Some(haul_job));
+    assert!(matches!(world.villagers[0].state, AgentState::MovingTo { .. }));
+    let grain_before = world.resources.grain;
+    if demolish_site {
+        world.demolish(site).unwrap();
+    } else {
+        let released = world.job_board.remove_site(site);
+        world.clear_released_work_claims(released);
+    }
+    assert_eq!(world.villagers[0].current_job, None);
+    assert!(world.resources.grain >= grain_before);
+    world
+}
+
+#[test]
+fn demolishing_the_haul_site_returns_carried_cargo() {
+    let world = carrying_hauler_after_site_removed(true);
+    assert!(world.villagers[0].carrying.is_none(), "cargo stranded on worker");
+}
+
+#[test]
+fn cleared_work_claim_returns_carried_cargo() {
+    let world = carrying_hauler_after_site_removed(false);
+    assert!(world.villagers[0].carrying.is_none(), "cargo stranded on worker");
+}
+
+#[test]
+fn worker_standing_where_a_building_is_placed_stops_working_there() {
+    let mut world = open_world(16);
+    world.nodes.push(ResourceNode::forest((8, 8)));
+    world.refresh_gather_jobs();
+    let job = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|job| job.kind == JobKind::Gather)
+        .expect("a gather job");
+    let stand = job.tile;
+    let job_id = job.id;
+    world.villagers[0].pos = world.tile_center(stand.0, stand.1);
+    world.begin_work(0, Some(job_id));
+    assert!(matches!(world.villagers[0].state, AgentState::Working { .. }));
+
+    complete(&mut world, "fence", stand.0, stand.1);
+    world.advance();
+
+    let v = &world.villagers[0];
+    assert_ne!(v.current_job, Some(job_id), "still working inside the fence");
+    assert!(!matches!(v.state, AgentState::Working { .. }));
+}
+
+fn ripen_all_crops(world: &mut World) {
+    for crop in &mut world.crops {
+        let max = world.catalog.get_crop(crop.kind_index).unwrap().max_stage();
+        crop.stage = max;
+    }
+}
+
+fn keep_only_one_crop(world: &mut World) {
+    world.crops.truncate(1);
+}
+
+#[test]
+fn ripe_crop_waits_for_room_instead_of_vanishing() {
+    let mut world = open_world(16);
+    let farm = complete(&mut world, "farm", 4, 4);
+    plant_and_water_farm(&mut world, farm);
+    keep_only_one_crop(&mut world);
+    ripen_all_crops(&mut world);
+    let job = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|job| job.site == farm && job.kind == JobKind::TendCrops)
+        .map(|job| job.id)
+        .unwrap();
+    add_inventory(&mut world, farm, "grain", PRODUCTION_BUFFER_CAP);
+
+    world.tend_harvest_ready_crop(job);
+    assert_eq!(world.crops.len(), 1, "crop harvested into a full buffer");
+    let full = world.buildings.iter().find(|b| b.id == farm).unwrap();
+    assert_eq!(inventory_get(&full.inventory, "grain"), PRODUCTION_BUFFER_CAP);
+
+    // Partial room is not enough for the whole yield either.
+    let building = world.buildings.iter_mut().find(|b| b.id == farm).unwrap();
+    inventory_take(&mut building.inventory, "grain", 1);
+    world.tend_harvest_ready_crop(job);
+    assert_eq!(world.crops.len(), 1, "yield would have been truncated");
+
+    let building = world.buildings.iter_mut().find(|b| b.id == farm).unwrap();
+    inventory_take(&mut building.inventory, "grain", 10);
+    world.tend_harvest_ready_crop(job);
+    assert!(world.crops.is_empty());
+}
+
+#[test]
+fn ripe_crop_does_not_make_a_farm_look_workable_when_full() {
+    let mut world = open_world(16);
+    let farm = complete(&mut world, "farm", 4, 4);
+    plant_and_water_farm(&mut world, farm);
+    ripen_all_crops(&mut world);
+    add_inventory(&mut world, farm, "grain", PRODUCTION_BUFFER_CAP);
+    assert!(!world.farm_needs_tending(farm));
+}
+
+#[test]
+fn finished_recipe_holds_its_output_until_there_is_room() {
+    let mut world = open_world(16);
+    let bakery = complete(&mut world, "bakery", 4, 4);
+    let job = world
+        .job_board
+        .jobs()
+        .iter()
+        .find(|job| job.site == bakery && job.kind == JobKind::Produce)
+        .map(|job| job.id)
+        .unwrap();
+    add_inventory(&mut world, bakery, "flour", PRODUCTION_BUFFER_CAP);
+    let b = world.buildings.iter_mut().find(|b| b.id == bakery).unwrap();
+    b.recipe_ticks = 1;
+    inventory_take(&mut b.inventory, "flour", 1);
+    // Buffer is one short of full: the 2-food output does not fit.
+    add_inventory(&mut world, bakery, "flour", 1);
+
+    world.tick_produce(job);
+    let b = world.buildings.iter().find(|b| b.id == bakery).unwrap();
+    assert_eq!(b.recipe_ticks, 1, "recipe completed into a full buffer");
+    assert_eq!(inventory_get(&b.inventory, "food"), 0);
+
+    let b = world.buildings.iter_mut().find(|b| b.id == bakery).unwrap();
+    inventory_take(&mut b.inventory, "flour", 5);
+    world.tick_produce(job);
+    let b = world.buildings.iter().find(|b| b.id == bakery).unwrap();
+    assert_eq!(b.recipe_ticks, 0);
+    assert_eq!(inventory_get(&b.inventory, "food"), 2);
+}
+
+#[test]
+fn natural_day_rollover_autosave_holds_the_completed_tick() {
+    let dir = std::env::temp_dir().join(format!(
+        "villagesim-r6-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut world = World::generate(16, 16, 32, 5);
+    world.set_autosave_dir(Some(dir.clone()));
+
+    let mut guard = 0;
+    while world.last_autosave_slot.is_none() {
+        world.advance();
+        guard += 1;
+        assert!(guard < 100_000, "no autosave within a day");
+    }
+    let slot = world.last_autosave_slot.unwrap();
+    let mut saved = crate::persist::load_world(&dir.join(format!("slot-{slot}.vsav"))).unwrap();
+    // The slot marker is bookkeeping written after the file; ignore it.
+    saved.last_autosave_slot = world.last_autosave_slot;
+
+    let live = crate::persist::encode_world(&world).unwrap();
+    let from_disk = crate::persist::encode_world(&saved).unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+    assert!(live == from_disk, "autosave captured a partially processed tick");
+}
+
+#[test]
+fn carrying_hauler_resumes_delivery_when_its_job_tile_is_unreachable() {
+    let mut world = open_world(24);
+    let granary = complete(&mut world, "granary", 3, 3);
+    let haul = world.job_board.jobs().iter()
+        .find(|job| job.site == granary && job.kind == JobKind::Haul).unwrap().id;
+    let id = world.villagers[0].id;
+    assert!(world.job_board.claim_id(haul, id));
+    world.villagers[0].current_job = Some(haul);
+    world.villagers[0].carrying = Some(CarryStack {
+        resource: "grain".into(), amount: 3, dest: HaulEndpoint::Stockpile,
+    });
+    enclose(&mut world, 1, 6);
+    let target = world.stockpile_stand().unwrap();
+    assert!(world.compute_path((0, 0), world.job_board.get(haul).unwrap().tile).is_none());
+    assert!(world.compute_path((0, 0), target).is_some());
+
+    world.begin_work(0, Some(haul));
+
+    assert_eq!(world.villagers[0].current_job, Some(haul));
+    assert_eq!(world.job_board.get(haul).unwrap().claimed_by, Some(id));
+    assert!(matches!(world.villagers[0].state,
+        AgentState::MovingTo { target: actual, purpose: MovePurpose::Work } if actual == target));
+    let before = world.resources.grain;
+    for _ in 0..600 {
+        world.tick_villager_at(0);
+        if world.villagers[0].carrying.is_none() { break; }
+    }
+    assert!(world.villagers[0].carrying.is_none());
+    assert_eq!(world.resources.grain, before + 3);
+}
+
+#[test]
+fn failed_cargo_resumption_returns_cargo_with_or_without_an_existing_claim() {
+    for claimed in [false, true] {
+        for missing_destination in [false, true] {
+            let mut world = open_world(24);
+            let granary = complete(&mut world, "granary", 3, 3);
+            let haul = world.job_board.jobs().iter()
+                .find(|job| job.site == granary && job.kind == JobKind::Haul).unwrap().id;
+            let id = world.villagers[0].id;
+            if claimed {
+                assert!(world.job_board.claim_id(haul, id));
+                world.villagers[0].current_job = Some(haul);
+            }
+            world.villagers[0].carrying = Some(CarryStack {
+                resource: "grain".into(), amount: 3,
+                dest: HaulEndpoint::Building(if missing_destination { u32::MAX } else { granary }),
+            });
+            enclose(&mut world, 1, 6);
+            let before = world.resources.grain;
+
+            world.begin_work(0, Some(haul));
+
+            assert_eq!(world.villagers[0].current_job, None);
+            assert_eq!(world.job_board.get(haul).unwrap().claimed_by, None);
+            assert!(world.villagers[0].carrying.is_none());
+            assert_eq!(world.resources.grain, before + 3);
+            world.begin_work(0, Some(haul));
+            assert_eq!(world.resources.grain, before + 3, "cargo returned twice");
+        }
+    }
+}
+
+#[test]
+fn blocked_completed_recipe_releases_the_only_worker_to_haul_then_finish() {
+    let mut world = open_world(16);
+    let bakery = complete(&mut world, "bakery", 4, 4);
+    let produce = world.job_board.jobs().iter()
+        .find(|job| job.site == bakery && job.kind == JobKind::Produce).unwrap().id;
+    let haul = world.job_board.jobs().iter()
+        .find(|job| job.site == bakery && job.kind == JobKind::Haul).unwrap().id;
+    add_inventory(&mut world, bakery, "food", PRODUCTION_BUFFER_CAP);
+    let building_index = world.buildings.iter().position(|b| b.id == bakery).unwrap();
+    world.buildings[building_index].recipe_ticks = 2;
+    assert!(world.job_actionable(world.job_board.get(produce).unwrap(), 0));
+    world.buildings[building_index].recipe_ticks = 1;
+    assert!(!world.job_actionable(world.job_board.get(produce).unwrap(), 0));
+    inventory_take(&mut world.buildings[building_index].inventory, "food", 1);
+    assert!(!world.job_actionable(world.job_board.get(produce).unwrap(), 0));
+    inventory_take(&mut world.buildings[building_index].inventory, "food", 1);
+    assert!(world.job_actionable(world.job_board.get(produce).unwrap(), 0));
+    add_inventory(&mut world, bakery, "food", 2);
+    let id = world.villagers[0].id;
+    world.villagers[0].pos = { let (x, y) = world.building_stand_tile(bakery).unwrap(); world.tile_center(x, y) };
+    assert!(world.job_board.claim_id(produce, id));
+    world.villagers[0].current_job = Some(produce);
+    world.villagers[0].current_action = Some(ActionKind::Work);
+    world.villagers[0].state = AgentState::Working { job: produce, ticks_remaining: WORK_CYCLE_TICKS };
+
+    world.tick_villager_at(0);
+
+    assert_eq!(world.villagers[0].current_job, None);
+    assert_eq!(world.job_board.get(produce).unwrap().claimed_by, None);
+    assert_eq!(world.buildings[building_index].recipe_ticks, 1, "pending output lost");
+    let before = world.resources.food;
+    let mut hauled = false;
+    for _ in 0..2000 {
+        world.tick_villager_at(0);
+        hauled |= world.villagers[0].current_job == Some(haul);
+        if world.buildings[building_index].recipe_ticks == 0 { break; }
+    }
+    assert!(hauled, "the only worker never switched to hauling");
+    assert_eq!(world.buildings[building_index].recipe_ticks, 0);
+    let carried = world.villagers[0].carrying.as_ref()
+        .filter(|cargo| cargo.resource == "food").map_or(0, |cargo| cargo.amount);
+    assert_eq!(world.resources.food
+        + inventory_get(&world.buildings[building_index].inventory, "food") + carried,
+        before + PRODUCTION_BUFFER_CAP + 2);
+    assert_eq!(world.villagers.len(), 1);
 }

@@ -221,20 +221,9 @@ pub fn demolish(&mut self, entity_id: u32) -> Result<(), String> {
         }
         self.resources.refund(&def.cost);
         let released = self.job_board.remove_site(entity_id);
+        self.clear_released_work_claims(released);
         for villager in &mut self.villagers {
-            if released.contains(&villager.id) {
-                villager.current_job = None;
-                if matches!(
-                    villager.state,
-                    AgentState::Working { .. }
-                        | AgentState::MovingTo {
-                            purpose: MovePurpose::Work,
-                            ..
-                        }
-                ) {
-                    villager.clear_path_to_idle();
-                }
-            } else if let Some(job_id) = villager.current_job {
+            if let Some(job_id) = villager.current_job {
                 if self.job_board.get(job_id).is_none() {
                     villager.current_job = None;
                 }
