@@ -127,7 +127,17 @@ export interface ResourceTotals {
   gold: number;
 }
 
+export interface ChickenView {
+  id: number; shelterId: number; name: string; tendency: 'curious' | 'sleepy' | 'social';
+  x: number; y: number; pose: 'walk' | 'peck' | 'scratch' | 'rest' | 'sleep' | 'tilt' | 'startled' | 'hop';
+  activity: string; soundSeq: number; facingLeft: boolean;
+}
+export interface EggBasketView { id: number; shelterId: number; x: number; y: number }
+
 export interface TickSnapshot {
+  chickenShelterId?: number | null;
+  chickens?: ChickenView[];
+  eggBaskets?: EggBasketView[];
   tick: number;
   villagers: VillagerView[];
   buildings: BuildingView[];

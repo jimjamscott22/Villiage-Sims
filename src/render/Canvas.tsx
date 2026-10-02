@@ -8,6 +8,7 @@ import { ART_SCALE, drawCell, loadAtlas } from './atlas';
 import { drawBuildings, drawCrops, drawVillagers } from './drawEntities';
 import { drawGhost } from './drawGhost';
 import { drawTerrain } from './drawTerrain';
+import { ChickenAudio } from './chickenAudio';
 import { hoverTargetAt, type HoverTarget } from './hover';
 import { drawIntentOverlay, planIntentOverlay } from './intentOverlay';
 import { drawNameTags, nameTagPlacements } from './nameTags';
@@ -45,6 +46,7 @@ interface CanvasProps {
   onSelectBuilding: (id: number | null) => void;
   onSelectVillager: (id: number | null) => void;
   onSnapshot: (snapshot: TickSnapshot) => void;
+  onDemolish: () => Promise<void>;
   /** Villager id → name-tag label; drawn under each villager when `showNameTags`. */
   tagLabels: ReadonlyMap<number, string>;
   showNameTags: boolean;
@@ -95,10 +97,17 @@ export function Canvas({
   onSelectBuilding,
   onSelectVillager,
   onSnapshot,
+  onDemolish,
   tagLabels,
   showNameTags,
   focusTile,
 }: CanvasProps) {
+  const audioRef = useRef<ChickenAudio | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  useEffect(() => {
+    const audio = new ChickenAudio(); audioRef.current = audio;
+    return () => { audio.close(); audioRef.current = null; };
+  }, []);
   const viewportRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cameraRef = useRef(new Camera());
@@ -116,6 +125,7 @@ export function Canvas({
   const selectedVillagerIdRef = useRef(selectedVillagerId);
   const villagerDetailRef = useRef(villagerDetail);
   const onSnapshotRef = useRef(onSnapshot);
+  const onDemolishRef = useRef(onDemolish);
   const tagLabelsRef = useRef(tagLabels);
   const showNameTagsRef = useRef(showNameTags);
   const onSelectBuildingRef = useRef(onSelectBuilding);
@@ -150,6 +160,7 @@ export function Canvas({
   useEffect(() => {
     villagerDetailRef.current = villagerDetail;
   }, [villagerDetail]);
+  useEffect(() => { onDemolishRef.current = onDemolish; }, [onDemolish]);
   useEffect(() => {
     onSnapshotRef.current = onSnapshot;
   }, [onSnapshot]);
@@ -582,6 +593,7 @@ export function Canvas({
         resize();
         const stopListening = await transport.listenToTicks((snapshot) => {
           buffer.push(snapshot, performance.now());
+          audioRef.current?.observe(snapshot.chickens ?? []);
           tickRef.current = snapshot.tick;
           setTick(snapshot.tick);
           try {
@@ -656,6 +668,9 @@ export function Canvas({
         },
         buildings: rendered?.buildings ?? [],
         crops: rendered?.crops ?? [],
+        chickens: rendered?.chickens ?? [],
+        eggBaskets: rendered?.eggBaskets ?? [],
+        chickenShelterId: rendered?.chickenShelterId ?? null,
         clock: rendered?.clock ?? null,
         resources: rendered?.resources ?? null,
         selectedKind: selectedKindRef.current,
@@ -670,6 +685,7 @@ export function Canvas({
     };
 
     const onKeyDown = async (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLElement && event.target.closest('dialog[open]')) return;
       if (event.key.toLowerCase() === 'f') {
         if (document.fullscreenElement) await document.exitFullscreen();
         else {
@@ -694,8 +710,7 @@ export function Canvas({
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedBuildingIdRef.current != null) {
         event.preventDefault();
         try {
-          await transport.demolish(selectedBuildingIdRef.current);
-          onSelectBuildingRef.current(null);
+          await onDemolishRef.current();
         } catch (cause) {
           fail(cause instanceof Error ? cause.message : String(cause));
         }
@@ -777,6 +792,7 @@ export function Canvas({
             return;
           }
           await transport.placeBuilding(kind, tile[0], tile[1], rotationRef.current);
+          if (kind === 'chicken_shelter') onCancelBuildRef.current();
           errorRef.current = null;
           setError(null);
         } catch (cause) {
@@ -788,6 +804,15 @@ export function Canvas({
       const snapshot = rendered ?? buffer.interpolate(performance.now(), TICK_MS);
       if (!snapshot) return;
       const [worldX, worldY] = camera.screenToWorld(pointerX, pointerY);
+      const cat = catalogRef.current;
+      const target = cat ? hoverTargetAt({ snapshot, catalog: cat, worldX, worldY, tileSize: terrain.tileSize, zoom: camera.zoom }) : null;
+      if (target?.shelterId != null && (target.kind === 'chicken' || target.kind === 'eggBasket')) {
+        try {
+          if (target.kind === 'chicken') await transport.clickChicken(target.shelterId, target.id);
+          else await transport.collectEggs(target.shelterId, target.id);
+        } catch (cause) { fail(cause instanceof Error ? cause.message : String(cause)); }
+        return;
+      }
       const hitRadius = Math.max(16, 22 / Math.max(camera.zoom, 0.01));
       let closestVillager: { id: number; dist: number } | null = null;
       for (const villager of snapshot.villagers) {
@@ -888,6 +913,11 @@ export function Canvas({
           selectedKind || selectedCrop ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'
         }`}
       />
+      <button type="button" className="pixel-btn pixel-focus absolute bottom-3 left-3 z-10 bg-black/60 px-2 py-1 text-xs text-white/80"
+        aria-pressed={soundEnabled}
+        onClick={() => { void audioRef.current?.toggle().then(setSoundEnabled).catch(cause => setError(`Could not enable sound: ${String(cause)}`)); }}>
+        Sound {soundEnabled ? 'on' : 'off'}
+      </button>
       {hovered && (
         <div
           role="tooltip"

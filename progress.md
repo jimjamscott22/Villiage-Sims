@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-09-30 (PR #56 demo storm cargo cleanup fixed and automated checks verified; live interaction testing remains unrun).
+Last updated: 2026-10-01 (small optional chicken flock implemented; verification below).
 
 ## Status
 
@@ -148,6 +148,49 @@ separately rerun here. Local `npm run build` and live Tauri/browser verification
 
 R7 is resolved in Rust and the demo. The scoped fixes are ready to merge on automated evidence;
 the R1/R4 remainders, R8 decisions and live interaction checks remain outstanding.
+
+## Chicken flock addition (2026-10-01)
+
+Implemented the requested small first release:
+
+- Append-only `chicken_shelter` catalog entry (15 wood, 1×1, immediately usable),
+  mirrored in the demo. Both simulations enforce one shelter and an adjacent exit.
+- Persisted Pip/curious, Mabel/sleepy, Poppy/social; bounded seeded wandering,
+  pecking, scratching, resting, following, passing-villager tilt/scurry, click hop
+  with five-second cooldown, dusk return and sleep. Roosts use reachable free tiles
+  on the shelter perimeter. Newly placed chickens explore for one minute before
+  early-morning sleep, to make the midnight-start village immediately enjoyable.
+- Chickens do not reserve occupancy. Placement under them relocates them to free
+  local ground; routes re-check obstacle and diagonal-flank validity.
+- One morning basket at 06:00, three-basket cap, individually identified baskets
+  worth 3 food. Repeated collection is rejected by the simulation. No feeding,
+  breeding, illness, slaughter, upgrades, extra species, or neglect penalties.
+- Visible Rust chicken snapshots, frontend interpolation, atlas poses and y-sort,
+  hover names/activities, individual clicks and optional quiet synthesized clucks.
+  Shelter placement exits build mode automatically. Button and Delete demolition
+  share an in-game confirmation explaining flock/basket removal.
+- Desktop save version **7** freezes and migrates version **6**, retaining older
+  version 3–5 migrations. Demo save version **4** accepts older versions 1–3.
+  All chicken positions, names, personality, RNG/timers and baskets persist.
+
+Verification: frontend **298 tests**, Rust **185 lib tests**, `npm run build`, and
+Rust Clippy `--all-targets -- -D warnings` passed. Tests cover first-minute variety,
+water/building avoidance, home range, dusk/dawn, reactions and cooldowns, collection
+retries/cap, construction under animals, save byte equality and deterministic
+continuation, v6 migration, interpolation and atlas/culling. `npm run art` regenerated
+committed entity assets; decoded-pixel drift tests passed.
+
+Browser smoke on port **5174** (5173 was occupied) visually verified placement,
+three chicken sprites, Pip's hover/hop, the one-shelter menu restriction, and Save.
+No VillageSim console errors were observed. The first native confirmation dialog
+stalled the browser tool; it was replaced with an accessible in-game dialog. Further
+live clicks, including the final dialog/keyboard cancellation and Load, remain
+unverified because the original browser dialog continued blocking automation.
+Egg collection/dusk/load are covered by automated simulation tests, not a full
+live gameplay session. Native Tauri interaction and subjective audio quality remain
+unverified; run `npm run tauri dev` for desktop acceptance and `npm run dev` for
+browser acceptance. Browser checks included narrow and desktop layouts, but no
+complete mobile interaction sweep.
 
 ## Next up
 

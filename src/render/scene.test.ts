@@ -394,3 +394,24 @@ describe('buildDrawList', () => {
     expect(list.find((e) => e.id === 'p:3,4')?.key).toBe('prop.cypress');
   });
 });
+
+it('renders chicken poses and baskets through the atlas and culls offscreen animals', () => {
+  const snapshot: TickSnapshot = {
+    tick: 0, villagers: [], buildings: [], crops: [],
+    resources: { wood: 0, stone: 0, grain: 0, flour: 0, food: 0, gold: 0 }, housingCapacity: 5,
+    clock: { minute: 480, day: 1, season: 0, year: 1, speed: 1, weather: 0 }, chronicleSeq: 0, unlocked: [],
+    chickens: [
+      { id: 1, shelterId: 9, name: 'Pip', tendency: 'curious', x: 48, y: 48, pose: 'peck', activity: 'pecking', soundSeq: 0, facingLeft: true },
+      { id: 2, shelterId: 9, name: 'Mabel', tendency: 'sleepy', x: 480, y: 480, pose: 'sleep', activity: 'sleeping', soundSeq: 0, facingLeft: false },
+    ],
+    eggBaskets: [{ id: 1, shelterId: 9, x: 50, y: 60 }],
+  };
+  const list = buildDrawList({ snapshot, catalog: { buildings, crops }, props: [], tileSize: 32, tick: 5,
+    reduceMotion: false, selectedBuildingId: null, selectedVillagerId: null, lastFacing: new Map(), atlas: fakeAtlas(),
+    viewTiles: { minX: 0, minY: 0, maxX: 3, maxY: 3 } });
+  expect(list.find(e => e.id === 'ch:9:1')).toMatchObject({ key: 'chicken.peck', frame: 1, mirror: true });
+  expect(list.find(e => e.id === 'ch:9:2')).toBeUndefined();
+  expect(list.find(e => e.id === 'egg:9:1')?.key).toBe('chicken.basket');
+  for (const pose of ['walk', 'peck', 'scratch', 'sleep', 'startled', 'hop', 'tilt', 'rest']) expect(manifest.cells[`chicken.${pose}`]).toBeDefined();
+  expect(manifest.cells.chicken_shelter).toBeDefined();
+});

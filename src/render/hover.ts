@@ -20,7 +20,8 @@ const BUILDING_STATUS_LABELS = [
 ] as const;
 
 export interface HoverTarget {
-  kind: 'villager' | 'building' | 'crop';
+  kind: 'villager' | 'building' | 'crop' | 'chicken' | 'eggBasket';
+  shelterId?: number;
   id: number;
   title: string;
   detail: string;
@@ -68,6 +69,13 @@ export function hoverTargetAt({
   tileSize,
   zoom,
 }: HoverTargetInput): HoverTarget | null {
+  // Small flock targets have tight hit areas so adjacent baskets stay individually collectable.
+  const basket = snapshot.eggBaskets?.find(b => Math.abs(b.x - worldX) <= 5 && worldY >= b.y - 14 && worldY <= b.y + 3);
+  if (basket) return { kind: 'eggBasket', id: basket.id, shelterId: basket.shelterId, title: 'Egg basket', detail: 'Click to collect · +3 food' };
+  const chicken = snapshot.chickens?.filter(c => Math.abs(c.x - worldX) <= 12 && worldY >= c.y - 26 && worldY <= c.y + 4)
+    .sort((a, b) => Math.hypot(a.x - worldX, a.y - worldY) - Math.hypot(b.x - worldX, b.y - worldY))[0];
+  if (chicken) return { kind: 'chicken', id: chicken.id, shelterId: chicken.shelterId, title: chicken.name,
+    detail: `${chicken.activity} · ${chicken.tendency}` };
   const hitRadius = Math.max(16, 22 / Math.max(zoom, 0.01));
   let closestVillager: { villager: VillagerView; distance: number } | null = null;
   for (const villager of snapshot.villagers) {

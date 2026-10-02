@@ -4,6 +4,7 @@ import type { PackItem } from './pack';
 import { pack } from './pack';
 import { Raster } from './raster';
 import { BUILDING_SPRITES } from './sprites/buildings';
+import { CHICKEN_SPRITES } from './sprites/chickens';
 import { CROP_SPRITES } from './sprites/crops';
 import { PROP_SPRITES } from './sprites/props';
 import { VFX_SPRITES } from './sprites/vfx';
@@ -97,6 +98,7 @@ function fromSprite(
 function entitySources(): Source[] {
   const sources: Source[] = [];
 
+  for (const [key, entry] of Object.entries(CHICKEN_SPRITES)) sources.push(fromSprite(key, entry));
   for (const [key, entry] of Object.entries(BUILDING_SPRITES)) {
     sources.push(fromSprite(key, entry));
   }

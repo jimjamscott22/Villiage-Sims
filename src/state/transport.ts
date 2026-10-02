@@ -36,6 +36,8 @@ interface Transport {
   validatePlacement(kind: string, x: number, y: number, rotation: number): Promise<PlacementValidity>;
   placeBuilding(kind: string, x: number, y: number, rotation: number): Promise<PlacementResult>;
   demolish(entityId: number): Promise<void>;
+  clickChicken(shelterId: number, id: number): Promise<boolean>;
+  collectEggs(shelterId: number, id: number): Promise<number>;
   moveVillagerTo(x: number, y: number, villagerId?: number | null): Promise<void>;
   assignHome(villagerId: number, buildingId: number | null): Promise<void>;
   getVillagerDetail(id: number): Promise<VillagerDetail>;
@@ -120,6 +122,13 @@ class BrowserTransport implements Transport {
     this.emit(this.world.snapshot());
   }
 
+  async clickChicken(shelterId: number, id: number): Promise<boolean> {
+    const hopped = this.world.clickChicken(shelterId, id); this.emit(this.world.snapshot()); return hopped;
+  }
+  async collectEggs(shelterId: number, id: number): Promise<number> {
+    const food = this.world.collectEggs(shelterId, id); this.emit(this.world.snapshot()); return food;
+  }
+
   async getVillagerDetail(id: number): Promise<VillagerDetail> {
     return this.world.getVillagerDetail(id);
   }
@@ -191,6 +200,8 @@ const tauriTransport: Transport = {
   placeBuilding: (kind, x, y, rotation) =>
     invoke<PlacementResult>('place_building', { kind, x, y, rotation }),
   demolish: (entityId) => invoke('demolish', { entityId }),
+  clickChicken: (shelterId, id) => invoke('click_chicken', { shelterId, id }),
+  collectEggs: (shelterId, id) => invoke('collect_eggs', { shelterId, id }),
   moveVillagerTo: (x, y, villagerId) =>
     invoke('move_villager_to', { x, y, villagerId: villagerId ?? null }),
   assignHome: (villagerId, buildingId) =>

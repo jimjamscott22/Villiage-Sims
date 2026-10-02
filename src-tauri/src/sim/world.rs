@@ -51,6 +51,8 @@ mod progression;
 pub(crate) mod legacy_v4;
 #[path = "legacy_v5.rs"]
 pub(crate) mod legacy_v5;
+#[path = "legacy_v6.rs"]
+pub(crate) mod legacy_v6;
 use social::{Encounter, Behavior};
 
 const VIEWPORT_MARGIN_TILES: f32 = 4.0;
@@ -98,6 +100,7 @@ pub struct World {
     behavior: BTreeMap<u32, Behavior>,
     #[serde(skip)]
     leisure_cache: leisure::LeisureCache,
+    pub(crate) flock: Option<super::chickens::Flock>,
     #[serde(skip)]
     pub(crate) viewport: Viewport,
     /// When set, day rollover writes a rotating autosave into this directory.
@@ -139,6 +142,7 @@ impl World {
             encounters: Vec::new(),
             behavior: BTreeMap::new(),
             leisure_cache: Default::default(),
+            flock: None,
             viewport: Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -157,6 +161,75 @@ impl World {
     }
 
 
+    pub(crate) fn chicken_ground(&self) -> super::chickens::Ground<'_> {
+        super::chickens::Ground {
+            width: self.width,
+            height: self.height,
+            tile_size: self.tile_size,
+            tiles: &self.tiles,
+            occupancy: &self.occupancy,
+        }
+    }
+    fn chicken_date(&self) -> u32 {
+        (self.clock.year * 4 + self.clock.season.as_u8() as u32) * 28 + self.clock.day
+    }
+    fn relocate_covered_chickens(&mut self) {
+        if let Some(mut flock) = self.flock.take() {
+            flock.relocate(&self.chicken_ground());
+            self.flock = Some(flock);
+        }
+    }
+    fn tick_chickens(&mut self) {
+        if let Some(mut flock) = self.flock.take() {
+            let walkers: Vec<_> = self
+                .villagers
+                .iter()
+                .filter(|v| matches!(v.state, AgentState::MovingTo { .. }))
+                .map(|v| v.pos)
+                .collect();
+            flock.tick(
+                &self.chicken_ground(),
+                self.clock.minute,
+                self.chicken_date(),
+                &walkers,
+            );
+            self.flock = Some(flock);
+        }
+    }
+    fn chicken_views(&self) -> Vec<super::chickens::ChickenView> {
+        let margin = VIEWPORT_MARGIN_TILES * self.tile_size as f32;
+        self.flock
+            .as_ref()
+            .map(|f| {
+                f.views()
+                    .into_iter()
+                    .filter(|c| {
+                        c.x >= self.viewport.x - margin
+                            && c.y >= self.viewport.y - margin
+                            && c.x <= self.viewport.x + self.viewport.w + margin
+                            && c.y <= self.viewport.y + self.viewport.h + margin
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+    pub fn click_chicken(&mut self, shelter_id: u32, id: u32) -> Result<bool, String> {
+        self.flock
+            .as_mut()
+            .filter(|f| f.shelter_id == shelter_id)
+            .ok_or("chicken shelter missing")?
+            .click(id)
+    }
+    pub fn collect_eggs(&mut self, shelter_id: u32, id: u32) -> Result<u32, String> {
+        let amount = self
+            .flock
+            .as_mut()
+            .filter(|f| f.shelter_id == shelter_id)
+            .ok_or("chicken shelter missing")?
+            .collect(id)?;
+        self.deposit_to_stockpile("food", amount);
+        Ok(amount)
+    }
     pub fn default_world() -> Self {
         Self::generate(
             DEFAULT_WIDTH,
@@ -207,6 +280,7 @@ impl World {
             self.record_season_turn();
         }
         self.complete_buildings();
+        self.tick_chickens();
         self.tick_crops();
         self.tick_nodes();
         self.refresh_gather_jobs();
@@ -412,6 +486,9 @@ impl World {
                 })
                 .collect(),
             buildings: self.building_views(),
+            chicken_shelter_id: self.flock.as_ref().map(|f|f.shelter_id),
+            chickens: self.chicken_views(),
+            egg_baskets: self.flock.as_ref().map(|f| f.basket_views(self.tile_size)).unwrap_or_default(),
             crops: self.crops.iter().map(Crop::view).collect(),
             resources: derive_totals(&self.resources, &building_inventories, &self.catalog),
             housing_capacity: self.housing_capacity(),

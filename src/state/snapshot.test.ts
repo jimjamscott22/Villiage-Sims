@@ -67,3 +67,19 @@ describe('SnapshotBuffer', () => {
     expect(villager?.dy).toBe(0);
   });
 });
+
+it('interpolates chickens and preserves baskets and shelter identity', () => {
+  const buffer = new SnapshotBuffer();
+  const chicken = { id: 1, shelterId: 2, name: 'Pip', tendency: 'curious' as const, x: 20, y: 40,
+    pose: 'walk' as const, activity: 'exploring', soundSeq: 0, facingLeft: false };
+  buffer.push({ ...tick(1, 0), chickens: [chicken] }, 950);
+  const basket = { id: 1, shelterId: 2, x: 60, y: 70 };
+  buffer.push({ ...tick(2, 0), chickenShelterId: 2, chickens: [{ ...chicken, x: 30 }], eggBaskets: [basket] }, 1000);
+  const snapshot = buffer.interpolate(1025, 50);
+  expect(snapshot?.chickens?.[0].x).toBe(25);
+  expect(snapshot?.eggBaskets).toEqual([basket]);
+  expect(snapshot?.chickenShelterId).toBe(2);
+  // A replacement shelter must never interpolate from its predecessor's flock.
+  buffer.push({ ...tick(3, 0), chickens: [{ ...chicken, shelterId: 3, x: 50 }] }, 1050);
+  expect(buffer.interpolate(1075, 50)?.chickens?.[0].x).toBe(50);
+});

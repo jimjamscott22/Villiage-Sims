@@ -27,6 +27,12 @@ pub fn handle_command(&mut self, command: SimCommand) {
                 let result = self.place_building(&kind, x, y, rotation);
                 let _ = reply.send(result);
             }
+            SimCommand::ClickChicken { shelter_id, id, reply } => {
+                let _ = reply.send(self.click_chicken(shelter_id, id));
+            }
+            SimCommand::CollectEggs { shelter_id, id, reply } => {
+                let _ = reply.send(self.collect_eggs(shelter_id, id));
+            }
             SimCommand::Demolish { entity_id, reply } => {
                 let result = self.demolish(entity_id);
                 let _ = reply.send(result);
@@ -107,6 +113,20 @@ pub fn validate_placement(
             };
         };
         let _ = kind_index;
+        if kind == "chicken_shelter" {
+            if self.flock.is_some() {
+                return PlacementValidity {
+                    valid: false,
+                    reason: "Only one chicken shelter per village".into(),
+                };
+            }
+            if !super::super::chickens::has_exit(&self.chicken_ground(), (x, y)) {
+                return PlacementValidity {
+                    valid: false,
+                    reason: "The shelter needs adjacent walkable ground".into(),
+                };
+            }
+        }
         // The frontend hides locked buildings, but it holds no authoritative state —
         // the sim must reject a direct placement attempt too (e.g. a raw `invoke`
         // bypassing the UI). Gating here also covers `validate_placement`, so the
@@ -196,7 +216,26 @@ pub fn place_building(
             inventory: BTreeMap::new(),
             recipe_ticks: 0,
         });
+        if kind == "chicken_shelter" {
+            if let Some(building) = self.buildings.last_mut() {
+                building.state = BuildState::Complete;
+            }
+            // Before dawn, the placement day's morning still belongs to this flock.
+            let last_morning = if self.clock.minute < 360 {
+                self.chicken_date().saturating_sub(1)
+            } else {
+                self.chicken_date()
+            };
+            self.flock = Some(super::super::chickens::Flock::new(
+                id, (x, y), self.seed, last_morning, &self.chicken_ground(),
+            ));
+            self.chronicle.push(&self.clock, Some((x, y)), ChronicleBody::BuildingComplete {
+                id,
+                building: kind.into(),
+            });
+        }
         self.invalidate_paths_if_needed();
+        self.relocate_covered_chickens();
         Ok(PlacementResult { id })
     }
 
@@ -207,6 +246,9 @@ pub fn demolish(&mut self, entity_id: u32) -> Result<(), String> {
             .position(|building| building.id == entity_id)
             .ok_or_else(|| format!("unknown building {entity_id}"))?;
         let building = self.buildings.remove(index);
+        if self.flock.as_ref().is_some_and(|f| f.shelter_id == entity_id) {
+            self.flock = None;
+        }
         let def = self
             .catalog
             .get(building.kind_index)

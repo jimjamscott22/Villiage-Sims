@@ -446,6 +446,20 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
     }
   }
 
+  for (const chicken of snapshot.chickens ?? []) {
+    if (viewTiles && !tileInBounds(Math.floor(chicken.x / tileSize), Math.floor(chicken.y / tileSize), viewTiles)) continue;
+    const key = `chicken.${chicken.pose}`;
+    if (!hasCell(atlas, key)) continue;
+    list.push({ rank: 1, baseY: chicken.y + 2, id: `ch:${chicken.shelterId}:${chicken.id}`, key,
+      frame: animFrame(tick, chicken.pose === 'startled' ? 2 : 5, cellFrames(atlas, key), reduceMotion),
+      x: chicken.x - 12, y: chicken.y - 26, mirror: chicken.facingLeft });
+  }
+  for (const basket of snapshot.eggBaskets ?? []) {
+    if (viewTiles && !tileInBounds(Math.floor(basket.x / tileSize), Math.floor(basket.y / tileSize), viewTiles)) continue;
+    list.push({ rank: 2, baseY: basket.y + 3, id: `egg:${basket.shelterId}:${basket.id}`, key: 'chicken.basket', frame: 0,
+      x: basket.x - 6, y: basket.y - 12 });
+  }
+
   list.sort((a, b) => {
     if (a.rank !== b.rank) return a.rank - b.rank;
     if (a.baseY !== b.baseY) return a.baseY - b.baseY;

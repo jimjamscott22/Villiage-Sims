@@ -56,6 +56,18 @@ pub(crate) fn prepare_after_load(&mut self) -> Result<(), String> {
             return Err("save has an invalid next building id".into());
         }
 
+        let shelters: Vec<_> = self.buildings.iter().filter(|building| {
+            self.catalog.get(building.kind_index).is_some_and(|def| def.id == "chicken_shelter")
+        }).collect();
+        if shelters.len() > 1 || shelters.len() != usize::from(self.flock.is_some()) {
+            return Err("save has inconsistent chicken shelter".into());
+        }
+        if let Some(flock) = &self.flock {
+            if shelters[0].id != flock.shelter_id || shelters[0].origin != flock.home {
+                return Err("save has invalid flock home".into());
+            }
+            flock.validate(&self.chicken_ground())?;
+        }
         let mut crop_ids = BTreeSet::new();
         for crop in &self.crops {
             if crop.id == 0 || !crop_ids.insert(crop.id) {

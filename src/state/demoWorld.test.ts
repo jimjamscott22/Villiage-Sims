@@ -253,7 +253,7 @@ describe('DemoWorld pathfinding', () => {
   });
 
   it('loads the M8 demo catalog with flour storage and recipes', () => {
-    expect(DEMO_CATALOG.buildings).toHaveLength(10);
+    expect(DEMO_CATALOG.buildings).toHaveLength(11);
     // Building kind is an index into this list, so new entries must be appended.
     // This must stay in lockstep with src-tauri/data/buildings.json.
     expect(DEMO_CATALOG.buildings.map((entry) => entry.id)).toEqual([
@@ -267,6 +267,7 @@ describe('DemoWorld pathfinding', () => {
       'gate',
       'signpost',
       'storehouse',
+      'chicken_shelter',
     ]);
     expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'storehouse')?.stores).toEqual(['wood', 'stone']);
     expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'granary')?.stores).toEqual(['grain', 'flour', 'food']);
@@ -536,7 +537,7 @@ describe('DemoWorld pathfinding', () => {
       width: 16,
       height: 16,
       tick: 75,
-      saveVersion: 3,
+      saveVersion: 4,
     });
   });
 
@@ -544,7 +545,7 @@ describe('DemoWorld pathfinding', () => {
     const state = JSON.parse(new DemoWorld(grassTerrain()).exportState()) as Record<string, unknown>;
     state.version = 99;
     expect(() => DemoWorld.importState(JSON.stringify(state))).toThrow(
-      'unsupported save version 99 (expected 3)',
+      'unsupported save version 99 (expected 4)',
     );
   });
 

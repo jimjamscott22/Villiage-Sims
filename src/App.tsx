@@ -11,6 +11,7 @@ import type {
   TickSnapshot,
   VillagerDetail,
 } from './state/types';
+import { ChickenDemolitionDialog } from './ui/ChickenDemolitionDialog';
 import { BuildMenu } from './ui/BuildMenu';
 import { ChronicleDrawer } from './ui/ChronicleDrawer';
 import { ClockBar } from './ui/ClockBar';
@@ -33,7 +34,7 @@ function sameLabels(a: ReadonlyMap<number, string>, b: ReadonlyMap<number, strin
 function isTypingTarget(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+    (target.isContentEditable || target.closest('dialog[open]') != null || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
   );
 }
 
@@ -44,6 +45,8 @@ export default function App() {
   const [selectedKind, setSelectedKind] = useState<string | null>(null);
   const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0);
+  const [pendingDemolition, setPendingDemolition] = useState<number | null>(null);
+  const [chickenShelterId, setChickenShelterId] = useState<number | null>(null);
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
   const [selectedVillagerId, setSelectedVillagerId] = useState<number | null>(1);
   const [villagerDetail, setVillagerDetail] = useState<VillagerDetail | null>(null);
@@ -174,6 +177,7 @@ export default function App() {
   }, []);
 
   const onSnapshot = (snapshot: TickSnapshot) => {
+    setChickenShelterId(snapshot.chickenShelterId ?? null);
     const previous = lastResourcesRef.current;
     if (previous) {
       const deltas = [
@@ -263,14 +267,19 @@ export default function App() {
     }
   };
 
-  const onDemolish = async () => {
-    if (selectedBuildingId == null) return;
+  const demolishBuilding = async (id: number) => {
     try {
-      await transport.demolish(selectedBuildingId);
+      await transport.demolish(id);
       setSelectedBuildingId(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
+  };
+
+  const onDemolish = async () => {
+    if (selectedBuildingId == null) return;
+    if (selectedBuildingId === chickenShelterId) { setPendingDemolition(selectedBuildingId); return; }
+    await demolishBuilding(selectedBuildingId);
   };
 
   const onSetSpeed = async (speed: number) => {
@@ -418,6 +427,7 @@ export default function App() {
             onSelectBuilding={setSelectedBuildingId}
             onSelectVillager={setSelectedVillagerId}
             onSnapshot={onSnapshot}
+            onDemolish={onDemolish}
             tagLabels={tagLabels}
             showNameTags={showNameTags}
             focusTile={focusTile}
@@ -446,6 +456,7 @@ export default function App() {
         </div>
         <div className="flex min-h-0 w-56 shrink-0 flex-col">
           <BuildMenu
+          chickenShelterId={chickenShelterId}
             catalog={catalog}
             selectedKind={selectedKind}
             selectedCrop={selectedCrop}
@@ -478,6 +489,11 @@ export default function App() {
           setFocusTile((previous) => ({ tile, nonce: (previous?.nonce ?? 0) + 1 }))
         }
       />
+      {pendingDemolition != null && (
+        <ChickenDemolitionDialog onCancel={() => setPendingDemolition(null)} onConfirm={() => {
+          const id = pendingDemolition; setPendingDemolition(null); void demolishBuilding(id);
+        }} />
+      )}
     </main>
   );
 }

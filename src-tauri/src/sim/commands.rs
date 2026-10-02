@@ -7,6 +7,16 @@ use crate::sim::chronicle::ChronicleEntryView;
 use crate::snapshot::{TerrainSnapshot, VillagerDetail, WorldInit};
 
 pub enum SimCommand {
+    ClickChicken {
+        shelter_id: u32,
+        id: u32,
+        reply: oneshot::Sender<Result<bool, String>>,
+    },
+    CollectEggs {
+        shelter_id: u32,
+        id: u32,
+        reply: oneshot::Sender<Result<u32, String>>,
+    },
     SetViewport {
         x: f32,
         y: f32,

@@ -1,3 +1,4 @@
+import { ChickenGround, newFlock, tickFlock, relocateChickens, chickenViews, basketViews, clickChicken, collectEggs, validateFlock, type Flock } from './chickens';
 import { DemoSocial, type Encounter } from './demoSocial';
 import type { Behavior } from './demoLeisure';
 import { findPath, terrainPassable } from './pathfind';
@@ -203,6 +204,7 @@ export const DEMO_CATALOG: Catalog = {
         minPopulation: 5,
       },
     },
+    { id: 'chicken_shelter', name: 'Chicken Shelter', footprint: [1, 1], cost: { wood: 15 }, buildTicks: 0, category: 'amenity', validTerrain: ['grass', 'sand'], jobs: [] },
   ],
   crops: DEMO_CROPS,
   traits: [
@@ -261,7 +263,7 @@ const DRINK_TICKS = 40;
 const SLEEP_TICKS = 100;
 const WANDER_RADIUS = 6;
 const DEMO_SEED = 42;
-export const DEMO_SAVE_VERSION = 3;
+export const DEMO_SAVE_VERSION = 4;
 
 /** Match Rust `weather::mix` — unsigned 64-bit wrapping. */
 function mixU64(a: bigint | number, b: number, c: number, d: number): bigint {
@@ -584,6 +586,7 @@ interface DemoClock {
 }
 
 interface DemoSaveState {
+  flock: Flock | null;
   encounters: Encounter[];
   behavior: Record<number, Behavior>;
   version: number;
@@ -696,6 +699,7 @@ export class DemoWorld {
   buildings: DemoBuilding[] = [];
   crops: DemoCrop[] = [];
   nodes: ResourceNode[] = [];
+  flock: Flock | null = null;
   private occupancy: Array<number | null>;
   private nextId = 1;
   private nextCropId = 1;
@@ -965,6 +969,7 @@ export class DemoWorld {
   exportState(): string {
     const state: DemoSaveState = {
       version: DEMO_SAVE_VERSION,
+      flock: this.flock,
       encounters: this.social.encounters,
       behavior: this.social.leisure.behavior,
       seed: this.seed,
@@ -993,7 +998,7 @@ export class DemoWorld {
       throw new Error(`could not decode save: ${cause instanceof Error ? cause.message : String(cause)}`);
     }
     if (state == null || typeof state !== 'object') throw new Error('could not decode save: invalid data');
-    if (state.version !== DEMO_SAVE_VERSION && state.version !== 1 && state.version !== 2) {
+    if (state.version !== DEMO_SAVE_VERSION && state.version !== 1 && state.version !== 2 && state.version !== 3) {
       throw new Error(`unsupported save version ${String(state.version)} (expected ${DEMO_SAVE_VERSION})`);
     }
     if (state.seed !== DEMO_SEED) throw new Error('save header seed does not match the demo world');
@@ -1035,6 +1040,13 @@ export class DemoWorld {
     }
     world.jobs = state.jobs;
     world.clock = state.clock;
+    world.flock = state.version < 4 ? null : state.flock;
+    const shelters = world.buildings.filter(b => DEMO_CATALOG.buildings[b.kindIndex]?.id === 'chicken_shelter');
+    if (shelters.length > 1 || shelters.length !== Number(world.flock != null)) throw new Error('save has inconsistent chicken shelter');
+    if (world.flock) {
+      if (shelters[0].id !== world.flock.shelterId || shelters[0].x !== world.flock.home[0] || shelters[0].y !== world.flock.home[1]) throw new Error('save has invalid flock home');
+      validateFlock(world.flock, world.chickenGround());
+    }
     if (state.version === 1) {
       for (const v of world.villagers) if (v.state === 'socializing') { world.clearToIdle(v); v.currentAction = null; }
     } else {
@@ -1095,6 +1107,7 @@ export class DemoWorld {
       this.advertiseJobsFor(id);
     }
 
+    if (this.flock) tickFlock(this.flock, this.chickenGround(), this.clock.minute, this.chickenDate(), this.villagers.filter(v => v.state === 'moving'));
     this.tickCrops();
     this.tickNodes();
     this.refreshGatherJobs();
@@ -1303,6 +1316,9 @@ export class DemoWorld {
         social: v.needs.social,
       })),
       buildings: this.buildingViews(),
+      chickenShelterId: this.flock?.shelterId ?? null,
+      chickens: chickenViews(this.flock),
+      eggBaskets: basketViews(this.flock, this.terrain.tileSize),
       crops,
       resources,
       housingCapacity: this.housingCapacity(),
@@ -1493,10 +1509,22 @@ export class DemoWorld {
       .map((entry) => entry.index);
   }
 
+  private chickenGround(): ChickenGround { return new ChickenGround(this.terrain, this.occupancy); }
+  private chickenDate(): number { return (this.clock.year * 4 + this.clock.season) * 28 + this.clock.day; }
+  clickChicken(shelterId: number, id: number): boolean { return clickChicken(this.flock, shelterId, id); }
+  collectEggs(shelterId: number, id: number): number {
+    const amount = collectEggs(this.flock, shelterId, id);
+    this.depositToStockpile('food', amount); return amount;
+  }
+
   validatePlacement(kind: string, x: number, y: number, rotation: number): PlacementValidity {
     const kindIndex = DEMO_CATALOG.buildings.findIndex((building) => building.id === kind);
     if (kindIndex < 0) return { valid: false, reason: `unknown building '${kind}'` };
     const def = DEMO_CATALOG.buildings[kindIndex];
+    if (kind === 'chicken_shelter') {
+      if (this.flock) return { valid: false, reason: 'Only one chicken shelter per village' };
+      if (!this.chickenGround().hasExit([x, y])) return { valid: false, reason: 'The shelter needs adjacent walkable ground' };
+    }
     const [fw, fh] = rotatedFootprint(def, rotation);
     for (const [tx, ty] of footprintTiles(x, y, fw, fh)) {
       if (tx < 0 || ty < 0 || tx >= this.terrain.width || ty >= this.terrain.height) {
@@ -1540,7 +1568,13 @@ export class DemoWorld {
       inventory: {},
       recipeTicks: 0,
     });
+    if (kind === 'chicken_shelter') {
+      this.buildings[this.buildings.length - 1].complete = true;
+      this.flock = newFlock(id, [x, y], this.seed, this.clock.minute < 360 ? this.chickenDate() - 1 : this.chickenDate(), this.chickenGround());
+      this.pushChronicle([x, y], { kind: 'buildingComplete', id, building: kind });
+    }
     this.invalidatePathsIfNeeded();
+    if (this.flock) relocateChickens(this.flock, this.chickenGround());
     return { id };
   }
 
@@ -1565,6 +1599,7 @@ export class DemoWorld {
       this.depositToStockpile(key, amount);
     }
     this.buildings.splice(index, 1);
+    if (this.flock?.shelterId === entityId) this.flock = null;
     const released = this.jobs
       .filter((job) => job.site === entityId && job.claimedBy != null)
       .map((job) => job.claimedBy!);

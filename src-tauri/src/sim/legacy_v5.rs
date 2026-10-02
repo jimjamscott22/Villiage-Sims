@@ -138,6 +138,7 @@ impl LegacyWorld {
             encounters: self.encounters,
             behavior: self.behavior,
             leisure_cache: Default::default(),
+            flock: None,
             viewport: Viewport::default(),
             autosave_dir: None,
             last_autosave_slot: None,

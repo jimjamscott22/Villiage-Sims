@@ -69,6 +69,20 @@ npm run dev
 
 **Controls:** drag to pan · scroll wheel to zoom (anchored to the cursor) · `F` for fullscreen · `R` rotates a building in build mode · `Esc` exits build mode.
 
+### Chickens
+
+Place a **Chicken Shelter** (15 wood) on grass or sand with adjacent walkable ground.
+One shelter brings Pip, Mabel, and Poppy, with curious, sleepy, and social tendencies.
+They explore, peck, scratch, follow friends, react to passing villagers, and roost at
+18:00. New arrivals explore for a minute even in a village that starts at midnight.
+Hover for a name/activity; click for a brief hop and cluck (five-second cooldown).
+Enable the optional **Sound** toggle on the map for quiet clucks.
+
+A basket appears each morning at 06:00. Click each basket for **3 food**; at most
+three wait by the shelter. There are no feeding requirements or neglect penalties.
+Demolition asks before removing the shelter, its flock, and uncollected baskets.
+Desktop saves preserve the flock; browser-demo saves remain in memory.
+
 ### Checks
 
 ```bash

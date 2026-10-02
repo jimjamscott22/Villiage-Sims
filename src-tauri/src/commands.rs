@@ -291,7 +291,7 @@ mod tests {
     fn app_state_holds_catalog() {
         let (tx, _rx) = mpsc::channel();
         let state = AppState::new(Catalog::load_builtin().unwrap(), tx);
-        assert_eq!(state.catalog.buildings.len(), 10);
+        assert_eq!(state.catalog.buildings.len(), 11);
         assert_eq!(state.catalog.crops.len(), 4);
     }
 
@@ -304,4 +304,43 @@ mod tests {
             "invalid save slot 4; expected 1, 2, or 3"
         );
     }
+}
+
+#[tauri::command]
+pub(crate) async fn click_chicken(
+    state: State<'_, AppState>,
+    shelter_id: u32,
+    id: u32,
+) -> Result<bool, String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::ClickChicken {
+            shelter_id,
+            id,
+            reply,
+        })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped click_chicken".to_string())?
+}
+#[tauri::command]
+pub(crate) async fn collect_eggs(
+    state: State<'_, AppState>,
+    shelter_id: u32,
+    id: u32,
+) -> Result<u32, String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::CollectEggs {
+            shelter_id,
+            id,
+            reply,
+        })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped collect_eggs".to_string())?
 }

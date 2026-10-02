@@ -1,3 +1,4 @@
+import { CHICKEN_DEMOLITION_WARNING } from './chickenDemolition';
 import { useState } from 'react';
 import type { BuildingDef, Catalog, CropDef, VillagerDetail } from '../state/types';
 import { transport } from '../state/transport';
@@ -7,6 +8,7 @@ import { uiIconStyle } from './pixelUi';
 import { VillagerPanel } from './VillagerPanel';
 
 interface BuildMenuProps {
+  chickenShelterId?: number | null;
   catalog: Catalog | null;
   selectedKind: string | null;
   selectedCrop: string | null;
@@ -36,6 +38,7 @@ export function nextSelection(current: string | null, clicked: string): string |
 }
 
 export function BuildMenu({
+  chickenShelterId = null,
   catalog,
   selectedKind,
   selectedCrop,
@@ -107,7 +110,7 @@ export function BuildMenu({
           <ul className="mt-2 flex flex-col gap-1">
             {(catalog?.buildings ?? []).map((building: BuildingDef) => {
               const active = selectedKind === building.id;
-              const locked = !unlocked.includes(building.id);
+              const locked = !unlocked.includes(building.id) || (building.id === 'chicken_shelter' && chickenShelterId != null);
               const spriteKey = building.sprite ?? building.id;
 
               return (
@@ -148,6 +151,7 @@ export function BuildMenu({
                         </div>
                         <div className="text-[11px] text-white/55">
                           {formatCost(building.cost)}
+                          {building.id === 'chicken_shelter' && <span className="block text-amber-100/80">{chickenShelterId != null ? 'One shelter already placed' : '3 named chickens · optional eggs'}</span>}
                           {formatRecipe(building)}
                         </div>
                       </div>
@@ -165,6 +169,9 @@ export function BuildMenu({
       </div>
 
       <div className="shrink-0 pt-2">
+        {selectedBuildingId != null && selectedBuildingId === chickenShelterId && (
+          <p className="mb-2 text-[11px] leading-relaxed text-amber-200">{CHICKEN_DEMOLITION_WARNING}</p>
+        )}
         {canAssignHome && (
           <div className="mb-2">
             <button
