@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VillageSim — What would make someone stay</title>
+  <style>
+    :root {
+      --sea-deepest: #0e3f52;
+      --sea-deep: #12556b;
+      --sea-mid: #1f7f92;
+      --sea-shallow: #2fa0a8;
+      --foam: #a8e0dc;
+      --sand-shadow: #8a7455;
+      --sand-mid: #c9b483;
+      --sand-light: #e0cfa0;
+      --sand-pale: #f2e8c8;
+      --veg-darkest: #2a4430;
+      --veg-dark: #3d5f39;
+      --veg-mid: #5c7a3e;
+      --veg-light: #8fa249;
+      --veg-pale: #b5bb6a;
+      --stone-shadow: #6b5f4e;
+      --stone-mid: #9c8b70;
+      --stone-pale: #dcd2bd;
+      --whitewash: #f2ece0;
+      --terra-deep: #7a3320;
+      --terra-dark: #a54428;
+      --terra-mid: #c05a34;
+      --terra-light: #e08a5a;
+      --wheat: #d9a531;
+      --ink: #2b2320;
+      --ui-panel: #1b3038;
+      --ui-raised: #26454f;
+      --shutter: #3f6f8f;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse 80% 40% at 10% -10%, rgba(47, 160, 168, 0.18), transparent 50%),
+        radial-gradient(ellipse 60% 30% at 100% 0%, rgba(192, 90, 52, 0.12), transparent 46%),
+        linear-gradient(180deg, #e7f3f1 0%, var(--sand-pale) 220px, #efe4c4 100%);
+      font-family: Palatino, "Palatino Linotype", "Iowan Old Style", "Book Antiqua", Georgia, serif;
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+
+    a { color: var(--sea-deep); text-underline-offset: 0.18em; }
+    a:hover { color: var(--terra-deep); }
+
+    .skip {
+      position: absolute;
+      left: 1rem;
+      top: -3rem;
+      background: var(--whitewash);
+      color: var(--ink);
+      padding: 0.4rem 0.7rem;
+      z-index: 5;
+    }
+    .skip:focus { top: 0.6rem; }
+
+    .mast {
+      background: var(--ui-panel);
+      color: var(--sand-pale);
+      border-bottom: 6px solid var(--terra-mid);
+    }
+
+    .mast-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 1.6rem 1.4rem 1.4rem;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 1.25rem 1.5rem;
+      align-items: end;
+    }
+
+    .mark { width: 92px; height: 72px; display: block; }
+
+    .kicker {
+      margin: 0 0 0.35rem;
+      font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--foam);
+    }
+
+    h1 {
+      margin: 0;
+      font-weight: 600;
+      font-size: clamp(1.8rem, 4vw, 2.7rem);
+      line-height: 1.12;
+      letter-spacing: -0.02em;
+      color: var(--whitewash);
+    }
+
+    .mast p {
+      margin: 0.55rem 0 0;
+      max-width: 42rem;
+      color: var(--sand-light);
+      font-size: 1.02rem;
+    }
+
+    .layout {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 1.5rem 1.4rem 4rem;
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      gap: 2rem;
+      align-items: start;
+    }
+
+    nav {
+      position: sticky;
+      top: 1rem;
+      padding: 0.9rem 0.85rem;
+      background: rgba(242, 236, 224, 0.86);
+      border: 1px solid var(--sand-mid);
+      box-shadow: 4px 4px 0 var(--veg-darkest);
+    }
+
+    nav strong {
+      display: block;
+      margin-bottom: 0.45rem;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--veg-dark);
+    }
+
+    nav ol {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: toc;
+    }
+
+    nav li { counter-increment: toc; }
+
+    nav a {
+      display: block;
+      padding: 0.28rem 0;
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 0.92rem;
+    }
+
+    nav a::before {
+      content: counter(toc, decimal-leading-zero);
+      margin-right: 0.45rem;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.72rem;
+      color: var(--terra-dark);
+    }
+
+    nav a:hover { color: var(--terra-deep); }
+
+    main { min-width: 0; }
+
+    section { margin: 0 0 2.6rem; }
+
+    h2 {
+      margin: 0 0 0.8rem;
+      font-size: 1.65rem;
+      line-height: 1.2;
+      color: var(--veg-darkest);
+      border-bottom: 2px solid var(--veg-mid);
+      padding-bottom: 0.3rem;
+    }
+
+    h3 {
+      margin: 1.35rem 0 0.35rem;
+      font-size: 1.15rem;
+      color: var(--terra-deep);
+    }
+
+    p { margin: 0.7rem 0; }
+
+    .verdict {
+      background: var(--whitewash);
+      border-left: 8px solid var(--wheat);
+      padding: 1.1rem 1.2rem 0.4rem;
+      box-shadow: 0 1px 0 var(--sand-shadow);
+    }
+
+    .verdict p:first-child {
+      font-size: 1.18rem;
+      line-height: 1.45;
+    }
+
+    .plateau {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.55rem;
+      margin: 1rem 0 0.4rem;
+    }
+
+    .step {
+      background: var(--whitewash);
+      border: 1px solid var(--sand-shadow);
+      min-height: 7.2rem;
+      padding: 0.7rem 0.75rem 0.8rem;
+      position: relative;
+    }
+
+    .step em {
+      display: block;
+      font-style: normal;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--sea-deep);
+      margin-bottom: 0.35rem;
+    }
+
+    .step strong { display: block; font-size: 1rem; line-height: 1.25; }
+    .step span { display: block; margin-top: 0.35rem; color: var(--stone-shadow); font-size: 0.9rem; }
+
+    .step.stall {
+      background: #f6e2d4;
+      border-color: var(--terra-dark);
+    }
+
+    .step.stall em { color: var(--terra-deep); }
+
+    .cards { display: grid; gap: 0.9rem; }
+
+    article.card {
+      background: var(--whitewash);
+      border: 1px solid var(--sand-mid);
+      padding: 0.95rem 1.05rem 0.85rem;
+    }
+
+    article.card h3 { margin-top: 0; }
+
+    .rank {
+      float: right;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--whitewash);
+      background: var(--veg-dark);
+      padding: 0.15rem 0.45rem;
+    }
+
+    .evidence {
+      margin: 0.75rem 0 0.2rem;
+      padding: 0.55rem 0.7rem;
+      background: #f7f1df;
+      border-top: 1px dashed var(--sand-shadow);
+      font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      color: var(--ui-panel);
+      overflow-x: auto;
+    }
+
+    .evidence code { font-family: inherit; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--whitewash);
+      font-size: 0.96rem;
+    }
+
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      padding: 0.65rem 0.7rem;
+      border-bottom: 1px solid var(--sand-mid);
+    }
+
+    th {
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--veg-darkest);
+      background: var(--sand-light);
+    }
+
+    .keep {
+      background: #e7f0df;
+      border: 1px solid var(--veg-mid);
+      padding: 0.85rem 1rem;
+    }
+
+    ol.queue { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+    ol.queue li { margin: 0.55rem 0; padding-left: 0.2rem; }
+    ol.queue li strong { color: var(--veg-darkest); }
+
+    footer {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 1.4rem 2.5rem;
+      color: var(--stone-shadow);
+      font-size: 0.92rem;
+    }
+
+    footer a { color: var(--sea-deepest); }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; padding-top: 1rem; }
+      nav { position: static; }
+      nav ol { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; }
+      .mast-inner { grid-template-columns: 1fr; }
+      .plateau { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 520px) {
+      .plateau { grid-template-columns: 1fr; }
+      body { font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#verdict">Skip to the verdict</a>
+
+  <header class="mast">
+    <div class="mast-inner">
+      <svg class="mark" viewBox="0 0 92 72" aria-hidden="true">
+        <rect width="92" height="72" fill="#12556b"/>
+        <path d="M0 46 C18 38 28 50 46 42 C64 34 74 48 92 40 L92 72 L0 72 Z" fill="#2fa0a8"/>
+        <path d="M0 52 C20 46 34 58 52 50 C70 42 80 54 92 48 L92 72 L0 72 Z" fill="#c9b483"/>
+        <path d="M8 58 C24 50 36 62 54 54 C68 48 78 58 92 52 L92 72 L0 72 Z" fill="#5c7a3e"/>
+        <rect x="38" y="28" width="16" height="14" fill="#f2ece0"/>
+        <path d="M34 28 L46 16 L58 28 Z" fill="#a54428"/>
+        <rect x="44" y="34" width="4" height="8" fill="#6b5f4e"/>
+      </svg>
+      <div>
+        <p class="kicker">Player retention review · 3 October 2026 · main @ 3c0981a</p>
+        <h1>What would make someone stay</h1>
+        <p>VillageSim already runs a village. The session runs out of reasons to continue once the checklist is done.</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav aria-label="Contents">
+      <strong>Contents</strong>
+      <ol>
+        <li><a href="#verdict">Verdict</a></li>
+        <li><a href="#plateau">The plateau</a></li>
+        <li><a href="#interesting">Keep playing</a></li>
+        <li><a href="#pointless">Dead weight</a></li>
+        <li><a href="#graphics">Clearer picture</a></li>
+        <li><a href="#next">Do this next</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <section id="verdict">
+        <h2>Verdict</h2>
+        <div class="verdict">
+          <p>A player can found a hamlet, feed it, and watch it talk to itself. They cannot yet care what happens on the second evening.</p>
+          <p>Placement, seasons, the grain–flour–food chain, thirst, storms, paired conversations, homes, saves, and a small chicken flock are all in the build. Eleven buildings and four crops sit in the catalogs. The utility AI chooses Eat, Drink, Sleep, Work, Socialize, and Wander on its own. That is a credible toy.</p>
+          <p>It is a short toy. Six objectives in <code>src-tauri/data/objectives.json</code> are the only goals, and finishing one only records an id. Gold is on the bar and stays at zero. Traits describe speed, farming, and carrying, and the simulation never consults them. The player zones land and sometimes assigns a bed. After housing fills and the stockpile ticks over, the village keeps breathing and the player has nothing new to attempt.</p>
+        </div>
+      </section>
+
+      <section id="plateau">
+        <h2>The plateau</h2>
+        <p>The first half hour has a shape. The second half hour repeats it.</p>
+        <div class="plateau" aria-label="Session arc from placement to a stalled village">
+          <div class="step">
+            <em>01</em>
+            <strong>Place buildings</strong>
+            <span>Hut, farm, well, granary. Ghost a footprint and pay wood and stone.</span>
+          </div>
+          <div class="step">
+            <em>02</em>
+            <strong>Watch the AI</strong>
+            <span>Needs decay. Villagers claim jobs, haul, drink, sleep, and meet.</span>
+          </div>
+          <div class="step">
+            <em>03</em>
+            <strong>Close the chain</strong>
+            <span>Wheat becomes grain, flour, then food. Population rises to the housing cap.</span>
+          </div>
+          <div class="step stall">
+            <em>04</em>
+            <strong>Nothing left to want</strong>
+            <span>Checklist done. Surplus sits. No wages, no roles, no ending.</span>
+          </div>
+        </div>
+        <p>Starting stores are 120 wood, 40 stone, and 50 food. The interesting pressure is real while those stores and the first unlocks are in play: winter stalls outdoor crops, thirst walks people to a shore or a well, a storm can knock one building back to half-built, and hunger or thirst can kill. Those threats already exist in <code>src-tauri/src/sim/weather.rs</code> and <code>src-tauri/src/sim/world/population.rs</code>. They never become a season the player is trying to survive on purpose, because the game never says what surviving is for.</p>
+      </section>
+
+      <section id="interesting">
+        <h2>What would make this more interesting</h2>
+        <p>Each of these plugs into a system that is already on <code>main</code>. New engine work is the long way around.</p>
+        <div class="cards">
+          <article class="card">
+            <span class="rank">First</span>
+            <h3>A village that can fail, and a goal after food</h3>
+            <p>Deaths and storms already change the world. The player learns about them by noticing a missing person or a building that is suddenly under construction again. <code>check_objectives</code> in <code>src-tauri/src/sim/world/progression.rs</code> adds completed ids and stops. There is no toast, no chronicle line, and no follow-on goal after “stockpile 50 food” or “reach 10 villagers.”</p>
+            <p>Give the six objectives a voice when they complete, write storms into the chronicle, and add one goal that can still be lost in winter: a calorie reserve that fails in public if the chain stalls. The autumn food warning in the clock is the seed of that season. It needs a stake attached.</p>
+            <div class="evidence">
+              <code>src-tauri/data/objectives.json</code> — Shelter, Fields, Growing village, Miller, Food security, First harvest<br>
+              <code>src-tauri/src/sim/world/progression.rs</code> — <code>check_objectives</code> extends <code>completed_objectives</code> and returns<br>
+              <code>src-tauri/src/sim/chronicle.rs</code> — born, died, building complete, unlock, harvest, season. No storm.
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="rank">Second</span>
+            <h3>Somewhere for surplus to go</h3>
+            <p>The production chain is the best system in the game, and it ends in a pile. Food is eaten. Grain and flour past the objectives have no buyer. Gold is a field on <code>ResourceTotals</code>, drawn in <code>src/ui/ResourceBar.tsx</code>, and never earned or spent. <code>starting()</code> sets it to 0. <code>get</code> and <code>set</code> are the only other mentions in <code>src-tauri/src/sim/resources.rs</code>.</p>
+            <p>A sink turns mastery into a choice: wages, a festival, a market stall, or upkeep on the mill. Any one of those makes the next harvest matter after the village is already fed.</p>
+            <div class="evidence">
+              <code>src-tauri/src/sim/resources.rs</code> — wood, stone, grain, flour, food, gold<br>
+              <code>src/ui/ResourceBar.tsx</code> — gold icon sits beside resources the player can actually move
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="rank">Third</span>
+            <h3>Villagers who behave like their labels</h3>
+            <p>Three traits ship in <code>src-tauri/data/traits.json</code>. Fast Walker “moves 25% faster.” Green Thumb “tends crops with extraordinary skill.” Strong Back “can carry more goods when hauling.” The sim stores the id, shows it in the villager panel, and assigns the next birth by modulo over the list in <code>src-tauri/src/sim/world/population.rs</code>. Movement, tending, and hauling never read it.</p>
+            <p>Honoring those three sentences is the cheapest way to make a name worth remembering. A false rule is worse than a blank biography: the panel is teaching a system the world does not run.</p>
+            <div class="evidence">
+              <code>src-tauri/data/traits.json</code> — description only, no modifier block<br>
+              <code>src-tauri/src/sim/agents.rs</code> — <code>traits: Vec&lt;String&gt;</code> stored on the villager<br>
+              Gameplay reads of <code>fast_walker</code>, <code>green_thumb</code>, or <code>strong_back</code> — none
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="rank">Fourth</span>
+            <h3>A hand on who works where</h3>
+            <p>The player opens buildings. The job board then staffs them. Commands in <code>src-tauri/src/sim/commands.rs</code> cover placement, demolition, planting, a move order, and assigning a home. The specification’s <code>assign_job</code> never arrived. Watching five people sort themselves out is pleasant for one chain. It is thin once the mill, bakery, farms, and gather nodes are all shouting at once.</p>
+            <p>A preference on the selected villager — farm, mill, haul, or “let them choose” — turns the existing job board into a strategy. The home assignment control in the build menu is the pattern to copy.</p>
+            <div class="evidence">
+              <code>src-tauri/src/sim/commands.rs</code> — <code>MoveVillagerTo</code>, placement, plant, chicken clicks. No job assignment.<br>
+              Homes already fill automatically and can be set by the player.
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="rank">Fifth</span>
+            <h3>Stories with memory</h3>
+            <p>Paired conversations restore the Social meter over a few seconds and then forget the partner. There is no friendship, kinship, or grudge. Births are a timer that drops a villager near the centre and cycles a short name list, so the chronicle’s birth line is a counter with a costume. Happiness is the average of hunger, energy, social, and thirst in <code>recompute_happiness</code>, and utility scoring does not ask for it.</p>
+            <p>The meters can stay. What is missing is a consequence that survives the conversation: a pair who seek each other out, a child who shares a parent’s trait, a happiness threshold that slows work or opens a festival. The chronicle is the right place to say it out loud. It already remembers births, deaths, harvests, and the turn of the season.</p>
+            <div class="evidence">
+              <code>src-tauri/src/sim/needs.rs</code> — happiness = (hunger + energy + social + thirst) / 4<br>
+              <code>docs/superpowers/plans/2026-09-13-socializing-and-purposeful-movement.md</code> — chats restore Social; no friendship graph<br>
+              <code>src-tauri/src/sim/world/population.rs</code> — trait id chosen by <code>next_id % traits_pool.len()</code>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="pointless">
+        <h2>What is pointless to keep showing</h2>
+        <p>The simulation underneath these pieces can stay. The interface should stop promising loops the world does not run.</p>
+        <table>
+          <thead>
+            <tr><th>Shown to the player</th><th>What it actually does</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Gold on the resource bar</td>
+              <td>Starts at 0. Nothing mines it, pays it, or prices a building in it.</td>
+            </tr>
+            <tr>
+              <td>Trait blurbs</td>
+              <td>Copy that states numeric rules. The rules are not implemented. A cosmetic adjective would be honest. This copy is not.</td>
+            </tr>
+            <tr>
+              <td>Objectives checklist</td>
+              <td>The only goal structure in the game, and completion is silent. The panel updates if you already have it open.</td>
+            </tr>
+            <tr>
+              <td>Happiness bar</td>
+              <td>A sixth meter that restates the other needs. No decision, unlock, or birth reads it.</td>
+            </tr>
+            <tr>
+              <td>Fence, gate, signpost</td>
+              <td>Decor entries in <code>src-tauri/data/buildings.json</code> with empty <code>jobs</code>. They occupy tiles. Whether a villager may walk a gate is still an open question in <code>progress.md</code>. They compete in the build menu with the mill.</td>
+            </tr>
+            <tr>
+              <td>Chimney smoke and mill dust</td>
+              <td>Atmosphere on every completed bakery and mill, including buildings that are idle. The attachment is correct. The signal “this building is working” is not.</td>
+            </tr>
+            <tr>
+              <td>Three tellings of the log</td>
+              <td>Toasts, the collapsed chronicle preview, and the drawer repeat one event stream. Storms, the sharpest event on the map, are absent from all three.</td>
+            </tr>
+            <tr>
+              <td>Dev chrome and a second name-tag switch</td>
+              <td>“Browser demo” in <code>src/App.tsx</code>, the tick readout on the canvas, and TAGS in the header plus “Name tags” inside <code>src/ui/VillagerRoster.tsx</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Chickens are a finished toy</h3>
+        <div class="keep">
+          <p>The flock is shallow on purpose: three named birds, a morning basket, a click, no feeding, no breeding, no neglect. That is a complete optional amusement, documented in <code>docs/superpowers/plans/2026-10-01-chickens.md</code>. It is not dead weight, and it is the wrong place to look for the next reason to keep playing. Livestock that feeds the economy would be a new production chain, not a deeper cluck.</p>
+        </div>
+      </section>
+
+      <section id="graphics">
+        <h2>How the picture can carry more of the game</h2>
+        <p>The world is one canvas plus DOM chrome. Terrain is baked offscreen. Entities, smoke, chickens, and selection are drawn from a 16px atlas scaled by 2 onto 32px tiles, using only the 29 colors in <code>tools/genart/palette.ts</code>. The map already has a point of view. The HUD around it does not.</p>
+
+        <article class="card">
+          <h3>Put weather on the island</h3>
+          <p>Clear, rain, and storm are a word in <code>src/ui/ClockBar.tsx</code>. The same snapshot that feeds that word can darken the frame, streak rain, and roughen the shoreline foam that already animates. A storm that only exists as text is why the chronicle can omit it and still feel complete. Seeing it makes the existing damage legible.</p>
+        </article>
+
+        <article class="card">
+          <h3>Ghost the building, not a traffic light</h3>
+          <p><code>src/render/drawGhost.ts</code> fills the footprint with <code>rgba(80, 200, 120, 0.35)</code> or a red wash. Those greens are outside the art palette, and they hide the sprite the player is about to commit to. Draw the atlas cell, dimmed, at the same 2× scale as the finished building, and keep the valid or blocked tint as a thin edge.</p>
+        </article>
+
+        <article class="card">
+          <h3>One typeface on the village</h3>
+          <p>Some headings use the bitmap strip from <code>ui.png</code>. Names, intent labels, chronicle lines, and tooltips use smooth UI fonts. The mix makes the pixel skin look like a sticker on a web app. Names and intents should use the bitmap font, or the panels should stop switching families mid-sentence. The bitmap strip is uppercase and limited; that constraint belongs in the label design, not in a second font beside it.</p>
+          <div class="evidence">
+            <code>src/render/nameTags.ts</code> — screen font under the feet<br>
+            <code>src/render/intentOverlay.ts</code> — screen font for “Meeting”, “Talking”, “Taking a stroll”<br>
+            <code>src/ui/PixelText.tsx</code> — bitmap labels on a few headings and buttons
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>Read work from the sprite</h3>
+          <p>Hauling already sets a carry flag while drawing, and the bodies still read as the same walk cycle. A sack, a flour sack, and a grain sack are the production chain made visible. Forest and rock nodes already deplete and regrow in the sim; the tile does not change, so a stripped grove looks identical to a full one. A stump or a rubble state, already anticipated in <code>docs/props-and-assets-backlog.md</code>, tells the player why the hauler stopped without opening the roster.</p>
+        </article>
+
+        <article class="card">
+          <h3>Draw the menu at the same scale as the map</h3>
+          <p>Build and plant thumbs in <code>src/ui/BuildMenu.tsx</code> pass <code>scale={1}</code> into <code>AtlasThumb</code>. The world draws those same cells at 2×. Inside the narrow rail the previews look soft and slightly foreign. Matching <code>ART_SCALE</code> makes the menu a catalog of the island rather than a separate icon set.</p>
+        </article>
+
+        <article class="card">
+          <h3>Remove chrome that has no village meaning</h3>
+          <p>Hide gold until a sink exists. Drop the on-canvas tick strip out of the play build. Keep a single name-tag control, on the roster. The header transport line (“Browser demo” / “Simulation connected”) can live behind a debug flag. None of that needs a new sprite.</p>
+        </article>
+      </section>
+
+      <section id="next">
+        <h2>Do this next</h2>
+        <p>Order is payoff against code that already exists. Presentation follows the loops, because a prettier idle village is still idle.</p>
+        <ol class="queue">
+          <li><strong>Speak when an objective completes, and log the storm.</strong> The checklist and the weather system are already authoritative. They are quiet.</li>
+          <li><strong>Add one spend.</strong> Wire gold, or delete it from the bar until it is wired. A festival or a wage is enough to make the bakery’s next batch a decision.</li>
+          <li><strong>Implement the three trait sentences.</strong> Speed, tend rate, carry stack. Leave the JSON descriptions alone once they are true.</li>
+          <li><strong>Let the player prefer a job.</strong> One command beside assign-home. The job board keeps doing the walking.</li>
+          <li><strong>Then paint the world to match.</strong> Weather overlay, atlas ghosts, one type system, carry and depleted-node sprites, 2× menu thumbs.</li>
+        </ol>
+        <p>Content volume — more crops, more trades — helps after those five. Another building with an empty job list will lengthen the menu and leave the plateau where it is.</p>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <p>Reviewed against <code>main</code> at <code>3c0981a</code> (“Fix chimney smoke and mill dust attachment”), with milestones M1–M11, thirst, chickens, and the pixel HUD in place. The August engineering review, <a href="state-of-the-game-review.html">State of the Game</a>, remains the record for simulation duplication, world structure, tick payload, and missing soak tests. Its content counts — six buildings, one crop — describe an earlier <code>main</code>. This page does not replace that record and does not change the game.</p>
+    <p>The browser demo still skips births and deaths, so population drama in a headless session is desktop-only. That is a parity gap, tracked in <code>progress.md</code>, separate from the missing second act.</p>
+  </footer>
+</body>
+</html>
