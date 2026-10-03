@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-10-01 (small optional chicken flock implemented; verification below).
+Last updated: 2026-10-02 (chimney smoke and mill dust anchors corrected; verification below).
 
 ## Status
 
@@ -191,6 +191,25 @@ live gameplay session. Native Tauri interaction and subjective audio quality rem
 unverified; run `npm run tauri dev` for desktop acceptance and `npm run dev` for
 browser acceptance. Browser checks included narrow and desktop layouts, but no
 complete mobile interaction sweep.
+
+## Chimney smoke and mill dust (2026-10-02)
+
+The existing three-frame smoke/dust atlas cells are now correctly attached to the
+bakery chimney and mill base. Offsets use the building sprite origin and account
+for both atlas anchors; effects share the owner's drawing depth so they stay above
+their own building without covering nearer entities. Completed buildings emit
+decorative effects regardless of production activity. Sim ticks drive animation
+(so pausing freezes it); reduced motion keeps frame zero. Construction, storm
+reconstruction, demolition and viewport culling omit effects through the existing
+building rendering path. No simulation, catalog, save-format or art changes.
+
+Verification: **299 frontend tests** and `npm run build` passed. Regression coverage
+checks exact anchors/depth, draw ordering, frame progression, rotation, reduced
+motion, construction, demolition and culling. A temporary browser preview using
+the actual atlas and scene renderer visually verified all three frames, reduced
+motion and construction, with no console warnings/errors. The preview was removed
+after inspection. Native Tauri gameplay and full placement/production interactions
+were not run; Rust checks were not rerun because only frontend rendering changed.
 
 ## Next up
 

@@ -81,15 +81,17 @@ function scaffoldKey(fw: number, fh: number): string {
 
 interface BuildingVfx {
   key: string;
-  /** Native-art pixel offset from the building footprint origin (top-left tile). */
+  /** Native-art pixel offset from the building sprite's top-left corner. */
   offsetX: number;
   offsetY: number;
   period: number;
 }
 
 const BUILDING_VFX: Record<string, BuildingVfx> = {
-  bakery: { key: 'vfx.smoke', offsetX: 20, offsetY: 2, period: SMOKE_TICKS_PER_FRAME },
-  mill: { key: 'vfx.dust', offsetX: 14, offsetY: 50, period: DUST_TICKS_PER_FRAME },
+  // Smoke's lowest puff sits just above the chimney at sprite pixels (20..23, 8).
+  bakery: { key: 'vfx.smoke', offsetX: 14, offsetY: -14, period: SMOKE_TICKS_PER_FRAME },
+  // Dust crosses the foot of the tower at sprite row 55.
+  mill: { key: 'vfx.dust', offsetX: 8, offsetY: 44, period: DUST_TICKS_PER_FRAME },
 };
 
 function bubbleForState(state: number | undefined): string | null {
@@ -185,8 +187,10 @@ function pushSprite(
     /** Extra native-art offset from the footprint origin before scaling. */
     offsetX?: number;
     offsetY?: number;
+    /** Attached effects share their owner's depth so they cannot cover nearer entities. */
+    baseY?: number;
   },
-): void {
+): DrawEntry | undefined {
   if (!hasCell(opts.atlas, opts.key)) return;
   const cell = opts.atlas.manifest.cells[opts.key];
   const anchorY = cellAnchorY(opts.atlas, opts.key);
@@ -195,16 +199,18 @@ function pushSprite(
   const drawY = worldY - anchorY * ART_SCALE;
   const spriteBottom = drawY + cell.h * ART_SCALE;
   const footprintBottom = worldY + opts.footprintH * opts.tileSize;
-  list.push({
+  const entry: DrawEntry = {
     rank: opts.rank,
-    baseY: Math.max(footprintBottom, spriteBottom),
+    baseY: opts.baseY ?? Math.max(footprintBottom, spriteBottom),
     id: opts.id,
     key: opts.key,
     frame: opts.frame,
     x: worldX,
     y: drawY,
     mirror: opts.mirror,
-  });
+  };
+  list.push(entry);
+  return entry;
 }
 
 /** Build a sorted draw list. Pure aside from mutating `lastFacing`. */
@@ -267,7 +273,7 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
       const key = spriteKey(def, `kind${building.kind}`);
       const frames = cellFrames(atlas, key);
       const period = key === 'mill' ? MILL_TICKS_PER_FRAME : 1;
-      pushSprite(list, {
+      const buildingSprite = pushSprite(list, {
         rank: 1,
         id: `b:${building.id}`,
         key,
@@ -280,7 +286,7 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
       });
 
       const vfx = def?.id ? BUILDING_VFX[def.id] : undefined;
-      if (vfx && hasCell(atlas, vfx.key)) {
+      if (buildingSprite && vfx && hasCell(atlas, vfx.key)) {
         const vfxFrames = cellFrames(atlas, vfx.key);
         pushSprite(list, {
           rank: 1,
@@ -293,7 +299,9 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
           footprintH: fh,
           atlas,
           offsetX: vfx.offsetX,
-          offsetY: vfx.offsetY,
+          // pushSprite offsets are footprint-relative and subtract the cell anchor.
+          offsetY: vfx.offsetY - cellAnchorY(atlas, key) + cellAnchorY(atlas, vfx.key),
+          baseY: buildingSprite.baseY,
         });
       }
     }

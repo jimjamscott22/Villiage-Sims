@@ -14,10 +14,11 @@ is in [`progress.md`](../progress.md).
 | Terrain bases | deep water, shallow water, sand, grass, rock — 4 variants each, plus fringes and animated foam |
 | Standing terrain props | `prop.cypress` (forest tiles), `prop.peak` (mountain tiles) |
 | Decor scatter | `prop.bush`, `prop.boulder`, `prop.palm`, `prop.reeds`, `prop.flowers`, `prop.stump`, `prop.deadfall`, `prop.mushroom`, `prop.shoreRock`, `prop.driftwood`, `prop.lilypad`, `prop.cactus`, `prop.campfire` (animated), `prop.pebbles`, `prop.crystal`, `prop.pine`, `prop.cattail` (animated), `prop.standingStone`, seasonal `prop.fallenLeaves` (autumn) and `prop.snowDrift` (winter) |
-| Buildings | hut, farm (+ field), granary, mill (animated), bakery (animated), well, fence, gate, signpost, storehouse, 3 scaffold sizes |
+| Buildings | hut, farm (+ field), granary, mill (animated sails + dust), bakery (animated chimney smoke), well, fence, gate, signpost, storehouse, 3 scaffold sizes |
 | Crops | wheat, 4 growth stages, sway animation on the ripe stage |
 | Characters | one villager body in 3 facings × idle/4-frame walk/lie-down, recolored into 6 dyes |
 | Character VFX | 4 thought bubbles (tool, fork, zzz, speech) |
+| Building VFX | `vfx.smoke` above bakery chimneys and `vfx.dust` at mill bases; 3 frames each, completed buildings only |
 | UI | 9-slice panel, bitmap font strip, resource/season/speed icons |
 
 All art is generated from `tools/genart/`, restricted to the 29 colors in
@@ -99,7 +100,7 @@ Roughly what each kind of addition costs, in the order the work happens:
 | Idea | Notes |
 |---|---|
 | Weather (rain, snow overlay) | Already named as remaining M10 work. A particle overlay on the entity layer plus a season/weather field on the snapshot. |
-| Chimney smoke, mill dust | Small animated cells anchored to a building; the mill and bakery already animate, so the pattern exists. |
+| Chimney smoke, mill dust | **Done.** Three-frame atlas cells anchored to the bakery chimney and mill base, sharing the building's drawing depth. Effects animate with sim ticks, freeze for reduced motion, and disappear during construction or demolition. |
 | Day/night tint | A single full-screen multiply keyed off `clock.minute`. Cheap and transformative. |
 | Selection and job-target markers | Selection brackets exist; a marker on the tile a villager is pathing to would make the AI legible. |
 

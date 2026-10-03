@@ -316,8 +316,37 @@ describe('buildDrawList', () => {
       lastFacing,
       atlas,
     });
-    expect(list.find((e) => e.id === 'vfx:10')?.key).toBe('vfx.dust');
-    expect(list.find((e) => e.id === 'vfx:11')?.key).toBe('vfx.smoke');
+    const mill = list.find((e) => e.id === 'b:10')!;
+    const bakery = list.find((e) => e.id === 'b:11')!;
+    expect(list.find((e) => e.id === 'vfx:10')).toMatchObject({
+      key: 'vfx.dust', x: mill.x + 16, y: mill.y + 88, baseY: mill.baseY, frame: 0,
+    });
+    expect(list.find((e) => e.id === 'vfx:11')).toMatchObject({
+      key: 'vfx.smoke', x: bakery.x + 28, y: bakery.y - 28, baseY: bakery.baseY, frame: 2,
+    });
+    expect(list.indexOf(mill)).toBeLessThan(list.findIndex((e) => e.id === 'vfx:10'));
+    expect(list.indexOf(bakery)).toBeLessThan(list.findIndex((e) => e.id === 'vfx:11'));
+  });
+
+  it('keeps building effects attached when rotated and freezes them for reduced motion', () => {
+    const input = {
+      snapshot: snapshot({ buildings: [
+        { id: 10, kind: 2, x: 4, y: 4, rot: 1, state: 2, progress: 100 },
+        { id: 11, kind: 3, x: 8, y: 4, rot: 1, state: 2, progress: 100 },
+      ] }),
+      catalog: { buildings, crops }, props: [], tileSize: 32, tick: 10,
+      reduceMotion: false, selectedBuildingId: null, selectedVillagerId: null,
+      lastFacing, atlas,
+    };
+    const list = buildDrawList(input);
+    expect(list.find(e => e.id === 'vfx:10')).toMatchObject({ x: 144, y: 152, frame: 2 });
+    expect(list.find(e => e.id === 'vfx:11')).toMatchObject({ x: 284, y: 68, frame: 1 });
+    const frozen = buildDrawList({ ...input, reduceMotion: true });
+    expect(frozen.filter(e => e.id.startsWith('vfx:')).map(e => e.frame)).toEqual([0, 0]);
+    const culled = buildDrawList({ ...input, viewTiles: { minX: 30, minY: 30, maxX: 32, maxY: 32 } });
+    expect(culled.filter(e => e.id.startsWith('vfx:'))).toEqual([]);
+    const demolished = buildDrawList({ ...input, snapshot: snapshot() });
+    expect(demolished.filter(e => e.id.startsWith('vfx:'))).toEqual([]);
   });
 
   it('skips building VFX while under construction', () => {
