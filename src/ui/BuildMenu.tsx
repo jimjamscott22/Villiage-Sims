@@ -72,7 +72,7 @@ export function BuildMenu({
         <VillagerPanel detail={villagerDetail} />
 
         <div>
-          <h2 className="text-[11px] text-white/50">
+          <h2 className="text-[11px] text-white/60">
             <PixelText text="PLANT" />
           </h2>
           <ul className="mt-2 flex flex-col gap-1">
@@ -91,7 +91,7 @@ export function BuildMenu({
                       <AtlasThumb cellKey={`${crop.id}.${crop.stages - 1}`} scale={1} />
                       <div>
                         <div className="font-medium text-white/90">{crop.name}</div>
-                        <div className="text-[11px] text-white/55">
+                        <div className="text-[11px] text-white/60">
                           {crop.seasons.join(', ')} · {crop.stages} stages
                         </div>
                       </div>
@@ -104,7 +104,7 @@ export function BuildMenu({
         </div>
 
         <div>
-          <h2 className="text-[11px] text-white/50">
+          <h2 className="text-[11px] text-white/60">
             <PixelText text="BUILD" />
           </h2>
           <ul className="mt-2 flex flex-col gap-1">
@@ -149,7 +149,7 @@ export function BuildMenu({
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-white/55">
+                        <div className="text-[11px] text-white/60">
                           {formatCost(building.cost)}
                           {building.id === 'chicken_shelter' && <span className="block text-amber-100/80">{chickenShelterId != null ? 'One shelter already placed' : '3 named chickens · optional eggs'}</span>}
                           {formatRecipe(building)}
