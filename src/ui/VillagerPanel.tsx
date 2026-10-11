@@ -41,7 +41,7 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
 
   return (
     <section className="border-t border-white/10 pt-3">
-      <h2 className="text-[11px] text-white/50">
+      <h2 className="text-[11px] text-white/60">
         <PixelText text="VILLAGER" />
       </h2>
       {!detail ? (
@@ -50,7 +50,7 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
         <div className="mt-2 flex flex-col gap-2">
           <div>
             <div className="font-medium text-white/90">{detail.name}</div>
-            <div className="text-[11px] text-white/55">{detail.stateLabel}</div>
+            <div className="text-[11px] text-white/60">{detail.stateLabel}</div>
             {detail.thought && (
               <div className="mt-1 text-[11px] text-amber-300/90">"{detail.thought}"</div>
             )}
@@ -75,10 +75,10 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
               ))}
             </div>
           )}
-          <p className="text-[11px] text-white/50">
+          <p className="text-[11px] text-white/60">
             Job: {formatWork(detail)}
           </p>
-          <div className="text-[11px] text-white/50">
+          <div className="text-[11px] text-white/60">
             <span>Home: {formatHome(detail)}</span>
             {detail.home != null && (
               <button
