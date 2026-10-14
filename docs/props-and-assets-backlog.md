@@ -13,7 +13,7 @@ is in [`progress.md`](../progress.md).
 |---|---|
 | Terrain bases | deep water, shallow water, sand, grass, rock — 4 variants each, plus fringes and animated foam |
 | Standing terrain props | `prop.cypress` (forest tiles), `prop.peak` (mountain tiles) |
-| Decor scatter | `prop.bush`, `prop.boulder`, `prop.palm`, `prop.reeds`, `prop.flowers`, `prop.stump`, `prop.deadfall`, `prop.mushroom`, `prop.shoreRock`, `prop.driftwood`, `prop.lilypad`, `prop.cactus`, `prop.campfire` (animated), `prop.pebbles`, `prop.crystal`, `prop.pine`, `prop.cattail` (animated), `prop.standingStone`, seasonal `prop.fallenLeaves` (autumn) and `prop.snowDrift` (winter) |
+| Decor scatter | `prop.bush`, `prop.boulder`, `prop.palm`, `prop.reeds`, `prop.flowers`, `prop.stump`, `prop.deadfall`, `prop.mushroom`, `prop.shoreRock`, `prop.driftwood`, `prop.lilypad`, `prop.cactus`, `prop.campfire` (animated), `prop.pebbles`, `prop.crystal`, `prop.pine`, `prop.cattail` (animated), `prop.standingStone`, `prop.sunflowers` (summer), `prop.shells` (beach), `prop.fishSplash` (animated, deep water), seasonal `prop.fallenLeaves` (autumn) and `prop.snowDrift` (winter) |
 | Buildings | hut, farm (+ field), granary, mill (animated sails + dust), bakery (animated chimney smoke), well, fence, gate, signpost, storehouse, 3 scaffold sizes |
 | Crops | wheat, 4 growth stages, sway animation on the ripe stage |
 | Characters | one villager body in 3 facings × idle/4-frame walk/lie-down, recolored into 6 dyes |
@@ -60,6 +60,7 @@ Roughly what each kind of addition costs, in the order the work happens:
 | Foothill pines | **Done.** `prop.pine` on grass touching mountain tiles — the mountain counterpart to forest-edge debris. |
 | Cattails | **Done.** `prop.cattail` (two-frame sway) on shallow water touching sand/grass/forest; lily pads stay on open water. |
 | Autumn leaves, winter snow | **Done.** `prop.fallenLeaves` (season 2) at forest margins and `prop.snowDrift` (season 3) on grass and rock, using the same season gate as flowers. |
+| Sunflowers, shells, leaping fish | **Done.** `prop.sunflowers` fills the missing summer slot (season 1) on open grass; `prop.shells` (scallop, starfish, spiral shell) on sand touching water; `prop.fishSplash`, a four-frame ripple/leap/spray cycle on sparse deep-water tiles. The splash is staggered per tile via `propFrame()` in `scene.ts` so the sea doesn't pulse in unison. |
 | Standing stones | **Done.** Very rare `prop.standingStone` landmark on open grass. |
 | Depleted-node art | `ResourceNode.amount` is already in the sim but invisible. A stump variant for an exhausted forest tile and a rubble variant for exhausted rock would make gathering readable. Needs nodes on the wire (they aren't in the tick snapshot today). |
 | Dirt paths worn by villagers | Track tile traversal counts in the sim, blend a path fringe over grass. Genuinely nice, genuinely not cheap. |

@@ -224,10 +224,12 @@ describe('terrainProps', () => {
     expect(decor.length).toBeGreaterThan(0);
     const grassKeys = new Set([
       'prop.bush', 'prop.flowers', 'prop.stump', 'prop.deadfall', 'prop.mushroom', 'prop.campfire',
-      'prop.fallenLeaves', 'prop.pine', 'prop.standingStone', 'prop.snowDrift',
+      'prop.fallenLeaves', 'prop.pine', 'prop.standingStone', 'prop.snowDrift', 'prop.sunflowers',
     ]);
     const rockKeys = new Set(['prop.boulder', 'prop.pebbles', 'prop.crystal', 'prop.snowDrift']);
-    const sandKeys = new Set(['prop.palm', 'prop.reeds', 'prop.shoreRock', 'prop.driftwood', 'prop.cactus']);
+    const sandKeys = new Set([
+      'prop.palm', 'prop.reeds', 'prop.shoreRock', 'prop.driftwood', 'prop.cactus', 'prop.shells',
+    ]);
     for (const prop of decor) {
       const terrain = rows[prop.y][prop.x];
       expect([GRASS, SAND, ROCK, SHALLOW]).toContain(terrain);
@@ -280,6 +282,40 @@ describe('terrainProps', () => {
     expect(snow.length).toBeGreaterThan(0);
     expect(leaves.every((prop) => prop.season === 2)).toBe(true);
     expect(snow.every((prop) => prop.season === 3)).toBe(true);
+  });
+
+  it('tags summer sunflowers with season 1 and keeps them off the forest edge', () => {
+    const rows = Array.from({ length: 32 }, (_, y) =>
+      Array.from({ length: 32 }, (_, x) => (y < 4 && x % 4 === 0 ? FOREST : GRASS)),
+    );
+    const props = terrainProps(grid(rows));
+    const sunflowers = props.filter((prop) => prop.key === 'prop.sunflowers');
+    expect(sunflowers.length).toBeGreaterThan(0);
+    expect(sunflowers.every((prop) => prop.season === 1 && prop.decor)).toBe(true);
+    for (const prop of sunflowers) {
+      const neighbours = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => rows[prop.y + dy]?.[prop.x + dx]);
+      expect(neighbours).not.toContain(FOREST);
+    }
+  });
+
+  it('scatters shells on beach sand touching water, never on inland sand', () => {
+    const rows = [
+      Array.from({ length: 64 }, () => SAND),
+      Array.from({ length: 64 }, () => SAND),
+      Array.from({ length: 64 }, () => SAND),
+      Array.from({ length: 64 }, () => SHALLOW),
+    ];
+    const shells = terrainProps(grid(rows)).filter((prop) => prop.key === 'prop.shells');
+    expect(shells.length).toBeGreaterThan(0);
+    for (const prop of shells) expect(prop.y).toBe(2);
+  });
+
+  it('leaps fish only from deep water, sparsely, with no season gate', () => {
+    const rows = Array.from({ length: 48 }, () => Array.from({ length: 48 }, () => DEEP));
+    const props = terrainProps(grid(rows));
+    expect(props.length).toBeGreaterThan(0);
+    expect(props.every((prop) => prop.key === 'prop.fishSplash' && prop.decor && prop.season == null)).toBe(true);
+    expect(props.length).toBeLessThan(48 * 48 * 0.05);
   });
 
   it('tags spring flowers with season 0', () => {

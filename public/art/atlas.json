@@ -15,28 +15,28 @@
     },
     "bubble.fork": {
       "sheet": "entities",
-      "x": 36,
+      "x": 96,
       "y": 592,
       "w": 8,
       "h": 8
     },
     "bubble.speech": {
       "sheet": "entities",
-      "x": 44,
+      "x": 104,
       "y": 592,
       "w": 8,
       "h": 8
     },
     "bubble.tool": {
       "sheet": "entities",
-      "x": 52,
+      "x": 112,
       "y": 592,
       "w": 8,
       "h": 8
     },
     "bubble.zzz": {
       "sheet": "entities",
-      "x": 60,
+      "x": 120,
       "y": 592,
       "w": 8,
       "h": 8
@@ -72,14 +72,14 @@
     },
     "chicken.basket": {
       "sheet": "entities",
-      "x": 68,
+      "x": 128,
       "y": 592,
       "w": 6,
       "h": 7
     },
     "chicken.hop": {
       "sheet": "entities",
-      "x": 128,
+      "x": 192,
       "y": 576,
       "w": 12,
       "h": 14,
@@ -87,7 +87,7 @@
     },
     "chicken.peck": {
       "sheet": "entities",
-      "x": 152,
+      "x": 216,
       "y": 576,
       "w": 12,
       "h": 14,
@@ -95,44 +95,44 @@
     },
     "chicken.rest": {
       "sheet": "entities",
-      "x": 176,
+      "x": 240,
       "y": 576,
       "w": 12,
       "h": 14
     },
     "chicken.scratch": {
       "sheet": "entities",
-      "x": 188,
-      "y": 576,
+      "x": 0,
+      "y": 592,
       "w": 12,
       "h": 14,
       "frames": 2
     },
     "chicken.sleep": {
       "sheet": "entities",
-      "x": 212,
-      "y": 576,
+      "x": 24,
+      "y": 592,
       "w": 12,
       "h": 14
     },
     "chicken.startled": {
       "sheet": "entities",
-      "x": 224,
-      "y": 576,
+      "x": 36,
+      "y": 592,
       "w": 12,
       "h": 14,
       "frames": 2
     },
     "chicken.tilt": {
       "sheet": "entities",
-      "x": 0,
+      "x": 60,
       "y": 592,
       "w": 12,
       "h": 14
     },
     "chicken.walk": {
       "sheet": "entities",
-      "x": 12,
+      "x": 72,
       "y": 592,
       "w": 12,
       "h": 14,
@@ -788,23 +788,31 @@
       "w": 16,
       "h": 16
     },
-    "prop.flowers": {
+    "prop.fishSplash": {
       "sheet": "entities",
       "x": 16,
+      "y": 560,
+      "w": 16,
+      "h": 16,
+      "frames": 4
+    },
+    "prop.flowers": {
+      "sheet": "entities",
+      "x": 80,
       "y": 560,
       "w": 16,
       "h": 16
     },
     "prop.lilypad": {
       "sheet": "entities",
-      "x": 32,
+      "x": 96,
       "y": 560,
       "w": 16,
       "h": 16
     },
     "prop.mushroom": {
       "sheet": "entities",
-      "x": 48,
+      "x": 112,
       "y": 560,
       "w": 16,
       "h": 16
@@ -827,7 +835,7 @@
     },
     "prop.pebbles": {
       "sheet": "entities",
-      "x": 64,
+      "x": 128,
       "y": 560,
       "w": 16,
       "h": 16
@@ -842,22 +850,29 @@
     },
     "prop.reeds": {
       "sheet": "entities",
-      "x": 80,
+      "x": 144,
       "y": 560,
       "w": 16,
       "h": 16,
       "frames": 2
     },
+    "prop.shells": {
+      "sheet": "entities",
+      "x": 176,
+      "y": 560,
+      "w": 16,
+      "h": 16
+    },
     "prop.shoreRock": {
       "sheet": "entities",
-      "x": 112,
+      "x": 192,
       "y": 560,
       "w": 16,
       "h": 16
     },
     "prop.snowDrift": {
       "sheet": "entities",
-      "x": 128,
+      "x": 208,
       "y": 560,
       "w": 16,
       "h": 16
@@ -872,7 +887,14 @@
     },
     "prop.stump": {
       "sheet": "entities",
-      "x": 144,
+      "x": 224,
+      "y": 560,
+      "w": 16,
+      "h": 16
+    },
+    "prop.sunflowers": {
+      "sheet": "entities",
+      "x": 240,
       "y": 560,
       "w": 16,
       "h": 16
@@ -919,22 +941,22 @@
     },
     "strawberry.0": {
       "sheet": "entities",
-      "x": 160,
-      "y": 560,
+      "x": 0,
+      "y": 576,
       "w": 16,
       "h": 16
     },
     "strawberry.1": {
       "sheet": "entities",
-      "x": 176,
-      "y": 560,
+      "x": 16,
+      "y": 576,
       "w": 16,
       "h": 16
     },
     "strawberry.2": {
       "sheet": "entities",
-      "x": 192,
-      "y": 560,
+      "x": 32,
+      "y": 576,
       "w": 16,
       "h": 16,
       "frames": 2
@@ -1235,7 +1257,7 @@
     },
     "vfx.dust": {
       "sheet": "entities",
-      "x": 0,
+      "x": 64,
       "y": 576,
       "w": 16,
       "h": 16,
@@ -3492,28 +3514,28 @@
     },
     "wheat.0": {
       "sheet": "entities",
-      "x": 48,
+      "x": 112,
       "y": 576,
       "w": 16,
       "h": 16
     },
     "wheat.1": {
       "sheet": "entities",
-      "x": 64,
+      "x": 128,
       "y": 576,
       "w": 16,
       "h": 16
     },
     "wheat.2": {
       "sheet": "entities",
-      "x": 80,
+      "x": 144,
       "y": 576,
       "w": 16,
       "h": 16
     },
     "wheat.3": {
       "sheet": "entities",
-      "x": 96,
+      "x": 160,
       "y": 576,
       "w": 16,
       "h": 16,

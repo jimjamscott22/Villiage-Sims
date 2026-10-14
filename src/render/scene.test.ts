@@ -7,6 +7,7 @@ import {
   buildDrawList,
   dyeIndex,
   facingFromDelta,
+  propFrame,
   type Facing,
 } from './scene';
 import type { BuildingDef, CropDef, TickSnapshot } from '../state/types';
@@ -443,4 +444,28 @@ it('renders chicken poses and baskets through the atlas and culls offscreen anim
   expect(list.find(e => e.id === 'egg:9:1')?.key).toBe('chicken.basket');
   for (const pose of ['walk', 'peck', 'scratch', 'sleep', 'startled', 'hop', 'tilt', 'rest']) expect(manifest.cells[`chicken.${pose}`]).toBeDefined();
   expect(manifest.cells.chicken_shelter).toBeDefined();
+});
+
+describe('propFrame', () => {
+  it('sways ordinary props in lockstep and freezes under reduced motion', () => {
+    const reeds = { x: 3, y: 4, key: 'prop.reeds' };
+    const other = { x: 40, y: 9, key: 'prop.reeds' };
+    expect(propFrame(24, reeds, 2, false)).toBe(propFrame(24, other, 2, false));
+    expect(propFrame(24, reeds, 2, true)).toBe(0);
+  });
+
+  it('staggers leaping fish so neighbouring tiles are not in unison', () => {
+    const frames = new Set<number>();
+    for (let x = 0; x < 16; x += 1) frames.add(propFrame(100, { x, y: 5, key: 'prop.fishSplash' }, 4, false));
+    expect(frames.size).toBeGreaterThan(1);
+    for (const frame of frames) expect(frame).toBeLessThan(4);
+  });
+
+  it('cycles every fish frame over time and rests on the ripple under reduced motion', () => {
+    const fish = { x: 11, y: 3, key: 'prop.fishSplash' };
+    const seen = new Set<number>();
+    for (let tick = 0; tick < 200; tick += 1) seen.add(propFrame(tick, fish, 4, false));
+    expect([...seen].sort()).toEqual([0, 1, 2, 3]);
+    expect(propFrame(57, fish, 4, true)).toBe(0);
+  });
 });
