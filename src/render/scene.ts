@@ -31,6 +31,20 @@ export const MILL_TICKS_PER_FRAME = 4;
 export const SMOKE_TICKS_PER_FRAME = 8;
 export const DUST_TICKS_PER_FRAME = 5;
 export const SWAY_TICKS_PER_FRAME = 12;
+export const SPLASH_TICKS_PER_FRAME = 7;
+
+/**
+ * Animation frame for a terrain prop. Most scatter (reeds, cattails, campfires) sways in
+ * lockstep, but leaping fish are staggered per tile so the sea doesn't pulse in unison.
+ */
+export function propFrame(tick: number, prop: { x: number; y: number; key: string }, frames: number, reduceMotion: boolean): number {
+  if (prop.key === 'prop.fishSplash') {
+    // Offset in ticks (not frames) across one full cycle, so neighbours rarely share a frame.
+    const phase = (prop.x * 7 + prop.y * 13) % (SPLASH_TICKS_PER_FRAME * Math.max(frames, 1));
+    return animFrame(tick + phase, SPLASH_TICKS_PER_FRAME, frames, reduceMotion);
+  }
+  return animFrame(tick, SWAY_TICKS_PER_FRAME, frames, reduceMotion);
+}
 
 const STATE_MOVING = 1;
 const STATE_WORKING = 2;
@@ -363,7 +377,7 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
       rank: 1,
       id: `p:${prop.x},${prop.y}`,
       key: prop.key,
-      frame: animFrame(tick, SWAY_TICKS_PER_FRAME, cellFrames(atlas, prop.key), reduceMotion),
+      frame: propFrame(tick, prop, cellFrames(atlas, prop.key), reduceMotion),
       tileX: prop.x,
       tileY: prop.y,
       tileSize,

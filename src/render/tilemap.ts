@@ -206,6 +206,9 @@ const SNOW_DRIFT_CHANCE = 0.06;
 const PEBBLE_CHANCE = 0.08;
 const CRYSTAL_CHANCE = 0.06;
 const CATTAIL_CHANCE = 0.14;
+const SUNFLOWER_CHANCE = 0.06;
+const SHELL_CHANCE = 0.1;
+const FISH_SPLASH_CHANCE = 0.015;
 
 function neighbourTerrain(
   tiles: ArrayLike<number>,
@@ -259,7 +262,14 @@ function decorFor(tiles: ArrayLike<number>, width: number, height: number, x: nu
     if (!nearForest && hash01(x, y, DECOR_SALT + 4) < CAMPFIRE_CHANCE) return { key: 'prop.campfire' };
     if (!nearForest && hash01(x, y, DECOR_SALT + 7) < STANDING_STONE_CHANCE) return { key: 'prop.standingStone' };
     if (roll < BUSH_CHANCE) return { key: 'prop.bush' };
+    // Summer's own prop. Rolled after the year-round scatter so it only claims bare tiles.
+    if (!nearForest && hash01(x, y, DECOR_SALT + 11) < SUNFLOWER_CHANCE) {
+      return { key: 'prop.sunflowers', season: 1 };
+    }
     return hash01(x, y, DECOR_SALT + 8) < SNOW_DRIFT_CHANCE ? { key: 'prop.snowDrift', season: 3 } : null;
+  }
+  if (t === 0) {
+    return hash01(x, y, DECOR_SALT + 12) < FISH_SPLASH_CHANCE ? { key: 'prop.fishSplash' } : null;
   }
   if (t === 5) {
     if (touchesTerrain(tiles, width, height, x, y, [6]) && hash01(x, y, DECOR_SALT + 9) < CRYSTAL_CHANCE) {
@@ -286,6 +296,7 @@ function decorFor(tiles: ArrayLike<number>, width: number, height: number, x: nu
     const shoreRoll = hash01(x, y, DECOR_SALT + 3);
     if (touchesDeep && shoreRoll < SHORE_ROCK_CHANCE) return { key: 'prop.shoreRock' };
     if (shoreRoll < SHORE_ROCK_CHANCE + DRIFTWOOD_CHANCE) return { key: 'prop.driftwood' };
+    if (shoreRoll < SHORE_ROCK_CHANCE + DRIFTWOOD_CHANCE + SHELL_CHANCE) return { key: 'prop.shells' };
     return null;
   }
   if (roll < PALM_CHANCE) return { key: 'prop.palm' };
@@ -294,8 +305,8 @@ function decorFor(tiles: ArrayLike<number>, width: number, height: number, x: nu
 
 /**
  * Standing props for Forest (4) and Mountain (6), plus a deterministic decor
- * scatter (bushes, boulders, palms, reeds, foothill pines, seasonal leaves and
- * snow, …) on the open terrains. Not baked —
+ * scatter (bushes, boulders, palms, reeds, foothill pines, seasonal flowers,
+ * sunflowers, leaves and snow, beach shells, leaping fish, …) on the open terrains. Not baked —
  * they y-sort on the entity layer.
  */
 export function terrainProps(terrain: TerrainSnapshot): TerrainProp[] {

@@ -543,6 +543,125 @@ export const STANDING_STONE: SpriteGrid = grid(16, 24, {
   for (let x = 4; x <= 14; x += 1) set(x, 20, 'i');
 });
 
+/** Summer sunflower patch. 16×16, anchorY 0 — the season slot between spring flowers and autumn leaves. */
+export const SUNFLOWERS: SpriteGrid = grid(16, 16, {
+  w: P.wheat,
+  l: P.terraLight,
+  d: P.terraDeep,
+  k: P.vegDarkest,
+  v: P.vegDark,
+  m: P.vegMid,
+  g: P.vegLight,
+  i: P.ink,
+}, (set) => {
+  // [centre x, centre y, stalk base y]: a tall head flanked by two shorter ones.
+  const heads: Array<[number, number, number]> = [[8, 3, 13], [4, 6, 13], [12, 7, 13]];
+  for (const [cx, cy, base] of heads) {
+    for (let y = cy + 2; y <= base; y += 1) set(cx, y, y % 2 === 0 ? 'k' : 'v');
+    // Petals around a dark seed disc, with warmer corners for depth.
+    for (const [dx, dy] of [[0, -2], [0, 2], [-2, 0], [2, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      set(cx + dx, cy + dy, dx !== 0 && dy !== 0 ? 'l' : 'w');
+    }
+    set(cx, cy, 'd');
+    set(cx - 1, cy, 'd');
+    set(cx + 1, cy, 'd');
+    set(cx, cy - 1, 'd');
+    set(cx, cy + 1, 'd');
+  }
+  // Leaves on the tall stalk and a tuft of grass at the base.
+  set(7, 8, 'g');
+  set(6, 9, 'g');
+  set(9, 9, 'g');
+  set(10, 10, 'g');
+  for (let x = 3; x <= 13; x += 1) set(x, 13, x % 2 === 0 ? 'v' : 'm');
+  for (let x = 5; x <= 11; x += 1) set(x, 14, 'i');
+});
+
+/** Scallop shell, starfish and a spiral shell washed up on the beach. 16×16, anchorY 0. */
+export const SHELLS: SpriteGrid = grid(16, 16, {
+  w: P.whitewash,
+  p: P.sandPale,
+  l: P.terraLight,
+  t: P.terraMid,
+  d: P.terraDark,
+  r: P.sandMid,
+  c: P.sandShadow,
+}, (set) => {
+  // Scallop: a pale fan with ribs, widening towards the rim, and a hinge.
+  const fan = [1, 2, 3, 3];
+  fan.forEach((half, row) => {
+    const y = 8 + row;
+    for (let x = 6 - half; x <= 5 + half; x += 1) {
+      const edge = x === 6 - half || x === 5 + half || row === 0;
+      set(x, y, edge ? 'r' : x % 2 === 0 ? 'p' : 'w');
+    }
+  });
+  set(5, 12, 'r');
+  set(6, 12, 'r');
+  // Starfish: five arms around a dark centre.
+  for (const [sx, sy] of [[10, 8], [9, 9], [11, 9], [9, 11], [11, 11]]) set(sx, sy, 'l');
+  for (const [sx, sy] of [[10, 9], [10, 10], [9, 10], [11, 10], [10, 11]]) set(sx, sy, 't');
+  set(10, 10, 'd');
+  // Small spiral shell.
+  set(13, 12, 'w');
+  set(14, 12, 'p');
+  set(13, 11, 'p');
+  set(14, 11, 'r');
+  for (let x = 3; x <= 14; x += 1) set(x, 13, 'c');
+});
+
+/** Ellipse outline centred on (cx, cy) — the ripple rings around a leaping fish. */
+function ripple(set: (x: number, y: number, k: string) => void, cx: number, cy: number, rx: number, ry: number, key: string): void {
+  for (let x = cx - rx; x <= cx + rx; x += 1) {
+    const dy = Math.round(ry * Math.sqrt(1 - ((x - cx) / rx) ** 2));
+    set(x, cy - dy, key);
+    set(x, cy + dy, key);
+  }
+}
+
+/**
+ * A fish leaping from deep water: faint ripple → fish rising → arc with spray →
+ * rings spreading. 16×16, anchorY 0, four frames. The renderer staggers each tile's
+ * phase so the sea doesn't pulse in unison.
+ */
+function fishSplash(frame: number): SpriteGrid {
+  return grid(16, 16, {
+    f: P.foam,
+    w: P.whitewash,
+    b: P.shutter,
+    c: P.seaShallow,
+  }, (set) => {
+    if (frame === 0) {
+      ripple(set, 8, 11, 3, 1, 'c');
+    } else if (frame === 1) {
+      ripple(set, 8, 11, 4, 1, 'c');
+      for (let y = 7; y <= 10; y += 1) {
+        set(7, y, 'b');
+        set(8, y, y === 7 ? 'w' : 'b');
+      }
+      set(6, 9, 'f');
+      set(9, 9, 'f');
+    } else if (frame === 2) {
+      ripple(set, 8, 11, 5, 1, 'c');
+      const back: Array<[number, number]> = [[5, 7], [6, 6], [7, 5], [8, 5], [9, 5], [10, 6], [11, 7]];
+      for (const [fx, fy] of back) set(fx, fy, 'b');
+      for (const fx of [7, 8, 9]) set(fx, 6, 'w');
+      set(4, 8, 'b');
+      set(12, 8, 'b');
+      for (const [dx, dy] of [[4, 4], [12, 4], [8, 2], [13, 9], [3, 9]]) set(dx, dy, 'f');
+    } else {
+      ripple(set, 8, 11, 6, 2, 'c');
+      ripple(set, 8, 11, 3, 1, 'f');
+      for (const fx of [7, 8, 9]) set(fx, 9, 'f');
+      set(8, 8, 'w');
+      set(6, 8, 'f');
+      set(10, 8, 'f');
+    }
+  });
+}
+
+export const FISH_SPLASH_FRAMES: SpriteGrid[] = [0, 1, 2, 3].map(fishSplash);
+
 export interface PropSprite {
   grid: SpriteGrid;
   anchorY: number;
@@ -572,4 +691,7 @@ export const PROP_SPRITES: Record<string, PropSprite> = {
   'prop.fallenLeaves': { grid: FALLEN_LEAVES, anchorY: 0 },
   'prop.snowDrift': { grid: SNOW_DRIFT, anchorY: 0 },
   'prop.standingStone': { grid: STANDING_STONE, anchorY: 8 },
+  'prop.sunflowers': { grid: SUNFLOWERS, anchorY: 0 },
+  'prop.shells': { grid: SHELLS, anchorY: 0 },
+  'prop.fishSplash': { grid: FISH_SPLASH_FRAMES[0], anchorY: 0, frames: FISH_SPLASH_FRAMES },
 };
