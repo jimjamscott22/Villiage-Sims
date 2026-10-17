@@ -60,10 +60,10 @@ export function ObjectivesPanel({ catalog, completed }: ObjectivesPanelProps) {
         data-testid="objectives-menu"
         onClick={() => setOpen((value) => !value)}
         title={current?.title ?? 'Objectives'}
-        className="pixel-btn pixel-focus flex items-center gap-2 px-2 py-1"
+        className="pixel-btn pixel-focus flex items-center gap-2 px-2 py-1 pixel-drop-shadow"
       >
         <PixelText text="OBJECTIVES" />
-        <span className="text-[11px] text-[#f7f4e9]">
+        <span className="text-[11px] text-[#f7f4e9] pixel-text-outline tracking-wide">
           {completed.length}/{objectives.length}
         </span>
       </button>
@@ -80,9 +80,9 @@ export function ObjectivesPanel({ catalog, completed }: ObjectivesPanelProps) {
           <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto">
             {active.map((obj) => (
               <li key={obj.id} className="flex flex-col gap-0.5">
-                <div className="font-medium text-[#f7f4e9]">{obj.title}</div>
-                <div className="text-[11px] leading-snug text-[#d4cfc0]">{obj.description}</div>
-                <div className="text-[10px] text-amber-200">{conditionText(obj)}</div>
+                <div className="font-medium text-[#f7f4e9] text-sm pixel-text-outline tracking-wide">{obj.title}</div>
+                <div className="text-[11px] leading-snug text-[#d4cfc0] pixel-text-outline">{obj.description}</div>
+                <div className="text-[10px] text-amber-200 pixel-text-outline">{conditionText(obj)}</div>
               </li>
             ))}
             {done.length > 0 && (

@@ -31,9 +31,9 @@ export function ClockBar({ clock, onSetSpeed, winterWarning }: ClockBarProps) {
   return (
     <div className="flex items-center gap-3 text-xs text-white/80">
       <div className="pixel-chip flex items-center gap-2 px-2 py-1">
-        <span className="pixel-icon" style={uiIconStyle(seasonIcon)} title={season} />
-        <PixelText text={clockText} />
-        <span title="Weather">
+        <span className="pixel-icon pixel-drop-shadow" style={uiIconStyle(seasonIcon)} title={season} />
+        <span className="pixel-drop-shadow flex items-center"><PixelText text={clockText} /></span>
+        <span title="Weather" className="pixel-drop-shadow flex items-center">
           <PixelText text={weather.toUpperCase()} />
         </span>
         {winterWarning && (
