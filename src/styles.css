@@ -114,3 +114,11 @@ button, canvas { touch-action: none; }
   background-repeat: no-repeat;
   image-rendering: pixelated;
 }
+
+.pixel-text-outline {
+  text-shadow: 1px 1px 0 #17211b, -1px -1px 0 #17211b, 1px -1px 0 #17211b, -1px 1px 0 #17211b, 0 1px 0 #17211b, 1px 0 0 #17211b, 0 -1px 0 #17211b, -1px 0 0 #17211b;
+}
+
+.pixel-drop-shadow {
+  filter: drop-shadow(1px 1px 0 #17211b) drop-shadow(-1px -1px 0 #17211b) drop-shadow(1px -1px 0 #17211b) drop-shadow(-1px 1px 0 #17211b);
+}
