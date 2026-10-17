@@ -120,5 +120,5 @@ button, canvas { touch-action: none; }
 }
 
 .pixel-drop-shadow {
-  filter: drop-shadow(1px 1px 0 #17211b) drop-shadow(-1px -1px 0 #17211b) drop-shadow(1px -1px 0 #17211b) drop-shadow(-1px 1px 0 #17211b);
+  filter: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='o' x='-25%25' y='-25%25' width='150%25' height='150%25' color-interpolation-filters='sRGB'%3E%3CfeMorphology in='SourceAlpha' operator='dilate' radius='1' result='d'/%3E%3CfeFlood flood-color='%2317211b' result='c'/%3E%3CfeComposite in='c' in2='d' operator='in' result='o'/%3E%3CfeMerge%3E%3CfeMergeNode in='o'/%3E%3CfeMergeNode in='SourceGraphic'/%3E%3C/feMerge%3E%3C/filter%3E%3C/svg%3E#o");
 }
