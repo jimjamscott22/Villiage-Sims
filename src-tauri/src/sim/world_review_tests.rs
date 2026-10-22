@@ -42,6 +42,152 @@ fn enclose(world: &mut World, min: i32, max: i32) {
 }
 
 #[test]
+fn manual_planting_rejects_missing_seeds_without_mutation() {
+    let mut world = open_world(16);
+    let farm = complete(&mut world, "farm", 2, 2);
+    world.resources.food = 0;
+    let before = crate::persist::encode_world(&world).unwrap();
+
+    for kind in ["wheat", "strawberry", "peas", "carrot"] {
+        assert_eq!(
+            world.plant_crop(kind, 2, 2).unwrap_err(),
+            "insufficient seeds"
+        );
+    }
+
+    assert_eq!(crate::persist::encode_world(&world).unwrap(), before);
+    assert!(world.crops.is_empty());
+    assert!(
+        world
+            .buildings
+            .iter()
+            .find(|b| b.id == farm)
+            .unwrap()
+            .inventory
+            .is_empty()
+    );
+}
+
+#[test]
+fn manual_planting_spends_local_seeds_then_stockpile() {
+    let mut world = open_world(16);
+    let farm = complete(&mut world, "farm", 2, 2);
+    add_inventory(&mut world, farm, "grain", 1);
+    world.resources.grain = 1;
+
+    world.plant_crop("wheat", 2, 2).unwrap();
+    assert_eq!(
+        inventory_get(
+            &world
+                .buildings
+                .iter()
+                .find(|b| b.id == farm)
+                .unwrap()
+                .inventory,
+            "grain"
+        ),
+        0
+    );
+    assert_eq!(world.resources.grain, 1);
+    world.plant_crop("wheat", 3, 2).unwrap();
+    assert_eq!(world.resources.grain, 0);
+    let before = crate::persist::encode_world(&world).unwrap();
+    assert_eq!(
+        world.plant_crop("wheat", 2, 3).unwrap_err(),
+        "insufficient seeds"
+    );
+    assert_eq!(crate::persist::encode_world(&world).unwrap(), before);
+    assert_eq!(
+        world.crops.iter().map(|c| c.id).collect::<Vec<_>>(),
+        vec![1, 2]
+    );
+}
+
+#[test]
+fn manual_planting_charges_food_seeds() {
+    for kind in ["strawberry", "peas", "carrot"] {
+        let mut world = open_world(16);
+        complete(&mut world, "farm", 2, 2);
+        world.resources.food = 1;
+        world.plant_crop(kind, 2, 2).unwrap();
+        assert_eq!(world.resources.food, 0);
+        assert_eq!(world.crops.len(), 1);
+    }
+}
+
+#[test]
+fn manual_planting_validates_before_spending_seeds() {
+    let mut world = open_world(16);
+    complete(&mut world, "farm", 2, 2);
+    world.place_building("farm", 6, 6, 0).unwrap();
+    world.resources.grain = 3;
+    world.plant_crop("wheat", 2, 2).unwrap();
+    let before = crate::persist::encode_world(&world).unwrap();
+
+    assert_eq!(
+        world.plant_crop("wheat", 2, 2).unwrap_err(),
+        "tile already has a crop"
+    );
+    assert_eq!(
+        world.plant_crop("wheat", 0, 0).unwrap_err(),
+        "tile is not on a completed farm"
+    );
+    assert_eq!(
+        world.plant_crop("wheat", 6, 6).unwrap_err(),
+        "tile is not on a completed farm"
+    );
+    assert!(
+        world
+            .plant_crop("unknown", 3, 2)
+            .unwrap_err()
+            .contains("unknown crop")
+    );
+    assert_eq!(crate::persist::encode_world(&world).unwrap(), before);
+    assert_eq!(world.resources.grain, 2);
+}
+
+#[test]
+fn manual_planting_combines_seed_supplies_and_rejects_partial_costs() {
+    let mut world = open_world(16);
+    let farm = complete(&mut world, "farm", 2, 2);
+    let wheat = world
+        .catalog
+        .crops
+        .iter_mut()
+        .find(|c| c.id == "wheat")
+        .unwrap();
+    wheat.seed_cost.insert("grain".into(), 3);
+    wheat.seed_cost.insert("food".into(), 2);
+    add_inventory(&mut world, farm, "grain", 1);
+    world.resources.grain = 2;
+    world.resources.food = 1;
+    let before = crate::persist::encode_world(&world).unwrap();
+    assert_eq!(
+        world.plant_crop("wheat", 2, 2).unwrap_err(),
+        "insufficient seeds"
+    );
+    assert_eq!(crate::persist::encode_world(&world).unwrap(), before);
+
+    world.resources.food = 2;
+    world.plant_crop("wheat", 2, 2).unwrap();
+    assert_eq!(world.resources.grain, 0);
+    assert_eq!(world.resources.food, 0);
+    assert_eq!(
+        inventory_get(
+            &world
+                .buildings
+                .iter()
+                .find(|b| b.id == farm)
+                .unwrap()
+                .inventory,
+            "grain"
+        ),
+        0
+    );
+    assert_eq!(world.crops.len(), 1);
+}
+
+#[test]
 fn starving_worker_interrupts_long_trip_when_food_arrives() {
     let mut world = open_world(64);
     world.resources.food = 0;
@@ -206,7 +352,9 @@ fn resuming_hauler_heads_for_delivery_not_job_tile() {
 }
 
 fn plant_and_water_farm(world: &mut World, farm: u32) {
-    for (x, y) in world.farm_footprint_tiles(farm) {
+    let tiles = world.farm_footprint_tiles(farm);
+    world.resources.grain = tiles.len() as u32;
+    for (x, y) in tiles {
         world.plant_crop("wheat", x, y).unwrap();
     }
     for crop in &mut world.crops {

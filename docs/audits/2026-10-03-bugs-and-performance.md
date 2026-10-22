@@ -6,6 +6,25 @@ Five actionable findings were identified. The highest priority is a measured sim
 
 Severity: **P1 / High** means a major responsiveness or gameplay failure; **P2 / Medium** means incorrect behavior in a specific supported scenario. Effort: **S** is a localized change; **M** requires coordinated state or simulation changes. These are estimates, not implementation specifications.
 
+## Resolution status — 2026-10-22
+
+| Finding | Status |
+|---|---|
+| 1. Hauling decision stalls | Open |
+| 2. Disconnected births | Open |
+| 3. Manual seed costs | Fixed in Rust and browser-demo: validate first, then atomically spend farm-buffer seeds followed by stockpile seeds before allocating the crop. Insufficient inputs leave resources, crops and ids unchanged. |
+| 4. Water cooldown persistence | Open |
+| 5. Viewport synchronization | Fixed: trailing throttle sends the latest rectangle within a 100 ms scheduling window during sustained movement and after it stops. Effective window/container resizes synchronize immediately through `ResizeObserver`; explicit focus jumps remain immediate. Cleanup cancels the timer and disconnects the observer. |
+
+Verification for these fixes:
+
+- `npm test -- --maxWorkers=1`: **315 passed**, including six new seed-cost cases and four scheduler cases. Existing manual planting fixtures now supply their seeds explicitly.
+- `npm run build`: TypeScript and Vite production build passed.
+- **188 Rust tests passed** using a temporary headless harness importing the repository's actual `sim`, `snapshot`, and `persist` modules, with direct dependency versions pinned to `Cargo.lock`. Five new tests failed against the original seed-cost bypass before passing with the fix; coverage includes combined and multi-resource costs, local-first spending, validation order and unchanged serialized state after rejection. The Tauri command wrapper is outside this harness.
+- Full native Rust/Tauri checks were unavailable because GTK/WebKit development libraries are absent. Strict Clippy on the harness with Rust 1.99.1 reports **14 pre-existing warnings** (four `manual_is_multiple_of`, ten `collapsible_if`), reproduced against a clean archive of the original commit. With only those two lint categories allowed, Clippy passes with all other warnings denied.
+- Headless Chromium at `http://127.0.0.1:5173/?test=1`: the actual transport recorded **8 updates during one second of edge scrolling** and **10 during sustained dragging**; the pre-fix scrolling probe recorded zero. Final rectangles matched the current camera after movement, zoom, window resize, container-only resize and roster focus. Both resize modes sent an update, and the roster focus sent one immediately. Viewports: 1440×900, 1440×650 and 900×700. No application errors, warnings or framework overlay; the existing favicon 404 was excluded. Connected Browser controls were not exposed in this session, so the checks used installed Playwright/Chromium.
+- Independent review found no actionable issues in these two fixes. Native desktop interaction remains unverified. The original audit evidence below is historical; findings 1, 2 and 4 remain open.
+
 ## 1. Hauling decisions can stall the simulation for seconds — P1 / High, M
 
 Sources: [job_actionable](../../src-tauri/src/sim/world.rs#L1426), [maybe_decide](../../src-tauri/src/sim/world.rs#L1151), [find_haul_task](../../src-tauri/src/sim/world.rs#L905), [nearest_storage_for](../../src-tauri/src/sim/world.rs#L869). Browser counterpart: [jobActionable](../../src/state/demoWorld.ts#L2159) and [findHaulTask](../../src/state/demoWorld.ts#L2700).

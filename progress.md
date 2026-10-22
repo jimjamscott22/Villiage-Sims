@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-10-02 (chimney smoke and mill dust anchors corrected; verification below).
+Last updated: 2026-10-22 (manual seed costs and viewport synchronization audit fixes; verification below).
 
 ## Status
 
@@ -212,6 +212,33 @@ the actual atlas and scene renderer visually verified all three frames, reduced
 motion and construction, with no console warnings/errors. The preview was removed
 after inspection. Native Tauri gameplay and full placement/production interactions
 were not run; Rust checks were not rerun because only frontend rendering changed.
+
+## Audit fixes (2026-10-22)
+
+Resolved findings **3 and 5** from `docs/audits/2026-10-03-bugs-and-performance.md`:
+
+- Manual planting now pays the crop's declared seed cost in Rust and browser-demo, using the
+  existing farm-buffer-first / stockpile-fallback transaction. Invalid placements and insufficient
+  inputs allocate no crop and consume no resources or crop ids. Existing planting fixtures now
+  supply seeds explicitly; regressions cover every crop, exhausted inputs, local-first spending,
+  validation order and atomic multi-resource spending.
+- Camera movement now uses a trailing 100 ms throttle so sustained edge scrolling and dragging
+  cannot indefinitely delay the simulation's culling rectangle. Effective resizes synchronize
+  immediately; `ResizeObserver` covers layout-only changes. Explicit focus remains immediate,
+  and unmount cancels the timer and disconnects the observer.
+
+Verification: **315 frontend tests**, production build and **188 Rust simulation/persistence
+tests** passed. Rust used a temporary harness importing actual repository modules and locked
+direct dependency versions because native GTK/WebKit libraries are unavailable; native Tauri
+checks were not run. Strict Clippy reports the same 14 warnings on a clean baseline under Rust
+1.99.1; with the two existing lint categories allowed, all remaining warnings are denied and
+the check passes. Browser transport probes confirmed updates during continuous edge scrolling
+and dragging, final camera rectangles, zoom, window/container resize and immediate roster focus
+at desktop and compact sizes. No application console errors or warnings. Independent review
+found no actionable issues. See the audit's resolution notes for exact counts and limitations.
+
+Still open: hauling latency (finding 1), disconnected births (2), and water-search cooldown
+persistence (4). No catalog or save-format changes were made.
 
 ## Next up
 

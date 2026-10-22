@@ -1625,9 +1625,13 @@ export class DemoWorld {
   plantCrop(kind: string, x: number, y: number): void {
     const kindIndex = DEMO_CROPS.findIndex((crop) => crop.id === kind);
     if (kindIndex < 0) throw new Error(`unknown crop '${kind}'`);
-    if (this.completedFarmAt(x, y) == null) throw new Error('tile is not on a completed farm');
+    const farmId = this.completedFarmAt(x, y);
+    if (farmId == null) throw new Error('tile is not on a completed farm');
     if (this.crops.some((crop) => crop.x === x && crop.y === y)) {
       throw new Error('tile already has a crop');
+    }
+    if (!this.spendSeedCost(farmId, DEMO_CROPS[kindIndex].seedCost ?? {})) {
+      throw new Error('insufficient seeds');
     }
     const id = this.nextCropId;
     this.nextCropId += 1;

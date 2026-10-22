@@ -289,13 +289,15 @@ pub fn plant_crop(&mut self, kind: &str, x: i32, y: i32) -> Result<(), String> {
             .catalog
             .find_crop(kind)
             .ok_or_else(|| format!("unknown crop '{kind}'"))?;
-        let _ = def;
+        let seed_cost = def.seed_cost.clone();
         let farm_id = self
             .completed_farm_at(x, y)
             .ok_or_else(|| "tile is not on a completed farm".to_string())?;
-        let _ = farm_id;
         if self.crops.iter().any(|crop| crop.tile == (x, y)) {
             return Err("tile already has a crop".into());
+        }
+        if !self.spend_seed_cost(farm_id, &seed_cost) {
+            return Err("insufficient seeds".into());
         }
         let id = self.next_crop_id;
         self.next_crop_id = self.next_crop_id.saturating_add(1);

@@ -22,11 +22,11 @@ import {
 } from './spatial';
 import type { ShorelineTile, TerrainProp } from './tilemap';
 import { bakeTerrain, shorelineTiles, terrainProps } from './tilemap';
+import { createViewportSync } from './viewportSync';
 
 const TICK_MS = 50;
 const FOAM_TICKS_PER_FRAME = 8;
 const FOAM_FRAMES = 3;
-const VIEWPORT_DEBOUNCE_MS = 100;
 const EDGE_SCROLL_MARGIN = 24;
 const EDGE_SCROLL_SPEED = 6;
 const CLICK_DRAG_THRESHOLD = 6;
@@ -193,7 +193,7 @@ export function Canvas({
     // Buildings are viewport-culled server-side; without this the sim doesn't
     // know the camera jumped, and the focused building drops out of the next
     // snapshot and renders as empty ground. An explicit focus jump bypasses the
-    // pan/zoom debounce so the building doesn't appear only after the debounce
+    // pan/zoom throttle so the building doesn't appear only after the throttle
     // interval elapses.
     syncViewportNowRef.current?.();
   }, [focusTile]);
@@ -226,7 +226,6 @@ export function Canvas({
     let frame = 0;
     let cancelled = false;
     let unlisten: (() => void) | undefined;
-    let viewportTimer: number | null = null;
     let viewWidth = 0;
     let viewHeight = 0;
     let dpr = window.devicePixelRatio || 1;
@@ -254,32 +253,21 @@ export function Canvas({
       setError(message);
     };
 
-    const scheduleViewportSync = () => {
-      if (viewportTimer !== null) window.clearTimeout(viewportTimer);
-      viewportTimer = window.setTimeout(() => {
-        const rect = camera.visibleWorldRect(viewWidth, viewHeight);
-        void transport.setViewport(rect.x, rect.y, rect.w, rect.h);
-      }, VIEWPORT_DEBOUNCE_MS);
-    };
-    scheduleViewportSyncRef.current = scheduleViewportSync;
-
-    // Bypasses the debounce for explicit focus jumps (chronicle entry clicks)
-    // so the camera doesn't sit on empty ground for VIEWPORT_DEBOUNCE_MS before
-    // the sim starts including the focused building. Pan/zoom keep using the
-    // debounced path above.
-    const syncViewportNow = () => {
-      if (viewportTimer !== null) {
-        window.clearTimeout(viewportTimer);
-        viewportTimer = null;
-      }
+    const viewportSync = createViewportSync(() => {
       const rect = camera.visibleWorldRect(viewWidth, viewHeight);
       void transport.setViewport(rect.x, rect.y, rect.w, rect.h);
-    };
+    });
+    const scheduleViewportSync = viewportSync.schedule;
+    scheduleViewportSyncRef.current = scheduleViewportSync;
+
+    // Explicit camera jumps immediately update server-side building culling.
+    const syncViewportNow = viewportSync.syncNow;
     syncViewportNowRef.current = syncViewportNow;
 
     const resize = () => {
       const parent = canvas.parentElement;
       if (!parent) return;
+      const sizeChanged = viewWidth !== parent.clientWidth || viewHeight !== parent.clientHeight;
       dpr = window.devicePixelRatio || 1;
       viewWidth = parent.clientWidth;
       viewHeight = parent.clientHeight;
@@ -290,7 +278,9 @@ export function Canvas({
       if (terrain && worldWidth > 0 && !cameraCentered) {
         camera.fitWorld(worldWidth, worldHeight, viewWidth, viewHeight);
         cameraCentered = true;
-        scheduleViewportSync();
+        syncViewportNow();
+      } else if (terrain && sizeChanged) {
+        syncViewportNow();
       }
     };
 
@@ -872,6 +862,8 @@ export function Canvas({
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('resize', resize);
+    const resizeObserver = new ResizeObserver(resize);
+    if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
     canvas.addEventListener('pointerup', onPointerUp);
@@ -887,7 +879,8 @@ export function Canvas({
       unlisten?.();
       scheduleViewportSyncRef.current = null;
       syncViewportNowRef.current = null;
-      if (viewportTimer !== null) window.clearTimeout(viewportTimer);
+      viewportSync.cancel();
+      resizeObserver.disconnect();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('pointerdown', onPointerDown);
