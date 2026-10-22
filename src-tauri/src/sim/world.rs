@@ -3020,6 +3020,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 2, 2).unwrap();
         assert_eq!(world.crops().len(), 1);
         assert!(world.plant_crop("wheat", 2, 2).is_err());
@@ -3052,6 +3053,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 3, 3).unwrap();
         world.advance_clock(0, Some(Season::Winter as u8)).unwrap();
         world.crops[0].watered = true;
@@ -3170,6 +3172,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 2;
         world.plant_crop("wheat", 2, 2).unwrap();
         world.plant_crop("wheat", 3, 2).unwrap();
         assert_eq!(world.crops().len(), 2);
@@ -3184,6 +3187,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 2, 2).unwrap();
         world.crops[0].watered = true;
         world.advance_clock(1, None).unwrap();
@@ -3210,6 +3214,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 4, 4).unwrap();
         let snap = world.tick_snapshot();
         assert_eq!(snap.clock.day, 1);
@@ -3359,6 +3364,7 @@ mod tests {
     fn tend_crops_harvests_ready_crop_into_farm_inventory() {
         let mut world = grass_world();
         let farm_id = place_complete(&mut world, "farm", 2, 2);
+        world.resources.grain = 1;
         world.plant_crop("wheat", 2, 2).unwrap();
         let wheat = world.catalog().find_crop("wheat").unwrap().1;
         world.crops[0].stage = wheat.max_stage();
@@ -3907,6 +3913,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 2, 2).unwrap();
         world.crops[0].watered = true;
         // seed 1 / spring day 2 is Rain (see weather::tests / hash).
@@ -3923,6 +3930,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 2, 2).unwrap();
         world.crops[0].watered = true;
         // Advance to spring day 3 (Clear for seed 1).

@@ -58,6 +58,68 @@ function jobIdFor(world: DemoWorld, site: number, kind: string): number {
   return job.id;
 }
 
+describe('manual planting seed costs', () => {
+  it('rejects depleted seeds without changing crops, inventories or the next id', () => {
+    const world = new DemoWorld(grassTerrain());
+    const farmId = completeBuilding(world, 'farm', 2, 2);
+    const farm = world.buildings.find((entry) => entry.id === farmId)!;
+    world.resources.grain = 0;
+    world.resources.food = 0;
+    const internals = world as unknown as { nextCropId: number };
+    const nextId = internals.nextCropId;
+    const resources = { ...world.resources };
+
+    for (const kind of ['wheat', 'strawberry', 'peas', 'carrot']) {
+      expect(() => world.plantCrop(kind, 2, 2)).toThrow('insufficient seeds');
+    }
+
+    expect(world.crops).toHaveLength(0);
+    expect(world.resources).toEqual(resources);
+    expect(farm.inventory).toEqual({});
+    expect(internals.nextCropId).toBe(nextId);
+  });
+
+  it('spends farm seeds first, falls back to stockpile and rejects exhausted supplies', () => {
+    const world = new DemoWorld(grassTerrain());
+    const farmId = completeBuilding(world, 'farm', 2, 2);
+    const farm = world.buildings.find((entry) => entry.id === farmId)!;
+    inventoryAdd(farm.inventory, 'grain', 1);
+    world.resources.grain = 1;
+
+    world.plantCrop('wheat', 2, 2);
+    expect(inventoryGet(farm.inventory, 'grain')).toBe(0);
+    expect(world.resources.grain).toBe(1);
+    world.plantCrop('wheat', 3, 2);
+    expect(world.resources.grain).toBe(0);
+    expect(() => world.plantCrop('wheat', 2, 3)).toThrow('insufficient seeds');
+    expect(world.crops).toHaveLength(2);
+    expect(world.crops.map((crop) => crop.id)).toEqual([1, 2]);
+  });
+
+  it.each(['strawberry', 'peas', 'carrot'])('charges the declared food seed cost for %s', (kind) => {
+    const world = new DemoWorld(grassTerrain());
+    completeBuilding(world, 'farm', 2, 2);
+    world.resources.food = 1;
+    world.plantCrop(kind, 2, 2);
+    expect(world.resources.food).toBe(0);
+    expect(world.crops[0].kind).toBe(kind);
+  });
+
+  it('validates requests before spending seeds', () => {
+    const world = new DemoWorld(grassTerrain());
+    completeBuilding(world, 'farm', 2, 2);
+    world.placeBuilding('farm', 6, 6, 0);
+    world.resources.grain = 3;
+    world.plantCrop('wheat', 2, 2);
+    expect(() => world.plantCrop('wheat', 2, 2)).toThrow('tile already has a crop');
+    expect(() => world.plantCrop('wheat', 0, 0)).toThrow('tile is not on a completed farm');
+    expect(() => world.plantCrop('wheat', 6, 6)).toThrow('tile is not on a completed farm');
+    expect(() => world.plantCrop('unknown', 3, 2)).toThrow('unknown crop');
+    expect(world.resources.grain).toBe(2);
+    expect(world.crops).toHaveLength(1);
+  });
+});
+
 describe('DemoWorld pathfinding', () => {
   it('spawns five idle villagers with starting food and walks on order', () => {
     const world = new DemoWorld(generateDemoTerrain());
@@ -182,6 +244,7 @@ describe('DemoWorld pathfinding', () => {
     const world = new DemoWorld(terrain);
     world.placeBuilding('farm', 2, 2, 0);
     for (let i = 0; i < 30; i += 1) world.advance();
+    world.resources.grain = 1;
     world.plantCrop('wheat', 2, 2);
     expect(world.snapshot().crops).toHaveLength(1);
     world.advanceClock(0, 3);
@@ -287,6 +350,7 @@ describe('DemoWorld pathfinding', () => {
   it('harvests ready wheat into farm inventory without counting it in totals', () => {
     const world = new DemoWorld(grassTerrain());
     const farmId = completeBuilding(world, 'farm', 2, 2);
+    world.resources.grain = 1;
     world.plantCrop('wheat', 2, 2);
     world.crops[0].stage = 3;
 
