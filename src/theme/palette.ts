@@ -12,3 +12,6 @@ export function withAlpha(hex: string, alpha: number): string {
   const b = Number.parseInt(hex.slice(5, 7), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
+
+/** Debug colour for a missing sprite or unknown enum value. The only allowed off-palette hex. */
+export const DEBUG_MISSING = '#ff00ff';

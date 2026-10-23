@@ -1,8 +1,15 @@
 import type { BuildingView, CropView, VillagerView } from '../state/types';
-import { THEME, withAlpha } from '../theme/palette';
+import { DEBUG_MISSING, THEME, withAlpha } from '../theme/palette';
 
-const BUILDING_COLORS = ['#c4a574', '#8fbc5a', '#b08968'];
-const CROP_STAGE_COLORS = ['#6b8f3c', '#7fa84a', '#c4b44a', '#d4a017'];
+/** Flat fallback colours (used when the atlas fails to load), indexed by building kind. */
+export const BUILDING_FALLBACK_COLORS: readonly string[] = [THEME.sandMid, THEME.vegLight, THEME.stoneMid];
+/** Flat fallback colours per crop growth stage. */
+export const CROP_STAGE_FALLBACK_COLORS: readonly string[] = [
+  THEME.vegDark,
+  THEME.vegMid,
+  THEME.vegLight,
+  THEME.wheat,
+];
 
 /** Draw a small pixel-style speech bubble above a villager. */
 function drawThoughtBubble(
@@ -81,7 +88,7 @@ export function drawBuildings(
     const height = (building.rot % 2 === 0 ? fh : fw) * tileSize;
     const x = building.x * tileSize;
     const y = building.y * tileSize;
-    const color = BUILDING_COLORS[building.kind] ?? '#ff00ff';
+    const color = BUILDING_FALLBACK_COLORS[building.kind] ?? DEBUG_MISSING;
     ctx.globalAlpha = building.state === 2 ? 1 : 0.55 + building.progress / 250;
     ctx.fillStyle = color;
     ctx.fillRect(x + 2, y + 2, width - 4, height - 4);
@@ -107,7 +114,8 @@ export function drawCrops(
     const size = tileSize - pad * 2;
     const x = crop.x * tileSize + pad;
     const y = crop.y * tileSize + pad;
-    ctx.fillStyle = CROP_STAGE_COLORS[crop.stage] ?? CROP_STAGE_COLORS[CROP_STAGE_COLORS.length - 1];
+    ctx.fillStyle = CROP_STAGE_FALLBACK_COLORS[crop.stage] ??
+      CROP_STAGE_FALLBACK_COLORS[CROP_STAGE_FALLBACK_COLORS.length - 1];
     ctx.fillRect(x, y, size, size);
     ctx.strokeStyle = THEME.vegDarkest;
     ctx.lineWidth = 1;
