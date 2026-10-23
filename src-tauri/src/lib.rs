@@ -49,6 +49,7 @@ pub fn run() {
             commands::demolish,
             commands::click_chicken,
             commands::collect_eggs,
+            commands::respond_to_visitor,
             commands::move_villager_to,
             commands::assign_home,
             commands::get_villager_detail,

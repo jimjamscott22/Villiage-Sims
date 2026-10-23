@@ -344,3 +344,13 @@ pub(crate) async fn collect_eggs(
         .await
         .map_err(|_| "simulation dropped collect_eggs".to_string())?
 }
+
+#[tauri::command]
+pub(crate) async fn respond_to_visitor(
+    state: State<'_, AppState>, visit_id: u32, decision: crate::sim::visitors::VisitDecision,
+) -> Result<(), String> {
+    let (reply, receiver) = oneshot::channel();
+    state.commands.send(SimCommand::RespondToVisitor { visit_id, decision, reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver.await.map_err(|_| "simulation dropped visitor response".to_string())?
+}

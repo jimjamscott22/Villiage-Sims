@@ -7,7 +7,7 @@ use crate::sim::world::World;
 const SAVE_MAGIC: [u8; 8] = *b"VILSAVE\0";
 const HEADER_LEN: usize = SAVE_MAGIC.len() + size_of::<u32>() + size_of::<u64>();
 const MAX_SAVE_BYTES: u64 = 64 * 1024 * 1024;
-pub const SAVE_VERSION: u32 = 7;
+pub const SAVE_VERSION: u32 = 8;
 
 fn config() -> impl bincode::config::Config {
     bincode::config::standard().with_limit::<{ MAX_SAVE_BYTES as usize }>()
@@ -54,7 +54,7 @@ pub(crate) fn decode_world(bytes: &[u8]) -> Result<World, String> {
             .try_into()
             .expect("fixed save version header"),
     );
-    if version != SAVE_VERSION && !(3..=6).contains(&version) {
+    if version != SAVE_VERSION && !(3..=7).contains(&version) {
         return Err(format!(
             "unsupported save version {version} (expected {SAVE_VERSION})"
         ));
@@ -83,6 +83,11 @@ pub(crate) fn decode_world(bytes: &[u8]) -> Result<World, String> {
         (legacy.into_world(), consumed)
     } else if version == 6 {
         let (legacy, consumed): (crate::sim::world::legacy_v6::LegacyWorld, usize) =
+            bincode::serde::decode_from_slice(payload, config())
+                .map_err(|error| format!("could not decode legacy save: {error}"))?;
+        (legacy.into_world(), consumed)
+    } else if version == 7 {
+        let (legacy, consumed): (crate::sim::world::legacy_v7::LegacyWorld, usize) =
             bincode::serde::decode_from_slice(payload, config())
                 .map_err(|error| format!("could not decode legacy save: {error}"))?;
         (legacy.into_world(), consumed)
@@ -296,12 +301,47 @@ mod tests {
     }
 
     #[test]
+    fn version_7_migrates_with_a_fresh_visitor_schedule() {
+        let world = World::generate(16, 16, 32, 42);
+        let legacy = crate::sim::world::legacy_v7::LegacyWorld::from_world(&world);
+        let payload = bincode::serde::encode_to_vec(&legacy, config()).unwrap();
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&SAVE_MAGIC);
+        bytes.extend_from_slice(&7u32.to_le_bytes());
+        bytes.extend_from_slice(&world.seed().to_le_bytes());
+        bytes.extend_from_slice(&payload);
+        let loaded = decode_world(&bytes).unwrap();
+        assert_eq!(loaded.visits, crate::sim::visitors::Visits::default());
+        assert_eq!(loaded.tick_snapshot().villagers, world.tick_snapshot().villagers);
+        assert_eq!(encode_world(&loaded).unwrap(), encode_world(&world).unwrap());
+    }
+
+    #[test]
+    fn active_visits_and_cooldowns_roundtrip_and_continue_deterministically() {
+        use crate::sim::visitors::{VisitDecision, VisitorKind};
+        for kind in [VisitorKind::Merchant, VisitorKind::Musician, VisitorKind::Grower] {
+            let mut world = World::generate(16, 16, 32, 42);
+            world.visits.next_index = kind as u8;
+            world.advance_visitors(1023, false);
+            let bytes = encode_world(&world).unwrap();
+            let mut loaded = decode_world(&bytes).unwrap();
+            assert_eq!(encode_world(&loaded).unwrap(), bytes);
+            world.advance_visitors(200, false); loaded.advance_visitors(200, false);
+            assert_eq!(encode_world(&loaded).unwrap(), encode_world(&world).unwrap());
+            let id = loaded.visits.active.unwrap().id;
+            loaded.respond_to_visitor(id, VisitDecision::Decline).unwrap();
+            let bytes = encode_world(&loaded).unwrap();
+            assert_eq!(encode_world(&decode_world(&bytes).unwrap()).unwrap(), bytes);
+        }
+    }
+
+    #[test]
     fn rejects_unknown_version_before_decoding() {
         let mut bytes = encode_world(&World::generate(8, 8, 32, 4)).expect("encode world");
         bytes[SAVE_MAGIC.len()..SAVE_MAGIC.len() + size_of::<u32>()]
             .copy_from_slice(&1u32.to_le_bytes());
         let error = decode_world(&bytes).expect_err("version must be rejected");
-        assert_eq!(error, "unsupported save version 1 (expected 7)");
+        assert_eq!(error, "unsupported save version 1 (expected 8)");
     }
 
     #[test]

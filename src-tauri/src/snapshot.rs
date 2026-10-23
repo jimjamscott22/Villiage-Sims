@@ -28,6 +28,7 @@ pub struct WorldInit {
 #[serde(rename_all = "camelCase")]
 pub struct TickSnapshot {
     pub tick: u64,
+    pub visitor: Option<crate::sim::visitors::VisitorView>,
     pub villagers: Vec<VillagerView>,
     pub buildings: Vec<BuildingView>,
     pub crops: Vec<CropView>,

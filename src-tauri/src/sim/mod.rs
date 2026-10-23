@@ -33,6 +33,7 @@ pub mod terrain;
 pub mod utility;
 pub mod weather;
 pub mod world;
+pub mod visitors;
 
 const TICK_INTERVAL: Duration = Duration::from_millis(50);
 

@@ -1,5 +1,6 @@
 import { ChickenGround, newFlock, tickFlock, relocateChickens, chickenViews, basketViews, clickChicken, collectEggs, validateFlock, type Flock } from './chickens';
 import { DemoSocial, type Encounter } from './demoSocial';
+import { initialVisits, advanceVisits, finishVisit, validateVisits, VISITOR_DEFINITIONS, type Visits } from './visitors';
 import type { Behavior } from './demoLeisure';
 import { findPath, terrainPassable } from './pathfind';
 import type {
@@ -19,6 +20,8 @@ import type {
   TickSnapshot,
   VillagerDetail,
   WorldInit,
+  VisitorView,
+  VisitDecision,
 } from './types';
 
 const DEMO_CROPS: CropDef[] = [
@@ -263,7 +266,7 @@ const DRINK_TICKS = 40;
 const SLEEP_TICKS = 100;
 const WANDER_RADIUS = 6;
 const DEMO_SEED = 42;
-export const DEMO_SAVE_VERSION = 4;
+export const DEMO_SAVE_VERSION = 5;
 
 /** Match Rust `weather::mix` — unsigned 64-bit wrapping. */
 function mixU64(a: bigint | number, b: number, c: number, d: number): bigint {
@@ -586,6 +589,9 @@ interface DemoClock {
 }
 
 interface DemoSaveState {
+  visits: Visits;
+  chronicleEntries: ChronicleEntry[];
+  chronicleNextSeq: number;
   flock: Flock | null;
   encounters: Encounter[];
   behavior: Record<number, Behavior>;
@@ -700,6 +706,7 @@ export class DemoWorld {
   crops: DemoCrop[] = [];
   nodes: ResourceNode[] = [];
   flock: Flock | null = null;
+  private visits = initialVisits();
   private occupancy: Array<number | null>;
   private nextId = 1;
   private nextCropId = 1;
@@ -969,6 +976,9 @@ export class DemoWorld {
   exportState(): string {
     const state: DemoSaveState = {
       version: DEMO_SAVE_VERSION,
+      visits: this.visits,
+      chronicleEntries: this.chronicleEntries,
+      chronicleNextSeq: this.chronicleNextSeq,
       flock: this.flock,
       encounters: this.social.encounters,
       behavior: this.social.leisure.behavior,
@@ -998,7 +1008,7 @@ export class DemoWorld {
       throw new Error(`could not decode save: ${cause instanceof Error ? cause.message : String(cause)}`);
     }
     if (state == null || typeof state !== 'object') throw new Error('could not decode save: invalid data');
-    if (state.version !== DEMO_SAVE_VERSION && state.version !== 1 && state.version !== 2 && state.version !== 3) {
+    if (state.version !== DEMO_SAVE_VERSION && state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4) {
       throw new Error(`unsupported save version ${String(state.version)} (expected ${DEMO_SAVE_VERSION})`);
     }
     if (state.seed !== DEMO_SEED) throw new Error('save header seed does not match the demo world');
@@ -1055,8 +1065,14 @@ export class DemoWorld {
       world.social.leisure.behavior = state.behavior;
       world.social.validate();
     }
-    world.chronicleEntries = [];
-    world.chronicleNextSeq = 0;
+    world.visits = state.version < 5 ? initialVisits() : state.visits;
+    validateVisits(world.visits);
+    if (state.version >= 5 && (!Array.isArray(state.chronicleEntries) || state.chronicleEntries.length > 200
+      || !Number.isSafeInteger(state.chronicleNextSeq) || state.chronicleNextSeq < 0)) {
+      throw new Error('save has invalid chronicle');
+    }
+    world.chronicleEntries = state.version < 5 ? [] : state.chronicleEntries;
+    world.chronicleNextSeq = state.version < 5 ? 0 : state.chronicleNextSeq;
     world.unlocked = world.satisfiedUnlocks();
     return world;
   }
@@ -1084,6 +1100,7 @@ export class DemoWorld {
       this.onDayRollover();
     }
 
+    this.advanceVisitors(1);
     const newlyComplete: number[] = [];
     for (const building of this.buildings) {
       if (building.complete) continue;
@@ -1132,6 +1149,106 @@ export class DemoWorld {
     // Save only once the whole tick is committed (mirrors Rust `World::advance`).
     if (dayRolled) this.maybeAutosave();
     return this.snapshot();
+  }
+
+  private advanceVisitors(ticks: number, jump = false): void {
+    for (const event of advanceVisits(this.visits, ticks)) {
+      const savedClock = this.clock;
+      if (jump && event.offset === ticks) {
+        this.clock = { ...savedClock };
+        this.clock.day += 1;
+        if (this.clock.day > DAYS_PER_SEASON) {
+          this.clock.day = 1; this.clock.season = (this.clock.season + 1) % 4;
+          if (this.clock.season === 0) this.clock.year += 1;
+        }
+      }
+      this.pushChronicle(null, {
+        kind: 'visitorEvent', visitor: event.visitor,
+        name: VISITOR_DEFINITIONS.find(d => d.id === event.visitor)!.name, outcome: event.outcome,
+      });
+      this.clock = savedClock;
+    }
+  }
+
+  private visitorHome(): { home: number; tile: [number, number] } | null {
+    const first = [...this.villagers].sort((a, b) => a.id - b.id)[0];
+    const anchor = first ? this.posToTile(first.x, first.y) : this.stockpileStand();
+    if (!anchor) return null;
+    const used = this.villagers.map(v => this.posToTile(v.x, v.y));
+    for (const home of [...this.buildings].sort((a, b) => a.id - b.id)) {
+      if (this.homeCapacityOf(home) <= this.homeResidents(home.id).length) continue;
+      const stand = this.homeStandTile(home.id);
+      if (!stand || !this.computePath(anchor, stand)) continue;
+      const tile = this.findSpawnTile(stand[0], stand[1], used, this.reachableFrom(stand));
+      if (tile) return { home: home.id, tile };
+    }
+    return null;
+  }
+
+  private visitorUnavailableReason(): string | null {
+    const visit = this.visits.active;
+    if (!visit) return 'This visitor\'s offer is no longer available';
+    if (visit.visitor !== 'grower') {
+      const def = VISITOR_DEFINITIONS.find(d => d.id === visit.visitor)!;
+      const cost = def.cost.food ?? 0;
+      return this.deriveTotals().food >= cost ? null : `Requires ${cost} food`;
+    }
+    if (this.villagers.length >= this.housingCapacity()) {
+      return 'Requires spare population capacity and a vacant bed in completed housing';
+    }
+    if (!Number.isSafeInteger(this.nextVillagerId + 1) || this.visits.growerSettled) return 'This resident cannot join the village';
+    return this.visitorHome() ? null : 'Requires a vacant bed in completed, reachable housing and a free arrival tile';
+  }
+
+  private visitorView(): VisitorView | null {
+    const visit = this.visits.active;
+    if (!visit) return null;
+    const def = VISITOR_DEFINITIONS.find(d => d.id === visit.visitor)!;
+    const unavailableReason = this.visitorUnavailableReason();
+    return {
+      visitId: visit.id, visitor: visit.visitor, name: def.name, title: def.title,
+      introduction: def.introduction, cost: def.cost as Record<string, number>, reward: def.reward,
+      remainingMinutes: Math.ceil(this.visits.remainingTicks * 60 / 1000),
+      canAccept: unavailableReason === null, unavailableReason,
+    };
+  }
+
+  respondToVisitor(visitId: number, decision: VisitDecision): void {
+    const visit = this.visits.active;
+    if (!visit || visit.id !== visitId) throw new Error('This visitor\'s offer is no longer available');
+    if (decision !== 'accept' && decision !== 'decline') throw new Error('Invalid visitor response');
+    let focus: [number, number] | null = null;
+    if (decision === 'accept') {
+      const reason = this.visitorUnavailableReason();
+      if (reason) throw new Error(reason);
+      if (visit.visitor === 'grower') {
+        const arrival = this.visitorHome();
+        if (!arrival) throw new Error('No reachable housing or arrival tile');
+        const [x, y] = this.tileCenter(...arrival.tile);
+        this.villagers.push({
+          id: this.nextVillagerId++, name: 'Mira', x, y, state: 'idle', purpose: null,
+          target: null, path: null, repathCooldown: 0, needs: fullNeeds(), currentJob: null,
+          workTicksRemaining: 0, activityTicks: 0, currentAction: null, carrying: null,
+          traits: ['green_thumb'], thought: null, thoughtTtl: 0, home: arrival.home,
+        });
+        this.visits.growerSettled = true;
+        focus = arrival.tile;
+      } else {
+        const def = VISITOR_DEFINITIONS.find(d => d.id === visit.visitor)!;
+        if (!this.withdrawCost(def.cost as Record<string, number>)) throw new Error('insufficient food');
+        if (visit.visitor === 'merchant') this.depositToStockpile('grain', 8);
+        else for (const v of this.villagers) {
+          v.needs.social = Math.min(1, v.needs.social + 0.2); recomputeHappiness(v.needs);
+        }
+      }
+    }
+    finishVisit(this.visits);
+    this.pushChronicle(focus, {
+      kind: 'visitorEvent', visitor: visit.visitor,
+      name: VISITOR_DEFINITIONS.find(d => d.id === visit.visitor)!.name,
+      outcome: decision === 'accept' ? 'accepted' : 'declined',
+    });
+    this.checkUnlocks(); this.checkObjectives();
   }
 
   housingCapacity(): number {
@@ -1322,6 +1439,7 @@ export class DemoWorld {
       crops,
       resources,
       housingCapacity: this.housingCapacity(),
+      visitor: this.visitorView(),
       clock,
       chronicleSeq: this.chronicleNextSeq,
       unlocked: [...this.unlocked],
@@ -1650,6 +1768,8 @@ export class DemoWorld {
 
   advanceClock(days: number, season: number | null): void {
     for (let i = 0; i < days; i += 1) {
+      // Match Rust: round fractional clock duration to the nearest logic tick.
+      this.advanceVisitors(Math.round((MINUTES_PER_DAY - this.clock.minuteAccum) / MINUTES_PER_TICK), true);
       this.clock.minuteAccum = 0;
       this.clock.minute = 0;
       this.rollDay();

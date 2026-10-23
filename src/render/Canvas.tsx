@@ -661,6 +661,7 @@ export function Canvas({
         chickens: rendered?.chickens ?? [],
         eggBaskets: rendered?.eggBaskets ?? [],
         chickenShelterId: rendered?.chickenShelterId ?? null,
+        visitor: rendered?.visitor ?? null,
         clock: rendered?.clock ?? null,
         resources: rendered?.resources ?? null,
         selectedKind: selectedKindRef.current,
