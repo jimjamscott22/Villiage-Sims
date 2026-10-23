@@ -10,6 +10,7 @@ import type {
   ResourceTotals,
   TickSnapshot,
   VillagerDetail,
+  VisitorView,
 } from './state/types';
 import { ChickenDemolitionDialog } from './ui/ChickenDemolitionDialog';
 import { BuildMenu } from './ui/BuildMenu';
@@ -20,6 +21,7 @@ import { ResourceBar } from './ui/ResourceBar';
 import { FloatingText, type Floater } from './ui/FloatingText';
 import { ObjectivesPanel } from './ui/ObjectivesPanel';
 import { ToastStack, type Toast } from './ui/ToastStack';
+import { VisitorPanel } from './ui/VisitorPanel';
 import { VillagerRoster } from './ui/VillagerRoster';
 
 const DETAIL_POLL_MS = 250;
@@ -141,6 +143,7 @@ export default function App() {
     };
   }, [selectedVillagerId]);
 
+  const [visitor, setVisitor] = useState<VisitorView | null>(null);
   const [population, setPopulation] = useState<number>(0);
   const [housingCapacity, setHousingCapacity] = useState<number>(0);
   const [chronicle, setChronicle] = useState<ChronicleEntry[]>([]);
@@ -178,6 +181,7 @@ export default function App() {
 
   const onSnapshot = (snapshot: TickSnapshot) => {
     setChickenShelterId(snapshot.chickenShelterId ?? null);
+    setVisitor(snapshot.visitor ?? null);
     const previous = lastResourcesRef.current;
     if (previous) {
       const deltas = [
@@ -231,7 +235,8 @@ export default function App() {
               (entry) =>
                 entry.body.kind === 'villagerBorn' ||
                 entry.body.kind === 'villagerDied' ||
-                entry.body.kind === 'buildingComplete',
+                entry.body.kind === 'buildingComplete' ||
+                (entry.body.kind === 'visitorEvent' && entry.body.outcome === 'arrived'),
             );
             if (toastable.length > 0) {
               setToasts((prev) => [
@@ -403,6 +408,14 @@ export default function App() {
         </div>
       </header>
       <ResourceBar resources={resources} population={population} housingCapacity={housingCapacity} />
+      {visitor && (
+        <VisitorPanel
+          key={`${worldKey}-${visitor.visitId}`}
+          visitor={visitor}
+          disabled={persistenceBusy}
+          onRespond={(decision) => transport.respondToVisitor(visitor.visitId, decision)}
+        />
+      )}
       {error && (
         <p role="alert" className="border-y-2 border-red-500/50 bg-red-950/90 px-4 py-2 text-sm text-red-100">
           {error}

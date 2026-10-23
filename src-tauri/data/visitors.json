@@ -1,0 +1,17 @@
+[
+  {
+    "id": "merchant", "name": "Rowan", "title": "Traveling merchant",
+    "introduction": "A dusty wagon stops at the village. Rowan has grain to spare, but needs provisions for the road.",
+    "cost": { "food": 12 }, "reward": "8 grain, usable as wheat seed"
+  },
+  {
+    "id": "musician", "name": "Lark", "title": "Wandering musician",
+    "introduction": "Lark offers an evening of songs in exchange for a meal. A little company could lift everyone's spirits.",
+    "cost": { "food": 6 }, "reward": "+20 percentage points of Social for every current villager (up to full)"
+  },
+  {
+    "id": "grower", "name": "Mira", "title": "Prospective resident",
+    "introduction": "Mira, a grower with a Green Thumb, is looking for a village to call home. Can you offer a spare bed?",
+    "cost": {}, "reward": "Mira joins with the Green Thumb trait; requires a vacant bed in completed, reachable housing"
+  }
+]

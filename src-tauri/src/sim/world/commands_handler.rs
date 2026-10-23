@@ -4,6 +4,9 @@ use super::*;
 impl super::World {
 pub fn handle_command(&mut self, command: SimCommand) {
         match command {
+            SimCommand::RespondToVisitor { visit_id, decision, reply } => {
+                let _ = reply.send(self.respond_to_visitor(visit_id, decision));
+            }
             SimCommand::SetViewport { x, y, w, h } => {
                 self.viewport = Viewport { x, y, w, h };
             }

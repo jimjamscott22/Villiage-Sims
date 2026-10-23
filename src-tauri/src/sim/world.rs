@@ -54,6 +54,9 @@ pub(crate) mod legacy_v5;
 #[path = "legacy_v6.rs"]
 pub(crate) mod legacy_v6;
 use social::{Encounter, Behavior};
+#[path = "legacy_v7.rs"]
+pub(crate) mod legacy_v7;
+mod visitors;
 
 const VIEWPORT_MARGIN_TILES: f32 = 4.0;
 const TICKS_PER_SECOND: f32 = 20.0;
@@ -101,6 +104,7 @@ pub struct World {
     #[serde(skip)]
     leisure_cache: leisure::LeisureCache,
     pub(crate) flock: Option<super::chickens::Flock>,
+    pub(crate) visits: super::visitors::Visits,
     #[serde(skip)]
     pub(crate) viewport: Viewport,
     /// When set, day rollover writes a rotating autosave into this directory.
@@ -143,6 +147,7 @@ impl World {
             behavior: BTreeMap::new(),
             leisure_cache: Default::default(),
             flock: None,
+            visits: Default::default(),
             viewport: Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -279,6 +284,7 @@ impl World {
         if rollover.season {
             self.record_season_turn();
         }
+        self.advance_visitors(1, false);
         self.complete_buildings();
         self.tick_chickens();
         self.tick_crops();
@@ -492,6 +498,7 @@ impl World {
             crops: self.crops.iter().map(Crop::view).collect(),
             resources: derive_totals(&self.resources, &building_inventories, &self.catalog),
             housing_capacity: self.housing_capacity(),
+            visitor: self.visitor_view(),
             clock: self.clock.view(self.current_weather().as_u8()),
             chronicle_seq: self.chronicle().seq(),
             unlocked: self.unlocked().iter().cloned().collect(),
@@ -2094,6 +2101,9 @@ impl World {
 
     pub fn advance_clock(&mut self, days: u32, season: Option<u8>) -> Result<(), String> {
         for _ in 0..days {
+            // Advance opportunities to midnight before daily effects/autosave.
+            let ticks = self.clock.ticks_until_midnight();
+            self.advance_visitors(ticks, true);
             let rollover = self.clock.force_day_rollover();
             self.on_day_rollover();
             if rollover.season {

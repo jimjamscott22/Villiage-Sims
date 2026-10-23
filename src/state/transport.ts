@@ -12,6 +12,7 @@ import type {
   Unlisten,
   VillagerDetail,
   WorldInit,
+  VisitDecision,
 } from './types';
 import { generateDemoTerrain } from './demoTerrain';
 
@@ -38,6 +39,7 @@ interface Transport {
   demolish(entityId: number): Promise<void>;
   clickChicken(shelterId: number, id: number): Promise<boolean>;
   collectEggs(shelterId: number, id: number): Promise<number>;
+  respondToVisitor(visitId: number, decision: VisitDecision): Promise<void>;
   moveVillagerTo(x: number, y: number, villagerId?: number | null): Promise<void>;
   assignHome(villagerId: number, buildingId: number | null): Promise<void>;
   getVillagerDetail(id: number): Promise<VillagerDetail>;
@@ -129,6 +131,11 @@ class BrowserTransport implements Transport {
     const food = this.world.collectEggs(shelterId, id); this.emit(this.world.snapshot()); return food;
   }
 
+  async respondToVisitor(visitId: number, decision: VisitDecision): Promise<void> {
+    this.world.respondToVisitor(visitId, decision);
+    this.emit(this.world.snapshot());
+  }
+
   async getVillagerDetail(id: number): Promise<VillagerDetail> {
     return this.world.getVillagerDetail(id);
   }
@@ -202,6 +209,7 @@ const tauriTransport: Transport = {
   demolish: (entityId) => invoke('demolish', { entityId }),
   clickChicken: (shelterId, id) => invoke('click_chicken', { shelterId, id }),
   collectEggs: (shelterId, id) => invoke('collect_eggs', { shelterId, id }),
+  respondToVisitor: (visitId, decision) => invoke('respond_to_visitor', { visitId, decision }),
   moveVillagerTo: (x, y, villagerId) =>
     invoke('move_villager_to', { x, y, villagerId: villagerId ?? null }),
   assignHome: (villagerId, buildingId) =>

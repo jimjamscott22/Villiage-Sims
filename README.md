@@ -83,6 +83,26 @@ three wait by the shelter. There are no feeding requirements or neglect penaltie
 Demolition asks before removing the shelter, its flock, and uncollected baskets.
 Desktop saves preserve the flock; browser-demo saves remain in memory.
 
+### Visitors
+
+Rowan the merchant, Lark the musician, and Mira the grower bring short offers.
+The first visitor arrives after one in-game hour. Visits last three in-game hours;
+the next arrival follows six hours after departure. Pause freezes the countdown.
+
+- Rowan trades **12 food for 8 grain**, usable as wheat seed.
+- Lark accepts **6 food** to restore **20 percentage points of Social** to current
+  villagers, capped at full.
+- Mira joins with **Green Thumb** when there is spare population capacity, a vacant
+  bed in completed reachable housing, and a free arrival tile. Existing residents
+  keep their beds. Automatic births leave one population slot during her visit.
+
+Use **Accept** or **Decline** in the offer panel, or let the visitor depart without
+penalty. Visits rotate in that order; Mira stops returning once she settles.
+Arrival and outcome appear in the Chronicle. Offers, timers, recruited residents,
+and outcomes survive save/load. Desktop saves are now version 8 (older supported
+versions 3–7 migrate); browser-demo saves are version 5 (versions 1–4 migrate).
+Older saves begin a fresh visitor schedule. Browser-demo now preserves its Chronicle.
+
 ### Checks
 
 ```bash
