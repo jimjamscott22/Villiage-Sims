@@ -4,7 +4,7 @@ import { outlineGrid, paintGrid, type SpriteGrid } from '../grid';
 function sprite(w: number, h: number, paint: (set: (x: number, y: number, key: string) => void) => void): SpriteGrid {
   const rows = Array.from({ length: h }, () => Array<string>(w).fill('.'));
   paint((x, y, key) => { if (x >= 0 && y >= 0 && x < w && y < h) rows[y][x] = key; });
-  return { size: [w, h], palette: { '.': null, w: P.whitewash, s: P.stoneLight, i: P.ink,
+  return { size: [w, h], palette: { '.': null, w: P.whitewash, s: P.sandMid, i: P.ink,
     r: P.terraMid, d: P.terraDark, l: P.terraLight, b: P.wheat, t: P.sandShadow, g: P.vegDark }, rows: rows.map(r => r.join('')) };
 }
 type Paint = (set: (x: number, y: number, key: string) => void) => void;

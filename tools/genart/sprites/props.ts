@@ -47,7 +47,7 @@ export const CYPRESS: SpriteGrid = grid(16, 32, {
 /** Mountain peak. 16×24, anchorY 8. */
 export const PEAK: SpriteGrid = grid(16, 24, {
   p: P.stonePale,
-  l: P.stoneLight,
+  l: P.sandMid,
   m: P.stoneMid,
   s: P.stoneShadow,
   i: P.ink,
@@ -71,7 +71,7 @@ export const PEAK: SpriteGrid = grid(16, 24, {
 
 /** Scatter boulder for bare rock tiles. 16×16, anchorY 0. */
 export const BOULDER: SpriteGrid = grid(16, 16, {
-  l: P.stoneLight,
+  l: P.sandMid,
   m: P.stoneMid,
   s: P.stoneShadow,
   i: P.ink,
@@ -176,7 +176,7 @@ export const STUMP: SpriteGrid = grid(16, 16, {
   b: P.vegDarkest,
   v: P.vegDark,
   r: P.stoneMid,
-  l: P.stoneLight,
+  l: P.sandMid,
   i: P.ink,
 }, (set) => {
   for (let y = 8; y <= 12; y += 1) {
@@ -233,7 +233,7 @@ export const MUSHROOM: SpriteGrid = grid(16, 16, {
 export const SHORE_ROCK: SpriteGrid = grid(16, 16, {
   s: P.stoneShadow,
   m: P.stoneMid,
-  l: P.stoneLight,
+  l: P.sandMid,
   w: P.seaMid,
   i: P.ink,
 }, (set) => {
@@ -254,7 +254,7 @@ export const SHORE_ROCK: SpriteGrid = grid(16, 16, {
 
 /** Sun-bleached driftwood on the beach. 16×16, anchorY 0. */
 export const DRIFTWOOD: SpriteGrid = grid(16, 16, {
-  p: P.sandPale,
+  p: P.whitewash,
   l: P.sandLight,
   m: P.sandMid,
   s: P.sandShadow,
@@ -390,7 +390,7 @@ export const CAMPFIRE_FRAMES: SpriteGrid[] = [campfire(0), campfire(1)];
 
 /** Loose scree for bare rock — a lighter alternative to the boulder. 16×16, anchorY 0. */
 export const PEBBLES: SpriteGrid = grid(16, 16, {
-  l: P.stoneLight,
+  l: P.sandMid,
   m: P.stoneMid,
   s: P.stoneShadow,
   i: P.ink,
@@ -463,7 +463,7 @@ function cattail(sway: number): SpriteGrid {
   return grid(16, 16, {
     m: P.vegMid,
     l: P.vegLight,
-    b: P.terraDeep,
+    b: P.terraDark,
     f: P.foam,
   }, (set) => {
     const stalks: Array<[number, number]> = [[4, 8], [7, 10], [10, 7], [12, 9]];
@@ -500,7 +500,7 @@ export const FALLEN_LEAVES: SpriteGrid = grid(16, 16, {
 export const SNOW_DRIFT: SpriteGrid = grid(16, 16, {
   w: P.whitewash,
   p: P.stonePale,
-  l: P.stoneLight,
+  l: P.sandMid,
 }, (set) => {
   for (let y = 9; y <= 12; y += 1) {
     const half = 2 + Math.floor((y - 9) * 1.7);
@@ -517,7 +517,7 @@ export const SNOW_DRIFT: SpriteGrid = grid(16, 16, {
 /** Ancient standing stones — a rare landmark on open grass. 16×24, anchorY 8. */
 export const STANDING_STONE: SpriteGrid = grid(16, 24, {
   p: P.stonePale,
-  l: P.stoneLight,
+  l: P.sandMid,
   m: P.stoneMid,
   s: P.stoneShadow,
   g: P.vegMid,
@@ -547,7 +547,7 @@ export const STANDING_STONE: SpriteGrid = grid(16, 24, {
 export const SUNFLOWERS: SpriteGrid = grid(16, 16, {
   w: P.wheat,
   l: P.terraLight,
-  d: P.terraDeep,
+  d: P.terraDark,
   k: P.vegDarkest,
   v: P.vegDark,
   m: P.vegMid,
@@ -580,7 +580,7 @@ export const SUNFLOWERS: SpriteGrid = grid(16, 16, {
 /** Scallop shell, starfish and a spiral shell washed up on the beach. 16×16, anchorY 0. */
 export const SHELLS: SpriteGrid = grid(16, 16, {
   w: P.whitewash,
-  p: P.sandPale,
+  p: P.whitewash,
   l: P.terraLight,
   t: P.terraMid,
   d: P.terraDark,

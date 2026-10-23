@@ -28,7 +28,7 @@ export const HUT: SpriteGrid = grid(16, 32, {
   s: P.shutter,
   i: P.ink,
   c: P.sandShadow,
-  g: P.stoneLight,
+  g: P.sandMid,
 }, (set) => {
   // Roof triangle in headroom (y 2..15)
   for (let y = 2; y <= 15; y += 1) {
@@ -266,7 +266,7 @@ export const BAKERY: SpriteGrid = bakeryFrame(0);
 /** 1×1 well — stone drum, timber frame, shingled cap. 16×32, anchorY 16. */
 export const WELL: SpriteGrid = grid(16, 32, {
   m: P.stoneMid,
-  l: P.stoneLight,
+  l: P.sandMid,
   p: P.stonePale,
   s: P.stoneShadow,
   t: P.terraMid,
@@ -310,7 +310,7 @@ const TIMBER: Pal = {
   t: P.terraMid,
   d: P.terraDark,
   m: P.stoneMid,
-  g: P.stoneLight,
+  g: P.sandMid,
   p: P.stonePale,
   i: P.ink,
   c: P.sandShadow,

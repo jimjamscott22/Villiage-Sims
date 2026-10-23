@@ -3,8 +3,13 @@ import { hash01 } from './hash';
 import { PALETTE, THEME, UI_TOKENS, assertPaletteHex, toRgba } from './palette';
 
 describe('PALETTE', () => {
-  it('holds exactly the 29 specified colors', () => {
-    expect(Object.keys(PALETTE)).toHaveLength(29);
+  it('holds exactly the 25 locked art colors', () => {
+    expect(Object.keys(PALETTE)).toHaveLength(25);
+  });
+
+  it('adds exactly two UI-only colours plus the uiText alias', () => {
+    expect(Object.keys(UI_TOKENS)).toEqual(['uiBg', 'highlight', 'uiText']);
+    expect(new Set(Object.values(THEME)).size).toBe(27);
   });
 
   it('has no duplicate hex values', () => {
