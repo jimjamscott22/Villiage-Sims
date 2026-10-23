@@ -1,3 +1,5 @@
+import type { Atlas } from './atlas';
+import { bitmapTextHeight, bitmapTextWidth, drawBitmapText } from './bitmapText';
 import type { Camera } from './camera';
 import { THEME, withAlpha } from '../theme/palette';
 
@@ -5,9 +7,10 @@ import { THEME, withAlpha } from '../theme/palette';
 export const MIN_TAG_ZOOM = 0.4;
 /** World-pixel gap between a villager's feet and the top of its tag. */
 const FEET_OFFSET = 7;
-const TAG_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
 const TAG_PAD_X = 4;
-const TAG_HEIGHT = 14;
+const TAG_PAD_Y = 2;
+/** Bitmap glyph height (7px × 2) plus vertical padding. */
+export const TAG_HEIGHT = bitmapTextHeight() + TAG_PAD_Y * 2;
 const OFFSCREEN_MARGIN = 80;
 
 export interface NameTagPlacement {
@@ -81,21 +84,24 @@ export function staggerTag(rect: TagRect, placed: readonly TagRect[]): TagRect {
   return { ...rect, top };
 }
 
+/** Tag box width from bitmap glyph metrics. */
+export function nameTagWidth(text: string): number {
+  return bitmapTextWidth(text) + TAG_PAD_X * 2;
+}
+
 /** Paint tags in CSS-pixel screen space (resets the transform to `dpr`). */
 export function drawNameTags(
   ctx: CanvasRenderingContext2D,
   placements: NameTagPlacement[],
   dpr: number,
+  atlas: Atlas | null,
 ): void {
   if (placements.length === 0) return;
   ctx.save();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.font = TAG_FONT;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
   const placed: TagRect[] = [];
   for (const tag of placements) {
-    const width = Math.ceil(ctx.measureText(tag.text).width) + TAG_PAD_X * 2;
+    const width = nameTagWidth(tag.text);
     const rect = staggerTag(
       { left: tag.sx - Math.round(width / 2), top: tag.sy, width, height: TAG_HEIGHT },
       placed,
@@ -106,8 +112,9 @@ export function drawNameTags(
     ctx.strokeStyle = tag.selected ? THEME.highlight : withAlpha(THEME.uiText, 0.25);
     ctx.lineWidth = 1;
     ctx.strokeRect(rect.left + 0.5, rect.top + 0.5, width - 1, TAG_HEIGHT - 1);
-    ctx.fillStyle = THEME.uiText;
-    ctx.fillText(tag.text, tag.sx, rect.top + TAG_HEIGHT / 2 + 0.5);
+    drawBitmapText(ctx, atlas, tag.text, rect.left + TAG_PAD_X, rect.top + TAG_PAD_Y, {
+      color: THEME.uiText,
+    });
   }
   ctx.restore();
 }

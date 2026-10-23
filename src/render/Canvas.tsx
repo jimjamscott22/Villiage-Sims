@@ -5,6 +5,7 @@ import type { BuildingDef, Catalog, TerrainSnapshot, TickSnapshot, VillagerDetai
 import { Camera } from './camera';
 import type { Atlas } from './atlas';
 import { ART_SCALE, drawCell, loadAtlas } from './atlas';
+import { bitmapTextHeight, bitmapTextWidth, drawBitmapText } from './bitmapText';
 import { drawBuildings, drawCrops, drawVillagers } from './drawEntities';
 import { drawGhost } from './drawGhost';
 import { drawTerrain } from './drawTerrain';
@@ -460,7 +461,7 @@ export function Canvas({
           );
           drawBuildings(ctx, rendered.buildings, terrain.tileSize, footprints);
           drawCrops(ctx, rendered.crops ?? [], terrain.tileSize);
-          drawVillagers(ctx, rendered.villagers, camera.zoom, selectedVillagerIdRef.current);
+          drawVillagers(ctx, rendered.villagers, camera.zoom, selectedVillagerIdRef.current, atlas);
           if (selectedBuildingIdRef.current != null) {
             const selected = rendered.buildings.find(
               (building) => building.id === selectedBuildingIdRef.current,
@@ -492,7 +493,7 @@ export function Canvas({
           tileSize: terrain.tileSize,
         });
         if (intent) {
-          drawIntentOverlay(ctx, intent, terrain.tileSize, camera, dpr);
+          drawIntentOverlay(ctx, intent, terrain.tileSize, camera, dpr, atlas);
         }
         if (showNameTagsRef.current) {
           drawNameTags(
@@ -506,6 +507,7 @@ export function Canvas({
               selectedVillagerIdRef.current,
             ),
             dpr,
+            atlas,
           );
         }
       }
@@ -541,15 +543,13 @@ export function Canvas({
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.imageSmoothingEnabled = false;
         const pad = 8;
-        const lineH = 14;
-        const boxW = 220;
-        const boxH = pad * 2 + lines.length * lineH;
+        const lineH = bitmapTextHeight() + 4;
+        const boxW = pad * 2 + Math.max(...lines.map((line) => bitmapTextWidth(line)));
+        const boxH = pad * 2 + lines.length * lineH - 4;
         ctx.fillStyle = withAlpha(THEME.uiBg, 0.72);
         ctx.fillRect(8, 8, boxW, boxH);
-        ctx.fillStyle = THEME.vegPale;
-        ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
         for (let i = 0; i < lines.length; i += 1) {
-          ctx.fillText(lines[i], 8 + pad, 8 + pad + (i + 1) * lineH - 3);
+          drawBitmapText(ctx, atlas, lines[i], 8 + pad, 8 + pad + i * lineH, { color: THEME.vegPale });
         }
       }
     };

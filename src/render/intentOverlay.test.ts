@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BuildingView, VillagerDetail, VillagerView } from '../state/types';
 import {
   intentLabel,
+  intentLabelBox,
   planIntentOverlay,
   PURPOSE_LABELS,
   STATE_MOVING,
@@ -212,5 +213,12 @@ describe('planIntentOverlay', () => {
       label: 'Home — Sleeping',
       showLine: false,
     });
+  });
+});
+
+describe('intentLabelBox', () => {
+  it('sizes the label from bitmap glyph metrics', () => {
+    // "GOING HOME" is 10 glyphs × 12px, plus 4px padding each side.
+    expect(intentLabelBox('Going home')).toEqual({ width: 10 * 12 + 8, height: 7 * 2 + 4 });
   });
 });

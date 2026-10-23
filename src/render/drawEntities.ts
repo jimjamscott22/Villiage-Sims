@@ -1,5 +1,7 @@
 import type { BuildingView, CropView, VillagerView } from '../state/types';
 import { DEBUG_MISSING, THEME, withAlpha } from '../theme/palette';
+import type { Atlas } from './atlas';
+import { bitmapTextHeight, bitmapTextWidth, drawBitmapText } from './bitmapText';
 
 /** Flat fallback colours (used when the atlas fails to load), indexed by building kind. */
 export const BUILDING_FALLBACK_COLORS: readonly string[] = [THEME.sandMid, THEME.vegLight, THEME.stoneMid];
@@ -11,32 +13,38 @@ export const CROP_STAGE_FALLBACK_COLORS: readonly string[] = [
   THEME.wheat,
 ];
 
-/** Draw a small pixel-style speech bubble above a villager. */
+/**
+ * Draw a small pixel-style speech bubble above a villager. Drawn in CSS-pixel
+ * screen space so the bitmap glyphs stay at a whole-pixel ×2 at any zoom.
+ */
 function drawThoughtBubble(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
+  worldX: number,
+  worldY: number,
   text: string,
   zoom: number,
+  atlas: Atlas | null,
 ): void {
-  const fontSize = Math.max(8, 10 / Math.max(zoom, 0.01));
-  const pad = Math.max(3, 4 / Math.max(zoom, 0.01));
-  const lineHeight = fontSize * 1.2;
-  ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
-  const metrics = ctx.measureText(text);
-  const boxW = metrics.width + pad * 2;
-  const boxH = lineHeight + pad;
-  const bx = x - boxW / 2;
-  const by = y - fontSize - boxH - 6 / Math.max(zoom, 0.01);
+  const transform = ctx.getTransform();
+  const dpr = transform.a / Math.max(zoom, 0.01);
+  const x = (transform.a * worldX + transform.e) / dpr;
+  const y = (transform.d * worldY + transform.f) / dpr;
+  const pad = 4;
+  const textH = bitmapTextHeight();
+  const boxW = bitmapTextWidth(text) + pad * 2;
+  const boxH = textH + pad * 2;
+  const bx = Math.round(x - boxW / 2);
+  const by = Math.round(y - boxH - 10);
 
   ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = THEME.uiBg;
   ctx.strokeStyle = THEME.highlight;
-  ctx.lineWidth = Math.max(1, 1.5 / Math.max(zoom, 0.01));
+  ctx.lineWidth = 1.5;
   ctx.fillRect(bx, by, boxW, boxH);
   ctx.strokeRect(bx, by, boxW, boxH);
   // tiny pointer
-  const pointerSize = Math.max(3, 4 / Math.max(zoom, 0.01));
+  const pointerSize = 4;
   ctx.beginPath();
   ctx.moveTo(x - pointerSize / 2, by + boxH);
   ctx.lineTo(x, by + boxH + pointerSize);
@@ -45,9 +53,7 @@ function drawThoughtBubble(
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = THEME.highlight;
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText(text, bx + pad, by + boxH - pad / 2);
+  drawBitmapText(ctx, atlas, text, bx + pad, by + pad, { color: THEME.highlight });
   ctx.restore();
 }
 
@@ -57,6 +63,7 @@ export function drawVillagers(
   villagers: VillagerView[],
   zoom = 1,
   selectedId: number | null = null,
+  atlas: Atlas | null = null,
 ): void {
   const radius = Math.max(6, 11 / Math.max(zoom, 0.01));
   const lineWidth = Math.max(1.5, 3 / Math.max(zoom, 0.01));
@@ -71,7 +78,7 @@ export function drawVillagers(
     ctx.stroke();
     const bubble = villager.activity === 'talking' ? '...' : villager.thought;
     if (bubble) {
-      drawThoughtBubble(ctx, villager.x, villager.y - radius, bubble, zoom);
+      drawThoughtBubble(ctx, villager.x, villager.y - radius, bubble, zoom, atlas);
     }
   }
 }
