@@ -24,7 +24,7 @@ export function ResourceBar({ resources, population, housingCapacity }: Resource
       data-testid="resource-bar"
     >
       {population != null && housingCapacity != null && (
-        <div className="pixel-chip flex items-center gap-2 px-2 py-1">
+        <div className="pixel-chip flex items-center gap-2 px-1.5 py-0.5">
           <span className="text-[var(--c-ui-text)] text-[11px] pixel-text-outline tracking-wide">Pop</span>
           {/* Keying on the value itself remounts this span whenever it changes,
               which replays the pulse animation with no extra state/timers. */}
@@ -36,7 +36,7 @@ export function ResourceBar({ resources, population, housingCapacity }: Resource
       {ENTRIES.map(({ key, label, icon }) => {
         const value = resources?.[key];
         return (
-          <div key={key} className="pixel-chip flex items-center gap-1.5 px-2 py-1" title={label}>
+          <div key={key} className="pixel-chip flex items-center gap-1.5 px-1.5 py-0.5" title={label}>
             <span className="pixel-icon pixel-drop-shadow" style={uiIconStyle(icon)} />
             <span key={value ?? 'empty'} className="animate-resource-pulse pixel-drop-shadow">
               <PixelText text={value != null ? String(value) : '-'} />

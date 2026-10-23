@@ -86,7 +86,7 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
                 disabled={homeBusy}
                 onClick={onClearHome}
                 title="Clear this villager's home assignment"
-                className="pixel-btn pixel-focus ml-2 px-1.5 py-0.5 disabled:cursor-wait disabled:opacity-40"
+                className="pixel-btn pixel-focus ml-2 px-1 py-0 disabled:cursor-wait disabled:opacity-40"
               >
                 Clear
               </button>

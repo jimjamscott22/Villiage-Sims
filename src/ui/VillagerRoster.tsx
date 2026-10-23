@@ -106,7 +106,7 @@ export function VillagerRoster({
           type="button"
           onClick={onClose}
           aria-label="Close villager roster"
-          className="pixel-btn pixel-focus px-1.5 py-0.5"
+          className="pixel-btn pixel-focus px-1 py-0"
         >
           ✕
         </button>

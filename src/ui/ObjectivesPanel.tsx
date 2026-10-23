@@ -60,7 +60,7 @@ export function ObjectivesPanel({ catalog, completed }: ObjectivesPanelProps) {
         data-testid="objectives-menu"
         onClick={() => setOpen((value) => !value)}
         title={current?.title ?? 'Objectives'}
-        className="pixel-btn pixel-focus flex items-center gap-2 px-2 py-1 pixel-drop-shadow"
+        className="pixel-btn pixel-focus flex items-center gap-2 px-1.5 py-0.5 pixel-drop-shadow"
       >
         <PixelText text="OBJECTIVES" />
         <span className="text-[11px] text-[var(--c-ui-text)] pixel-text-outline tracking-wide">

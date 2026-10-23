@@ -920,7 +920,7 @@ export function Canvas({
           selectedKind || selectedCrop ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'
         }`}
       />
-      <button type="button" className="pixel-btn pixel-focus absolute bottom-3 left-3 z-10 bg-black/60 px-2 py-1 text-xs text-white/80"
+      <button type="button" className="pixel-btn pixel-focus absolute bottom-3 left-3 z-10 bg-black/60 px-1.5 py-0.5 text-xs text-white/80"
         aria-pressed={soundEnabled}
         onClick={() => { void audioRef.current?.toggle().then(setSoundEnabled).catch(cause => setError(`Could not enable sound: ${String(cause)}`)); }}>
         Sound {soundEnabled ? 'on' : 'off'}

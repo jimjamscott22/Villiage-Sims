@@ -360,7 +360,7 @@ export default function App() {
             aria-pressed={rosterOpen}
             title="Villager roster (V)"
             onClick={() => setRosterOpen((open) => !open)}
-            className={`pixel-btn pixel-focus px-2 py-1 ${rosterOpen ? 'pixel-btn-active' : ''}`}
+            className={`pixel-btn pixel-focus px-1.5 py-0.5 ${rosterOpen ? 'pixel-btn-active' : ''}`}
           >
             <PixelText text="SIMS" />
           </button>
@@ -370,7 +370,7 @@ export default function App() {
             aria-pressed={showNameTags}
             title="Villager name tags (N)"
             onClick={() => setShowNameTags((show) => !show)}
-            className={`pixel-btn pixel-focus px-2 py-1 ${showNameTags ? 'pixel-btn-active' : ''}`}
+            className={`pixel-btn pixel-focus px-1.5 py-0.5 ${showNameTags ? 'pixel-btn-active' : ''}`}
           >
             <PixelText text="TAGS" />
           </button>
@@ -382,7 +382,7 @@ export default function App() {
             onClick={() => {
               void onSave();
             }}
-            className="pixel-btn pixel-focus px-2 py-1 disabled:cursor-wait disabled:opacity-40"
+            className="pixel-btn pixel-focus px-1.5 py-0.5 disabled:cursor-wait disabled:opacity-40"
           >
             <PixelText text="SAVE" />
           </button>
@@ -394,7 +394,7 @@ export default function App() {
             onClick={() => {
               void onLoad();
             }}
-            className="pixel-btn pixel-focus px-2 py-1 disabled:cursor-wait disabled:opacity-40"
+            className="pixel-btn pixel-focus px-1.5 py-0.5 disabled:cursor-wait disabled:opacity-40"
           >
             <PixelText text="LOAD" />
           </button>
