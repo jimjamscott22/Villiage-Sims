@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mirrorHorizontal, rasterizeGrid, remapColor } from './grid';
+import { mirrorHorizontal, outlineGrid, paintGrid, rasterizeGrid, remapColor } from './grid';
 import { PALETTE } from './palette';
 
 describe('rasterizeGrid', () => {
@@ -70,5 +70,34 @@ describe('remapColor', () => {
     const remapped = remapColor(source, PALETTE.shutter, PALETTE.terraMid);
     expect(remapped.get(0, 0)).toEqual([0xc0, 0x5a, 0x34, 255]);
     expect(remapped.get(1, 0)).toEqual([0x2b, 0x23, 0x20, 255]);
+  });
+});
+
+describe('outlineGrid', () => {
+  const pal = { '.': null, w: PALETTE.whitewash, i: PALETTE.ink };
+
+  it('rings the silhouette with the outline key without growing the cell', () => {
+    const out = outlineGrid({ size: [5, 5], palette: pal, rows: ['.....', '.....', '..w..', '.....', '.....'] }, 'i');
+    expect(out.size).toEqual([5, 5]);
+    expect(out.rows).toEqual(['.....', '..i..', '.iwi.', '..i..', '.....']);
+  });
+
+  it('leaves sides that touch the cell edge unoutlined', () => {
+    const out = outlineGrid({ size: [3, 2], palette: pal, rows: ['www', '...'] }, 'i');
+    expect(out.rows).toEqual(['www', 'iii']);
+  });
+
+  it('rejects a transparent or missing outline key', () => {
+    expect(() => outlineGrid({ size: [1, 1], palette: pal, rows: ['w'] }, '.')).toThrow();
+    expect(() => outlineGrid({ size: [1, 1], palette: pal, rows: ['w'] }, 'z')).toThrow();
+  });
+});
+
+describe('paintGrid', () => {
+  it('paints over a copy and leaves the source untouched', () => {
+    const source = { size: [2, 1] as [number, number], palette: { '.': null, w: PALETTE.whitewash }, rows: ['..'] };
+    const painted = paintGrid(source, (set) => set(1, 0, 'w'));
+    expect(painted.rows).toEqual(['.w']);
+    expect(source.rows).toEqual(['..']);
   });
 });
