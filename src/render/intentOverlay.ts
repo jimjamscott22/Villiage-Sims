@@ -1,4 +1,5 @@
 import type { BuildingView, VillagerDetail, VillagerView } from '../state/types';
+import { THEME, withAlpha } from '../theme/palette';
 
 /** AgentState::MovingTo */
 export const STATE_MOVING = 1;
@@ -146,8 +147,8 @@ export function planIntentOverlay(input: PlanIntentInput): IntentPlan | null {
   return null;
 }
 
-const INTENT_COLOR = '#f4c95d';
-const INTENT_MUTED = 'rgba(244, 201, 93, 0.85)';
+const INTENT_COLOR = THEME.highlight;
+const INTENT_MUTED = withAlpha(THEME.highlight, 0.85);
 const LABEL_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
 
 export interface IntentCamera {
@@ -223,12 +224,12 @@ export function drawIntentOverlay(
   const padY = 2;
   const boxW = metrics.width + padX * 2;
   const boxH = 14;
-  ctx.fillStyle = 'rgba(58, 42, 12, 0.92)';
+  ctx.fillStyle = withAlpha(THEME.ink, 0.92);
   ctx.fillRect(toSx - boxW / 2, labelY - boxH, boxW, boxH);
   ctx.strokeStyle = INTENT_COLOR;
   ctx.lineWidth = 1;
   ctx.strokeRect(toSx - boxW / 2 + 0.5, labelY - boxH + 0.5, boxW - 1, boxH - 1);
-  ctx.fillStyle = '#fff6d5';
+  ctx.fillStyle = THEME.uiText;
   ctx.fillText(plan.label, toSx, labelY - padY);
 
   ctx.restore();

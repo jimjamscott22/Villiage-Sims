@@ -23,6 +23,7 @@ import {
 import type { ShorelineTile, TerrainProp } from './tilemap';
 import { bakeTerrain, shorelineTiles, terrainProps } from './tilemap';
 import { createViewportSync } from './viewportSync';
+import { THEME, withAlpha } from '../theme/palette';
 
 const TICK_MS = 50;
 const FOAM_TICKS_PER_FRAME = 8;
@@ -464,7 +465,7 @@ export function Canvas({
               const [fw, fh] = footprints[selected.kind] ?? [1, 1];
               const width = (selected.rot % 2 === 0 ? fw : fh) * terrain.tileSize;
               const height = (selected.rot % 2 === 0 ? fh : fw) * terrain.tileSize;
-              ctx.strokeStyle = '#f4c95d';
+              ctx.strokeStyle = THEME.highlight;
               ctx.lineWidth = 2 / Math.max(camera.zoom, 0.01);
               ctx.strokeRect(
                 selected.x * terrain.tileSize,
@@ -539,9 +540,9 @@ export function Canvas({
         const lineH = 14;
         const boxW = 220;
         const boxH = pad * 2 + lines.length * lineH;
-        ctx.fillStyle = 'rgba(12, 18, 12, 0.72)';
+        ctx.fillStyle = withAlpha(THEME.uiBg, 0.72);
         ctx.fillRect(8, 8, boxW, boxH);
-        ctx.fillStyle = '#b6f28a';
+        ctx.fillStyle = THEME.vegPale;
         ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
         for (let i = 0; i < lines.length; i += 1) {
           ctx.fillText(lines[i], 8 + pad, 8 + pad + (i + 1) * lineH - 3);
@@ -898,7 +899,7 @@ export function Canvas({
   }, []);
 
   return (
-    <section ref={viewportRef} className="relative min-h-0 flex-1 overflow-hidden bg-[#0b151c]">
+    <section ref={viewportRef} className="relative min-h-0 flex-1 overflow-hidden bg-[var(--c-ui-bg)]">
       <canvas
         ref={canvasRef}
         aria-label="Village simulation"
@@ -925,7 +926,7 @@ export function Canvas({
             })`,
           }}
         >
-          <div className="font-medium text-[#f7f4e9]">{hovered.title}</div>
+          <div className="font-medium text-[var(--c-ui-text)]">{hovered.title}</div>
           <div className="mt-0.5 text-[11px] text-white/60">{hovered.detail}</div>
         </div>
       )}

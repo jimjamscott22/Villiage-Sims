@@ -162,8 +162,8 @@ export function BuildMenu({
             })}
           </ul>
           <p className="mt-3 text-[11px] leading-relaxed text-white/70">
-            Select a building or crop, then click the map. <kbd className="text-[#f7f4e9]">R</kbd> rotates,{' '}
-            <kbd className="text-[#f7f4e9]">Esc</kbd> cancels. Middle-drag pans. Right-click to move.
+            Select a building or crop, then click the map. <kbd className="text-[var(--c-ui-text)]">R</kbd> rotates,{' '}
+            <kbd className="text-[var(--c-ui-text)]">Esc</kbd> cancels. Middle-drag pans. Right-click to move.
           </p>
         </div>
       </div>

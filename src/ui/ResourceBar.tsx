@@ -25,7 +25,7 @@ export function ResourceBar({ resources, population, housingCapacity }: Resource
     >
       {population != null && housingCapacity != null && (
         <div className="pixel-chip flex items-center gap-2 px-2 py-1">
-          <span className="text-[#f7f4e9] text-[11px] pixel-text-outline tracking-wide">Pop</span>
+          <span className="text-[var(--c-ui-text)] text-[11px] pixel-text-outline tracking-wide">Pop</span>
           {/* Keying on the value itself remounts this span whenever it changes,
               which replays the pulse animation with no extra state/timers. */}
           <span key={`${population}/${housingCapacity}`} className="animate-resource-pulse pixel-drop-shadow">

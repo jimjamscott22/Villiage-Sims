@@ -1,4 +1,5 @@
 import type { BuildingView, CropView, VillagerView } from '../state/types';
+import { THEME, withAlpha } from '../theme/palette';
 
 const BUILDING_COLORS = ['#c4a574', '#8fbc5a', '#b08968'];
 const CROP_STAGE_COLORS = ['#6b8f3c', '#7fa84a', '#c4b44a', '#d4a017'];
@@ -22,8 +23,8 @@ function drawThoughtBubble(
   const by = y - fontSize - boxH - 6 / Math.max(zoom, 0.01);
 
   ctx.save();
-  ctx.fillStyle = '#1a1510';
-  ctx.strokeStyle = '#f4c95d';
+  ctx.fillStyle = THEME.uiBg;
+  ctx.strokeStyle = THEME.highlight;
   ctx.lineWidth = Math.max(1, 1.5 / Math.max(zoom, 0.01));
   ctx.fillRect(bx, by, boxW, boxH);
   ctx.strokeRect(bx, by, boxW, boxH);
@@ -37,7 +38,7 @@ function drawThoughtBubble(
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = '#f4c95d';
+  ctx.fillStyle = THEME.highlight;
   ctx.textBaseline = 'alphabetic';
   ctx.fillText(text, bx + pad, by + boxH - pad / 2);
   ctx.restore();
@@ -56,10 +57,10 @@ export function drawVillagers(
     const selected = selectedId != null && villager.id === selectedId;
     ctx.beginPath();
     ctx.arc(villager.x, villager.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = '#f4c95d';
+    ctx.fillStyle = THEME.highlight;
     ctx.fill();
     ctx.lineWidth = selected ? lineWidth * 1.4 : lineWidth;
-    ctx.strokeStyle = selected ? '#fff6d5' : '#352f25';
+    ctx.strokeStyle = selected ? THEME.uiText : THEME.ink;
     ctx.stroke();
     const bubble = villager.activity === 'talking' ? '...' : villager.thought;
     if (bubble) {
@@ -86,10 +87,10 @@ export function drawBuildings(
     ctx.fillRect(x + 2, y + 2, width - 4, height - 4);
     ctx.globalAlpha = 1;
     ctx.lineWidth = 2;
-    ctx.strokeStyle = building.state === 2 ? '#2b2118' : '#5a4634';
+    ctx.strokeStyle = building.state === 2 ? THEME.ink : THEME.stoneShadow;
     ctx.strokeRect(x + 2, y + 2, width - 4, height - 4);
     if (building.state !== 2) {
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillStyle = withAlpha(THEME.whitewash, 0.35);
       ctx.fillRect(x + 4, y + height - 10, ((width - 8) * building.progress) / 100, 4);
     }
   }
@@ -108,7 +109,7 @@ export function drawCrops(
     const y = crop.y * tileSize + pad;
     ctx.fillStyle = CROP_STAGE_COLORS[crop.stage] ?? CROP_STAGE_COLORS[CROP_STAGE_COLORS.length - 1];
     ctx.fillRect(x, y, size, size);
-    ctx.strokeStyle = '#2a3a1a';
+    ctx.strokeStyle = THEME.vegDarkest;
     ctx.lineWidth = 1;
     ctx.strokeRect(x, y, size, size);
   }

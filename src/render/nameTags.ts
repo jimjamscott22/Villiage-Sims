@@ -1,4 +1,5 @@
 import type { Camera } from './camera';
+import { THEME, withAlpha } from '../theme/palette';
 
 /** Below this zoom only the selected villager keeps its tag, to avoid label soup. */
 export const MIN_TAG_ZOOM = 0.4;
@@ -100,12 +101,12 @@ export function drawNameTags(
       placed,
     );
     placed.push(rect);
-    ctx.fillStyle = tag.selected ? 'rgba(58, 42, 12, 0.92)' : 'rgba(12, 18, 12, 0.72)';
+    ctx.fillStyle = tag.selected ? withAlpha(THEME.ink, 0.92) : withAlpha(THEME.uiBg, 0.72);
     ctx.fillRect(rect.left, rect.top, width, TAG_HEIGHT);
-    ctx.strokeStyle = tag.selected ? '#f4c95d' : 'rgba(247, 244, 233, 0.25)';
+    ctx.strokeStyle = tag.selected ? THEME.highlight : withAlpha(THEME.uiText, 0.25);
     ctx.lineWidth = 1;
     ctx.strokeRect(rect.left + 0.5, rect.top + 0.5, width - 1, TAG_HEIGHT - 1);
-    ctx.fillStyle = tag.selected ? '#fff6d5' : '#f7f4e9';
+    ctx.fillStyle = THEME.uiText;
     ctx.fillText(tag.text, tag.sx, rect.top + TAG_HEIGHT / 2 + 0.5);
   }
   ctx.restore();

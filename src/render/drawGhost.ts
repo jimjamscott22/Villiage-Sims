@@ -1,3 +1,5 @@
+import { THEME, withAlpha } from '../theme/palette';
+
 export function drawGhost(
   ctx: CanvasRenderingContext2D,
   tileX: number,
@@ -11,8 +13,8 @@ export function drawGhost(
   const y = tileY * tileSize;
   const width = fw * tileSize;
   const height = fh * tileSize;
-  ctx.fillStyle = valid ? 'rgba(80, 200, 120, 0.35)' : 'rgba(220, 70, 70, 0.35)';
-  ctx.strokeStyle = valid ? 'rgba(40, 160, 90, 0.95)' : 'rgba(200, 50, 50, 0.95)';
+  ctx.fillStyle = valid ? withAlpha(THEME.vegLight, 0.35) : withAlpha(THEME.terraMid, 0.35);
+  ctx.strokeStyle = valid ? withAlpha(THEME.vegMid, 0.95) : withAlpha(THEME.terraDark, 0.95);
   ctx.lineWidth = 2;
   ctx.fillRect(x, y, width, height);
   ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);

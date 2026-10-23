@@ -113,7 +113,7 @@ export function VillagerRoster({
       </header>
       <div className="min-h-0 overflow-auto">
         <table className="w-full border-collapse">
-          <thead className="sticky top-0 bg-[#1c2a21] text-left text-[10px] uppercase tracking-wide text-white/60">
+          <thead className="sticky top-0 bg-[var(--c-ui-bg)] text-left text-[10px] uppercase tracking-wide text-white/60">
             <tr>
               <th className="px-3 py-1">
                 <button type="button" className="pixel-focus" onClick={() => toggleSort('name')}>

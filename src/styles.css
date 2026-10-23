@@ -3,8 +3,8 @@
 @import "./theme/palette.css";
 
 :root {
-  color: #f7f4e9;
-  background: #17211b;
+  color: var(--c-ui-text);
+  background: var(--c-ui-bg);
   font-family: 'Pixelify Sans', ui-sans-serif, system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -21,7 +21,7 @@ button, canvas { touch-action: none; }
   /* Standalone 18×18 frame — border-image cannot crop ui.png atlas cells. */
   border-image: url(/art/panel.png) 6 fill repeat;
   image-rendering: pixelated;
-  background-color: #1b3038;
+  background-color: var(--c-ui-panel);
 }
 
 .pixel-btn {
@@ -29,7 +29,7 @@ button, canvas { touch-action: none; }
   border-width: 4px;
   border-image: url(/art/panel.png) 6 fill repeat;
   image-rendering: pixelated;
-  background-color: #26454f;
+  background-color: var(--c-ui-raised);
   /* Declared here (not left to Tailwind's per-element `transition` utility)
      so every pixel-btn gets the same hover fade and press squash whether or
      not its className happens to include `transition`. */
@@ -37,7 +37,7 @@ button, canvas { touch-action: none; }
 }
 
 .pixel-btn:hover:not(:disabled) {
-  background-color: #2f5562;
+  background-color: var(--c-sea-deep);
 }
 
 .pixel-btn:active:not(:disabled) {
@@ -45,7 +45,7 @@ button, canvas { touch-action: none; }
 }
 
 .pixel-btn-active {
-  background-color: #3f6f8f;
+  background-color: var(--c-shutter);
 }
 
 /* Non-interactive variant of .pixel-btn for metric tiles — same 9-slice
@@ -55,11 +55,11 @@ button, canvas { touch-action: none; }
   border-width: 4px;
   border-image: url(/art/panel.png) 6 fill repeat;
   image-rendering: pixelated;
-  background-color: #26454f;
+  background-color: var(--c-ui-raised);
 }
 
 .pixel-focus:focus-visible {
-  outline: 2px solid #3f6f8f;
+  outline: 2px solid var(--c-shutter);
   outline-offset: 2px;
 }
 
@@ -117,7 +117,7 @@ button, canvas { touch-action: none; }
 }
 
 .pixel-text-outline {
-  text-shadow: 1px 1px 0 #17211b, -1px -1px 0 #17211b, 1px -1px 0 #17211b, -1px 1px 0 #17211b, 0 1px 0 #17211b, 1px 0 0 #17211b, 0 -1px 0 #17211b, -1px 0 0 #17211b;
+  text-shadow: 1px 1px 0 var(--c-ui-bg), -1px -1px 0 var(--c-ui-bg), 1px -1px 0 var(--c-ui-bg), -1px 1px 0 var(--c-ui-bg), 0 1px 0 var(--c-ui-bg), 1px 0 0 var(--c-ui-bg), 0 -1px 0 var(--c-ui-bg), -1px 0 0 var(--c-ui-bg);
 }
 
 .pixel-drop-shadow {

@@ -8,6 +8,7 @@ import {
   type TileSpatialIndex,
 } from './spatial';
 import type { TerrainProp } from './tilemap';
+import { THEME } from '../theme/palette';
 
 export type Facing = 'n' | 'e' | 's' | 'w';
 
@@ -548,7 +549,7 @@ function drawSelectionBrackets(
   }
 
   const len = Math.min(8, w / 3, h / 3);
-  ctx.strokeStyle = '#f4c95d';
+  ctx.strokeStyle = THEME.highlight;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(x, y + len);
