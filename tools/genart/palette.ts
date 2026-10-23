@@ -40,6 +40,22 @@ export const PALETTE = {
 
 export type PaletteName = keyof typeof PALETTE;
 
+/**
+ * UI-only tokens. They never appear in generated art (the rasterizer only
+ * accepts `PALETTE`), but the app's CSS and canvas overlays may use them.
+ * `uiText` is an alias of `whitewash`, not a new colour.
+ */
+export const UI_TOKENS = {
+  uiBg: '#17211b',
+  highlight: '#f4c95d',
+  uiText: PALETTE.whitewash,
+} as const;
+
+/** Every colour the app may use: the art palette plus the UI-only tokens. */
+export const THEME = { ...PALETTE, ...UI_TOKENS } as const;
+
+export type ThemeToken = keyof typeof THEME;
+
 export type Rgba = [number, number, number, number];
 
 export function toRgba(name: PaletteName): Rgba {

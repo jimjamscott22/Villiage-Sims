@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildAtlas } from './build';
+import { renderPaletteCss } from './css';
 import { rasterizeGrid } from './grid';
-import { ART_DIR } from './paths';
+import { ART_DIR, THEME_CSS_PATH } from './paths';
 import { decodePng } from './png';
 import { PANEL } from './sprites/ui';
 
@@ -32,5 +33,9 @@ describe('committed art', () => {
     expect(decoded.width).toBe(expected.width);
     expect(decoded.height).toBe(expected.height);
     expect(Array.from(decoded.rgba)).toEqual(Array.from(expected.rgba));
+  });
+
+  it('matches the committed palette CSS', () => {
+    expect(readFileSync(THEME_CSS_PATH, 'utf8')).toBe(renderPaletteCss());
   });
 });

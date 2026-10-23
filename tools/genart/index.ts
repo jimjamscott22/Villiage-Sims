@@ -2,8 +2,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DESKTOP_PNGS, rasterForIconSize, renderAppIcon } from './app-icon';
 import { buildAtlas } from './build';
+import { renderPaletteCss } from './css';
 import { rasterizeGrid } from './grid';
-import { APP_ICON_PATH, ART_DIR, ICONS_DIR } from './paths';
+import { APP_ICON_PATH, ART_DIR, ICONS_DIR, THEME_CSS_PATH } from './paths';
 import { encodePng } from './png';
 import { PANEL } from './sprites/ui';
 
@@ -35,6 +36,9 @@ function main(): void {
     writeFileSync(join(ICONS_DIR, file), encodePng(raster.width, raster.height, raster.rgba));
     console.log(`${file}  ${raster.width}x${raster.height}`);
   }
+
+  writeFileSync(THEME_CSS_PATH, renderPaletteCss());
+  console.log('src/theme/palette.css');
 }
 
 main();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hash01 } from './hash';
-import { PALETTE, assertPaletteHex, toRgba } from './palette';
+import { PALETTE, THEME, UI_TOKENS, assertPaletteHex, toRgba } from './palette';
 
 describe('PALETTE', () => {
   it('holds exactly the 29 specified colors', () => {
@@ -54,5 +54,17 @@ describe('hash01', () => {
       for (let y = 0; y < 100; y += 1) buckets[Math.floor(hash01(x, y, 5) * 4)] += 1;
     }
     for (const count of buckets) expect(count).toBeGreaterThan(1800);
+  });
+});
+
+describe('THEME', () => {
+  it('adds only the UI tokens on top of the art palette', () => {
+    expect(Object.keys(THEME)).toEqual([...Object.keys(PALETTE), ...Object.keys(UI_TOKENS)]);
+    expect(UI_TOKENS.uiText).toBe(PALETTE.whitewash);
+  });
+
+  it('keeps UI-only colours out of the art palette', () => {
+    expect(() => assertPaletteHex(UI_TOKENS.uiBg)).toThrow();
+    expect(() => assertPaletteHex(UI_TOKENS.highlight)).toThrow();
   });
 });
