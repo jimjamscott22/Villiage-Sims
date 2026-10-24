@@ -106,7 +106,8 @@ export type ChronicleBody =
   | { kind: 'buildingComplete'; id: number; building: string }
   | { kind: 'buildingUnlocked'; building: string }
   | { kind: 'harvestReady'; site: number; building: string | null; count: number }
-  | { kind: 'seasonTurned'; season: number; year: number };
+  | { kind: 'seasonTurned'; season: number; year: number }
+  | { kind: 'visitorEvent'; visitor: VisitorKind; name: string; outcome: 'arrived' | 'accepted' | 'declined' | 'expired' };
 
 export interface ChronicleEntry {
   seq: number;
@@ -134,7 +135,23 @@ export interface ChickenView {
 }
 export interface EggBasketView { id: number; shelterId: number; x: number; y: number }
 
+export type VisitorKind = 'merchant' | 'musician' | 'grower';
+export type VisitDecision = 'accept' | 'decline';
+export interface VisitorView {
+  visitId: number;
+  visitor: VisitorKind;
+  name: string;
+  title: string;
+  introduction: string;
+  cost: Record<string, number>;
+  reward: string;
+  remainingMinutes: number;
+  canAccept: boolean;
+  unavailableReason: string | null;
+}
+
 export interface TickSnapshot {
+  visitor?: VisitorView | null;
   chickenShelterId?: number | null;
   chickens?: ChickenView[];
   eggBaskets?: EggBasketView[];

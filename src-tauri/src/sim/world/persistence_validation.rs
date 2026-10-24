@@ -3,6 +3,7 @@ use super::*;
 
 impl super::World {
 pub(crate) fn prepare_after_load(&mut self) -> Result<(), String> {
+        self.visits.validate()?;
         if self.width == 0 || self.height == 0 || self.tile_size == 0 {
             return Err("save has invalid world dimensions".into());
         }

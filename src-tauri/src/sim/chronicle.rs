@@ -43,6 +43,11 @@ pub enum ChronicleBody {
         season: u8,
         year: u32,
     },
+    VisitorEvent {
+        visitor: super::visitors::VisitorKind,
+        name: String,
+        outcome: super::visitors::VisitOutcome,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -162,6 +167,9 @@ impl ChronicleBody {
     /// Convert storage body to JSON wire form with kind discriminator.
     pub fn view(&self) -> ChronicleBodyView {
         match self {
+            ChronicleBody::VisitorEvent { visitor, name, outcome } => ChronicleBodyView::VisitorEvent {
+                visitor: *visitor, name: name.clone(), outcome: *outcome,
+            },
             ChronicleBody::VillagerBorn { id, name } => ChronicleBodyView::VillagerBorn {
                 id: *id,
                 name: name.clone(),
@@ -240,6 +248,11 @@ pub enum ChronicleBodyView {
     SeasonTurned {
         season: u8,
         year: u32,
+    },
+    VisitorEvent {
+        visitor: super::visitors::VisitorKind,
+        name: String,
+        outcome: super::visitors::VisitOutcome,
     },
 }
 

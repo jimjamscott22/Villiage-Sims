@@ -66,6 +66,7 @@ impl LegacyWorld {
             autosave_dir: self.autosave_dir,
             last_autosave_slot: self.last_autosave_slot,
             flock: None,
+            visits: Default::default(),
         }
     }
     #[cfg(test)]

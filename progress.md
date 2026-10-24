@@ -240,6 +240,54 @@ found no actionable issues. See the audit's resolution notes for exact counts an
 Still open: hauling latency (finding 1), disconnected births (2), and water-search cooldown
 persistence (4). No catalog or save-format changes were made.
 
+## Visitors with interesting offers (2026-10-23)
+
+Implemented the approved first release on `feature/visitor-offers`:
+
+- Shared authored content for Rowan (12 food → 8 grain), Lark (6 food → +0.20
+  Social, capped at full), and Mira (Green Thumb resident requiring spare
+  population capacity, a real vacant completed reachable home and a free spawn).
+- Deterministic integer-tick schedule: first arrival after one game hour, a
+  three-hour stay, and six hours between departure and the next arrival.
+  Rotation repeats; a settled Mira does not return. Decline/expiry has no penalty.
+  Rust births reserve one population slot during Mira's visit; existing homes
+  are not evicted. Browser-demo still does not simulate births/deaths.
+- Authoritative transactional decisions recheck resources, visit identity,
+  housing, and arrival access. Duplicate/stale responses cannot double-spend or
+  spawn. Global snapshots expose current terms and unmet requirements.
+- Accessible pixel offer panel, arrival toast, exact terms, live simulation-time
+  countdown, busy/error handling, keyboard controls, and compact-width layout.
+- Visitor arrival/outcome Chronicle entries persist. Desktop save version **8**
+  freezes/migrates **7** and retains **3–6** migrations. Demo save version **5**
+  accepts **1–4** and now preserves its Chronicle. Old saves start visits fresh.
+
+Verification: **330 frontend tests**, production build, and **201 actual Rust
+simulation/persistence tests** passed. Rust check and Clippy with baseline lint
+categories allowed passed through a temporary harness importing the repository's
+actual `sim`, `snapshot`, and `persist` modules and pinning direct dependencies to
+`Cargo.lock`. Native `cargo check` is blocked by unavailable GLib/GTK development
+libraries; desktop IPC/webview interaction remains unverified locally. Strict
+Clippy on Rust 1.99.1 reports the same **14** pre-existing `manual_is_multiple_of`
+and `collapsible_if` warnings on both the immutable baseline and feature tree;
+with only those categories allowed, warnings remain denied and the check passes.
+
+Independent whole-branch review found one debug-clock fractional-minute issue.
+Matching Rust/demo regressions first failed, then passed after both runtimes
+used fractional time rounded to the nearest tick. Midnight departures use the
+new date. The existing floating-point calendar itself was not redesigned.
+
+Playwright/Chromium checked `http://127.0.0.1:5173/?test=1` at **1440×1000** and
+**390×844**: first arrival, exact merchant debit/reward by keyboard, offer save/load,
+Pause/3×, decline, musician Social reward, unmet housing, constructing three huts,
+recruitment/home assignment, settled-resident and cooldown save/load, unanswered
+expiry, and fractional debug-day advancement. The visitor panel fits the compact
+viewport; the older header/resource row retains its existing compact clipping.
+Screenshots were inspected outside the repository. No application runtime errors;
+the sole console error was the existing missing `/favicon.ico` (404). Browser
+skill was read, but no callable Browser runtime was available, so the approved
+browser checks used installed Chromium and temporary Playwright tooling. No new
+project dependencies or art assets.
+
 ## Next up
 
 Milestone 11 is implemented. The next engineering priority is running the deferred full checks and

@@ -7,6 +7,11 @@ use crate::sim::chronicle::ChronicleEntryView;
 use crate::snapshot::{TerrainSnapshot, VillagerDetail, WorldInit};
 
 pub enum SimCommand {
+    RespondToVisitor {
+        visit_id: u32,
+        decision: super::visitors::VisitDecision,
+        reply: oneshot::Sender<Result<(), String>>,
+    },
     ClickChicken {
         shelter_id: u32,
         id: u32,
