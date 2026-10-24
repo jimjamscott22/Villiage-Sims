@@ -288,6 +288,15 @@ skill was read, but no callable Browser runtime was available, so the approved
 browser checks used installed Chromium and temporary Playwright tooling. No new
 project dependencies or art assets.
 
+## PR #64 visitor palette compatibility (2026-10-23)
+
+Updated the style-lock branch with current `main`, including visitor offers, and
+replaced the visitor introduction's off-palette `#e2ddcd` with `--c-ui-text`.
+The existing palette guard reproduced the integration failure before the change.
+Afterward, all **378 frontend tests** (37 files) and `npm run build` passed using
+a clean `npm ci` install. No new browser or native Tauri checks were run for this
+single colour-token correction; Rust logic is unchanged by the fix.
+
 ## Next up
 
 Milestone 11 is implemented. The next engineering priority is running the deferred full checks and

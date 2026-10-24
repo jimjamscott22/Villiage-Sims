@@ -60,10 +60,10 @@ export function ObjectivesPanel({ catalog, completed }: ObjectivesPanelProps) {
         data-testid="objectives-menu"
         onClick={() => setOpen((value) => !value)}
         title={current?.title ?? 'Objectives'}
-        className="pixel-btn pixel-focus flex items-center gap-2 px-2 py-1 pixel-drop-shadow"
+        className="pixel-btn pixel-focus flex items-center gap-2 px-1.5 py-0.5 pixel-drop-shadow"
       >
         <PixelText text="OBJECTIVES" />
-        <span className="text-[11px] text-[#f7f4e9] pixel-text-outline tracking-wide">
+        <span className="text-[11px] text-[var(--c-ui-text)] pixel-text-outline tracking-wide">
           {completed.length}/{objectives.length}
         </span>
       </button>
@@ -75,18 +75,18 @@ export function ObjectivesPanel({ catalog, completed }: ObjectivesPanelProps) {
           className="pixel-panel absolute right-0 top-full z-30 mt-1 w-72 p-3 text-xs"
         >
           {objectives.length === 0 && (
-            <p className="text-[#d4cfc0]">No objectives available.</p>
+            <p className="text-[var(--c-stone-pale)]">No objectives available.</p>
           )}
           <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto">
             {active.map((obj) => (
               <li key={obj.id} className="flex flex-col gap-0.5">
-                <div className="font-medium text-[#f7f4e9] text-sm pixel-text-outline tracking-wide">{obj.title}</div>
-                <div className="text-[11px] leading-snug text-[#d4cfc0] pixel-text-outline">{obj.description}</div>
+                <div className="font-medium text-[var(--c-ui-text)] text-sm pixel-text-outline tracking-wide">{obj.title}</div>
+                <div className="text-[11px] leading-snug text-[var(--c-stone-pale)] pixel-text-outline">{obj.description}</div>
                 <div className="text-[10px] text-amber-200 pixel-text-outline">{conditionText(obj)}</div>
               </li>
             ))}
             {done.length > 0 && (
-              <li className="mt-1 border-t border-white/10 pt-2 text-[10px] text-[#c5c0a8]">
+              <li className="mt-1 border-t border-white/10 pt-2 text-[10px] text-[var(--c-stone-mid)]">
                 Completed: {done.map((obj) => obj.title).join(', ')}
               </li>
             )}

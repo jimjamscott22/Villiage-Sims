@@ -38,7 +38,7 @@ export function VisitorPanel({ visitor, onRespond, disabled = false }: VisitorPa
         <h2 className="font-bold text-amber-200">{visitor.name} · {visitor.title}</h2>
         <span className="text-amber-100/80">Leaves in {remaining} of game time</span>
       </div>
-      <p className="my-1 text-[#e2ddcd]">{visitor.introduction}</p>
+      <p className="my-1 text-[var(--c-ui-text)]">{visitor.introduction}</p>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0 flex-1 basis-64">
           <p><span className="text-amber-200">Give:</span> {cost}</p>

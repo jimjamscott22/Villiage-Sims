@@ -52,7 +52,7 @@ function ToastItem({ toast, onDismiss, onFocus }: ToastItemProps) {
   }, [toast.id, onDismiss]);
 
   const clickable = toast.tile != null;
-  const style = KIND_STYLES[toast.kind] ?? 'border-white/20 bg-[#1a1510]/95 text-white/90';
+  const style = KIND_STYLES[toast.kind] ?? 'border-white/20 bg-[var(--c-ui-bg)]/95 text-white/90';
 
   return (
     <button

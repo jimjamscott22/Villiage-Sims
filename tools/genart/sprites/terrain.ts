@@ -29,9 +29,9 @@ interface Material {
 export const MATERIALS: Record<BaseTerrain, Material> = {
   deepWater: { base: 'seaDeep', shade: 'seaDeepest', hilite: 'seaMid', speckle: 0.1, salt: 11 },
   shallowWater: { base: 'seaShallow', shade: 'seaMid', hilite: 'foam', speckle: 0.07, salt: 23 },
-  sand: { base: 'sandLight', shade: 'sandMid', hilite: 'sandPale', speckle: 0.14, salt: 37 },
+  sand: { base: 'sandLight', shade: 'sandMid', hilite: 'whitewash', speckle: 0.14, salt: 37 },
   grass: { base: 'vegLight', shade: 'vegMid', hilite: 'vegPale', speckle: 0.18, salt: 53 },
-  rock: { base: 'stoneLight', shade: 'stoneShadow', hilite: 'stonePale', speckle: 0.16, salt: 71 },
+  rock: { base: 'sandMid', shade: 'stoneShadow', hilite: 'stonePale', speckle: 0.16, salt: 71 },
 };
 
 /** A flat material field, dithered so the tilemap does not read as flat color. */

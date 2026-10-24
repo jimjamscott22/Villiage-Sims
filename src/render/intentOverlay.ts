@@ -1,4 +1,7 @@
 import type { BuildingView, VillagerDetail, VillagerView } from '../state/types';
+import { THEME, withAlpha } from '../theme/palette';
+import type { Atlas } from './atlas';
+import { bitmapTextHeight, bitmapTextWidth, drawBitmapText } from './bitmapText';
 
 /** AgentState::MovingTo */
 export const STATE_MOVING = 1;
@@ -146,9 +149,18 @@ export function planIntentOverlay(input: PlanIntentInput): IntentPlan | null {
   return null;
 }
 
-const INTENT_COLOR = '#f4c95d';
-const INTENT_MUTED = 'rgba(244, 201, 93, 0.85)';
-const LABEL_FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
+const INTENT_COLOR = THEME.highlight;
+const INTENT_MUTED = withAlpha(THEME.highlight, 0.85);
+const LABEL_PAD_X = 4;
+const LABEL_PAD_Y = 2;
+
+/** Label box size from bitmap glyph metrics (no `measureText`). */
+export function intentLabelBox(label: string): { width: number; height: number } {
+  return {
+    width: bitmapTextWidth(label) + LABEL_PAD_X * 2,
+    height: bitmapTextHeight() + LABEL_PAD_Y * 2,
+  };
+}
 
 export interface IntentCamera {
   worldToScreen(wx: number, wy: number): [number, number];
@@ -164,6 +176,7 @@ export function drawIntentOverlay(
   tileSize: number,
   camera: IntentCamera,
   dpr: number,
+  atlas: Atlas | null,
 ): void {
   const x0 = plan.tileX * tileSize;
   const y0 = plan.tileY * tileSize;
@@ -214,22 +227,18 @@ export function drawIntentOverlay(
   ctx.lineTo(right - inset, bottom - inset - tick);
   ctx.stroke();
 
-  ctx.font = LABEL_FONT;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
   const labelY = top - 4;
-  const metrics = ctx.measureText(plan.label);
-  const padX = 4;
-  const padY = 2;
-  const boxW = metrics.width + padX * 2;
-  const boxH = 14;
-  ctx.fillStyle = 'rgba(58, 42, 12, 0.92)';
-  ctx.fillRect(toSx - boxW / 2, labelY - boxH, boxW, boxH);
+  const { width: boxW, height: boxH } = intentLabelBox(plan.label);
+  const boxLeft = Math.round(toSx - boxW / 2);
+  const boxTop = Math.round(labelY - boxH);
+  ctx.fillStyle = withAlpha(THEME.ink, 0.92);
+  ctx.fillRect(boxLeft, boxTop, boxW, boxH);
   ctx.strokeStyle = INTENT_COLOR;
   ctx.lineWidth = 1;
-  ctx.strokeRect(toSx - boxW / 2 + 0.5, labelY - boxH + 0.5, boxW - 1, boxH - 1);
-  ctx.fillStyle = '#fff6d5';
-  ctx.fillText(plan.label, toSx, labelY - padY);
+  ctx.strokeRect(boxLeft + 0.5, boxTop + 0.5, boxW - 1, boxH - 1);
+  drawBitmapText(ctx, atlas, plan.label, boxLeft + LABEL_PAD_X, boxTop + LABEL_PAD_Y, {
+    color: THEME.uiText,
+  });
 
   ctx.restore();
 }

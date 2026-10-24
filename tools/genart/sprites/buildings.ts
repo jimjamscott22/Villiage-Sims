@@ -1,5 +1,5 @@
 import { PALETTE } from '../palette';
-import type { SpriteGrid } from '../grid';
+import { outlineGrid, paintGrid, type SpriteGrid } from '../grid';
 
 const P = PALETTE;
 
@@ -28,7 +28,7 @@ export const HUT: SpriteGrid = grid(16, 32, {
   s: P.shutter,
   i: P.ink,
   c: P.sandShadow,
-  g: P.stoneLight,
+  g: P.sandMid,
 }, (set) => {
   // Roof triangle in headroom (y 2..15)
   for (let y = 2; y <= 15; y += 1) {
@@ -266,7 +266,7 @@ export const BAKERY: SpriteGrid = bakeryFrame(0);
 /** 1×1 well — stone drum, timber frame, shingled cap. 16×32, anchorY 16. */
 export const WELL: SpriteGrid = grid(16, 32, {
   m: P.stoneMid,
-  l: P.stoneLight,
+  l: P.sandMid,
   p: P.stonePale,
   s: P.stoneShadow,
   t: P.terraMid,
@@ -310,7 +310,7 @@ const TIMBER: Pal = {
   t: P.terraMid,
   d: P.terraDark,
   m: P.stoneMid,
-  g: P.stoneLight,
+  g: P.sandMid,
   p: P.stonePale,
   i: P.ink,
   c: P.sandShadow,
@@ -320,24 +320,32 @@ const TIMBER: Pal = {
  * 1×1 fence — two rails and a pair of posts. 16×24, anchorY 8.
  * The rails run the full sprite width so abutting fence tiles read as one run.
  */
-export const FENCE: SpriteGrid = grid(16, 24, TIMBER, (set) => {
-  for (const railY of [14, 19]) {
-    for (let x = 0; x <= 15; x += 1) {
-      set(x, railY, 'd');
-      set(x, railY + 1, 't');
-    }
-  }
-  for (const postX of [2, 12]) {
-    for (let y = 11; y <= 21; y += 1) {
-      set(postX, y, 'd');
-      set(postX + 1, y, 'm');
-    }
-  }
-  for (let x = 1; x <= 14; x += 1) set(x, 22, 'c');
-});
+export const FENCE: SpriteGrid = paintGrid(
+  outlineGrid(
+    grid(16, 24, TIMBER, (set) => {
+      for (const railY of [14, 19]) {
+        for (let x = 0; x <= 15; x += 1) {
+          set(x, railY, 'd');
+          set(x, railY + 1, 't');
+        }
+      }
+      for (const postX of [2, 12]) {
+        for (let y = 11; y <= 21; y += 1) {
+          set(postX, y, 'd');
+          set(postX + 1, y, 'm');
+        }
+      }
+    }),
+    'i',
+  ),
+  // Contact shadow, painted after the outline so it stays unoutlined.
+  (set) => {
+    for (let x = 1; x <= 14; x += 1) set(x, 22, 'c');
+  },
+);
 
 /** 1×1 gate — posts, lintel, and a braced swing panel. 16×24, anchorY 8. */
-export const GATE: SpriteGrid = grid(16, 24, TIMBER, (set) => {
+export const GATE: SpriteGrid = paintGrid(outlineGrid(grid(16, 24, TIMBER, (set) => {
   // Uprights and the lintel spanning them.
   for (const postX of [1, 13]) {
     for (let y = 6; y <= 21; y += 1) {
@@ -359,11 +367,13 @@ export const GATE: SpriteGrid = grid(16, 24, TIMBER, (set) => {
     set(4 + step, 20 - step, 'd');
   }
   set(10, 15, 'i');
+}), 'i'), (set) => {
+  // Contact shadow, painted after the outline so it stays unoutlined.
   for (let x = 0; x <= 15; x += 1) set(x, 22, 'c');
 });
 
 /** 1×1 signpost — a lettered board on a leaning post. 16×24, anchorY 8. */
-export const SIGNPOST: SpriteGrid = grid(16, 24, TIMBER, (set) => {
+export const SIGNPOST: SpriteGrid = paintGrid(outlineGrid(grid(16, 24, TIMBER, (set) => {
   for (let y = 12; y <= 21; y += 1) {
     set(7, y, 'd');
     set(8, y, 'm');
@@ -377,6 +387,8 @@ export const SIGNPOST: SpriteGrid = grid(16, 24, TIMBER, (set) => {
   // Two lines of illegible lettering — reads as text at 2× without spelling anything.
   for (let x = 4; x <= 11; x += 1) set(x, 9, 'i');
   for (let x = 4; x <= 8; x += 1) set(x, 11, 'i');
+}), 'i'), (set) => {
+  // Contact shadow, painted after the outline so it stays unoutlined.
   for (let x = 5; x <= 10; x += 1) set(x, 22, 'c');
 });
 

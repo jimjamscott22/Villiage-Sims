@@ -17,7 +17,7 @@ export function SegmentedBar({ label, value, segments = 10 }: SegmentedBarProps)
 
   return (
     <div className="flex flex-col gap-0.5" style={notchVars}>
-      <div className="flex justify-between text-[11px] text-[#f7f4e9] pixel-text-outline mb-0.5 tracking-wide">
+      <div className="flex justify-between text-[11px] text-[var(--c-ui-text)] pixel-text-outline mb-0.5 tracking-wide">
         <span>{label}</span>
         <span className="tabular-nums">{pct}%</span>
       </div>

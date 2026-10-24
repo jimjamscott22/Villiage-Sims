@@ -5,6 +5,7 @@ import type { BuildingDef, Catalog, TerrainSnapshot, TickSnapshot, VillagerDetai
 import { Camera } from './camera';
 import type { Atlas } from './atlas';
 import { ART_SCALE, drawCell, loadAtlas } from './atlas';
+import { bitmapTextHeight, bitmapTextWidth, drawBitmapText } from './bitmapText';
 import { drawBuildings, drawCrops, drawVillagers } from './drawEntities';
 import { drawGhost } from './drawGhost';
 import { drawTerrain } from './drawTerrain';
@@ -23,6 +24,7 @@ import {
 import type { ShorelineTile, TerrainProp } from './tilemap';
 import { bakeTerrain, shorelineTiles, terrainProps } from './tilemap';
 import { createViewportSync } from './viewportSync';
+import { THEME, withAlpha } from '../theme/palette';
 
 const TICK_MS = 50;
 const FOAM_TICKS_PER_FRAME = 8;
@@ -31,6 +33,10 @@ const EDGE_SCROLL_MARGIN = 24;
 const EDGE_SCROLL_SPEED = 6;
 const CLICK_DRAG_THRESHOLD = 6;
 const CAMERA_OVERSCROLL_PX = 120;
+/** Accumulated wheel delta (CSS px) that moves one zoom step. */
+const WHEEL_STEP_PX = 50;
+/** Pixels per line for wheel events reported in lines (deltaMode 1). */
+const WHEEL_LINE_PX = 40;
 
 interface CanvasProps {
   catalog: Catalog | null;
@@ -455,7 +461,7 @@ export function Canvas({
           );
           drawBuildings(ctx, rendered.buildings, terrain.tileSize, footprints);
           drawCrops(ctx, rendered.crops ?? [], terrain.tileSize);
-          drawVillagers(ctx, rendered.villagers, camera.zoom, selectedVillagerIdRef.current);
+          drawVillagers(ctx, rendered.villagers, camera.zoom, selectedVillagerIdRef.current, atlas);
           if (selectedBuildingIdRef.current != null) {
             const selected = rendered.buildings.find(
               (building) => building.id === selectedBuildingIdRef.current,
@@ -464,7 +470,7 @@ export function Canvas({
               const [fw, fh] = footprints[selected.kind] ?? [1, 1];
               const width = (selected.rot % 2 === 0 ? fw : fh) * terrain.tileSize;
               const height = (selected.rot % 2 === 0 ? fh : fw) * terrain.tileSize;
-              ctx.strokeStyle = '#f4c95d';
+              ctx.strokeStyle = THEME.highlight;
               ctx.lineWidth = 2 / Math.max(camera.zoom, 0.01);
               ctx.strokeRect(
                 selected.x * terrain.tileSize,
@@ -487,7 +493,7 @@ export function Canvas({
           tileSize: terrain.tileSize,
         });
         if (intent) {
-          drawIntentOverlay(ctx, intent, terrain.tileSize, camera, dpr);
+          drawIntentOverlay(ctx, intent, terrain.tileSize, camera, dpr, atlas);
         }
         if (showNameTagsRef.current) {
           drawNameTags(
@@ -501,6 +507,7 @@ export function Canvas({
               selectedVillagerIdRef.current,
             ),
             dpr,
+            atlas,
           );
         }
       }
@@ -536,15 +543,13 @@ export function Canvas({
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.imageSmoothingEnabled = false;
         const pad = 8;
-        const lineH = 14;
-        const boxW = 220;
-        const boxH = pad * 2 + lines.length * lineH;
-        ctx.fillStyle = 'rgba(12, 18, 12, 0.72)';
+        const lineH = bitmapTextHeight() + 4;
+        const boxW = pad * 2 + Math.max(...lines.map((line) => bitmapTextWidth(line)));
+        const boxH = pad * 2 + lines.length * lineH - 4;
+        ctx.fillStyle = withAlpha(THEME.uiBg, 0.72);
         ctx.fillRect(8, 8, boxW, boxH);
-        ctx.fillStyle = '#b6f28a';
-        ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
         for (let i = 0; i < lines.length; i += 1) {
-          ctx.fillText(lines[i], 8 + pad, 8 + pad + (i + 1) * lineH - 3);
+          drawBitmapText(ctx, atlas, lines[i], 8 + pad, 8 + pad + i * lineH, { color: THEME.vegPale });
         }
       }
     };
@@ -836,13 +841,22 @@ export function Canvas({
       clearHover();
     };
 
+    // Mouse wheels send ~100px per notch; trackpads send many small deltas.
+    // Accumulate until one step's worth so a trackpad doesn't race through
+    // every zoom level in a single gesture.
+    let wheelAccum = 0;
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       const bounds = canvas.getBoundingClientRect();
       const sx = event.clientX - bounds.left;
       const sy = event.clientY - bounds.top;
-      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
-      camera.zoomAt(sx, sy, camera.zoom * factor);
+      const delta = event.deltaMode === 0 ? event.deltaY : event.deltaY * WHEEL_LINE_PX;
+      if (Math.sign(delta) !== Math.sign(wheelAccum)) wheelAccum = 0;
+      wheelAccum += delta;
+      if (Math.abs(wheelAccum) < WHEEL_STEP_PX) return;
+      const direction = wheelAccum < 0 ? 1 : -1;
+      wheelAccum = 0;
+      camera.stepZoom(sx, sy, direction);
       camera.clampToWorld(worldWidth, worldHeight, viewWidth, viewHeight, CAMERA_OVERSCROLL_PX);
       scheduleViewportSync();
       void refreshGhost();
@@ -899,7 +913,7 @@ export function Canvas({
   }, []);
 
   return (
-    <section ref={viewportRef} className="relative min-h-0 flex-1 overflow-hidden bg-[#0b151c]">
+    <section ref={viewportRef} className="relative min-h-0 flex-1 overflow-hidden bg-[var(--c-ui-bg)]">
       <canvas
         ref={canvasRef}
         aria-label="Village simulation"
@@ -907,7 +921,7 @@ export function Canvas({
           selectedKind || selectedCrop ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'
         }`}
       />
-      <button type="button" className="pixel-btn pixel-focus absolute bottom-3 left-3 z-10 bg-black/60 px-2 py-1 text-xs text-white/80"
+      <button type="button" className="pixel-btn pixel-focus absolute bottom-3 left-3 z-10 bg-black/60 px-1.5 py-0.5 text-xs text-white/80"
         aria-pressed={soundEnabled}
         onClick={() => { void audioRef.current?.toggle().then(setSoundEnabled).catch(cause => setError(`Could not enable sound: ${String(cause)}`)); }}>
         Sound {soundEnabled ? 'on' : 'off'}
@@ -926,7 +940,7 @@ export function Canvas({
             })`,
           }}
         >
-          <div className="font-medium text-[#f7f4e9]">{hovered.title}</div>
+          <div className="font-medium text-[var(--c-ui-text)]">{hovered.title}</div>
           <div className="mt-0.5 text-[11px] text-white/60">{hovered.detail}</div>
         </div>
       )}

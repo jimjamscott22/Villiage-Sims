@@ -31,7 +31,7 @@ export const PANEL: SpriteGrid = grid(
   {
     b: P.uiPanel,
     r: P.uiRaised,
-    s: P.uiRecess,
+    s: P.uiPanel,
     i: P.ink,
     h: P.shutter,
   },
@@ -178,7 +178,7 @@ export const ICON_WOOD = icon16({ m: P.stoneMid, l: P.sandMid, i: P.ink }, (set)
   }
 });
 
-export const ICON_STONE = icon16( { m: P.stoneMid, l: P.stoneLight, d: P.stoneShadow, i: P.ink }, (set) => {
+export const ICON_STONE = icon16( { m: P.stoneMid, l: P.sandMid, d: P.stoneShadow, i: P.ink }, (set) => {
   for (let y = 5; y <= 12; y += 1) {
     for (let x = 4; x <= 11; x += 1) {
       const edge = y === 5 || y === 12 || x === 4 || x === 11;
@@ -229,7 +229,7 @@ export const ICON_FOOD = icon16( { c: P.terraLight, d: P.terraDark, i: P.ink, w:
 });
 
 /** A round coin, not a framed square — reads as currency at a glance. */
-export const ICON_GOLD = icon16({ g: P.wheat, l: P.sandPale, i: P.ink }, (set) => {
+export const ICON_GOLD = icon16({ g: P.wheat, l: P.whitewash, i: P.ink }, (set) => {
   const cx = 8;
   const cy = 8;
   const r = 5;
@@ -379,7 +379,7 @@ export const BAR_NOTCH = grid(4, 6, { f: P.vegLight, i: P.ink, r: P.vegMid }, (s
   set(2, 0, 'r');
 });
 
-export const BAR_NOTCH_EMPTY = grid(4, 6, { e: P.uiRecess, i: P.ink }, (set) => {
+export const BAR_NOTCH_EMPTY = grid(4, 6, { e: P.uiPanel, i: P.ink }, (set) => {
   for (let y = 1; y <= 4; y += 1) {
     for (let x = 1; x <= 2; x += 1) set(x, y, 'e');
   }

@@ -82,3 +82,38 @@ export function remapColor(source: Raster, fromHex: string, toHex: string): Rast
   }
   return out;
 }
+
+type GridPaint = (set: (x: number, y: number, key: string) => void) => void;
+
+/** Paint more pixels onto a copy of `def`. Keys must already be in its palette. */
+export function paintGrid(def: SpriteGrid, paint: GridPaint): SpriteGrid {
+  const [width, height] = def.size;
+  const cells = def.rows.map((row) => row.split(''));
+  paint((x, y, key) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    if (!(key in def.palette)) throw new Error(`Unknown palette key '${key}'`);
+    cells[y][x] = key;
+  });
+  return { ...def, rows: cells.map((row) => row.join('')) };
+}
+
+/**
+ * Add a 1px outline in `key` on every transparent pixel 4-adjacent to the
+ * silhouette. The cell does not grow, so a silhouette touching the cell edge
+ * stays unoutlined on that side. Paint contact shadows after this so they are
+ * not outlined.
+ */
+export function outlineGrid(def: SpriteGrid, key: string): SpriteGrid {
+  if (def.palette[key] == null) throw new Error(`Outline key '${key}' must be an opaque palette colour`);
+  const [width, height] = def.size;
+  const opaque = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x < width && y < height && def.palette[def.rows[y][x]] != null;
+  return paintGrid(def, (set) => {
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (opaque(x, y)) continue;
+        if (opaque(x - 1, y) || opaque(x + 1, y) || opaque(x, y - 1) || opaque(x, y + 1)) set(x, y, key);
+      }
+    }
+  });
+}

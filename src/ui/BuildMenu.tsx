@@ -83,7 +83,7 @@ export function BuildMenu({
                   <button
                     type="button"
                     onClick={() => onSelectCrop(nextSelection(selectedCrop, crop.id))}
-                    className={`pixel-btn pixel-focus w-full px-2 py-2 text-left transition ${
+                    className={`pixel-btn pixel-focus w-full px-1.5 py-1.5 text-left transition ${
                       active ? 'pixel-btn-active' : ''
                     }`}
                   >
@@ -119,7 +119,7 @@ export function BuildMenu({
                     type="button"
                     disabled={locked}
                     onClick={() => onSelectKind(nextSelection(selectedKind, building.id))}
-                    className={`pixel-btn pixel-focus relative w-full px-2 py-2 text-left transition ${
+                    className={`pixel-btn pixel-focus relative w-full px-1.5 py-1.5 text-left transition ${
                       locked
                         ? 'cursor-not-allowed opacity-60'
                         : active
@@ -162,8 +162,8 @@ export function BuildMenu({
             })}
           </ul>
           <p className="mt-3 text-[11px] leading-relaxed text-white/70">
-            Select a building or crop, then click the map. <kbd className="text-[#f7f4e9]">R</kbd> rotates,{' '}
-            <kbd className="text-[#f7f4e9]">Esc</kbd> cancels. Middle-drag pans. Right-click to move.
+            Select a building or crop, then click the map. <kbd className="text-[var(--c-ui-text)]">R</kbd> rotates,{' '}
+            <kbd className="text-[var(--c-ui-text)]">Esc</kbd> cancels. Middle-drag pans. Right-click to move.
           </p>
         </div>
       </div>
@@ -179,7 +179,7 @@ export function BuildMenu({
               disabled={homeBusy}
               onClick={onAssignHome}
               title="Assign the selected building as this villager's home"
-              className="pixel-btn pixel-focus w-full bg-emerald-950/60 px-2 py-2 text-xs text-emerald-100 disabled:cursor-wait disabled:opacity-40"
+              className="pixel-btn pixel-focus w-full bg-emerald-950/60 px-1.5 py-1.5 text-xs text-emerald-100 disabled:cursor-wait disabled:opacity-40"
             >
               Assign home ({villagerDetail?.name} → #{selectedBuildingId})
             </button>
@@ -190,7 +190,7 @@ export function BuildMenu({
           type="button"
           disabled={selectedBuildingId == null}
           onClick={onDemolish}
-          className="pixel-btn pixel-focus w-full bg-red-950/60 px-2 py-2 text-xs text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+          className="pixel-btn pixel-focus w-full bg-red-950/60 px-1.5 py-1.5 text-xs text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Demolish selected
         </button>

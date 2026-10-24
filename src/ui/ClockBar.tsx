@@ -30,7 +30,7 @@ export function ClockBar({ clock, onSetSpeed, winterWarning }: ClockBarProps) {
 
   return (
     <div className="flex items-center gap-3 text-xs text-white/80">
-      <div className="pixel-chip flex items-center gap-2 px-2 py-1">
+      <div className="pixel-chip flex items-center gap-2 px-1.5 py-0.5">
         <span className="pixel-icon pixel-drop-shadow" style={uiIconStyle(seasonIcon)} title={season} />
         <span className="pixel-drop-shadow flex items-center"><PixelText text={clockText} /></span>
         <span title="Weather" className="pixel-drop-shadow flex items-center">
@@ -54,7 +54,7 @@ export function ClockBar({ clock, onSetSpeed, winterWarning }: ClockBarProps) {
               type="button"
               title={entry.label}
               onClick={() => onSetSpeed(entry.value)}
-              className={`pixel-btn pixel-focus flex items-center justify-center p-0.5 transition ${
+              className={`pixel-btn pixel-focus flex items-center justify-center p-0 transition ${
                 active ? 'pixel-btn-active' : ''
               }`}
             >

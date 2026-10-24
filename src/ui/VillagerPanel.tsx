@@ -49,7 +49,7 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
       ) : (
         <div className="mt-2 flex flex-col gap-2">
           <div>
-            <div className="font-medium text-[#f7f4e9] text-sm pixel-text-outline tracking-wide">{detail.name}</div>
+            <div className="font-medium text-[var(--c-ui-text)] text-sm pixel-text-outline tracking-wide">{detail.name}</div>
             <div className="text-[11px] text-emerald-200/90 pixel-text-outline">{detail.stateLabel}</div>
             {detail.thought && (
               <div className="mt-1 text-[11px] text-amber-300 pixel-text-outline italic">"{detail.thought}"</div>
@@ -75,10 +75,10 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
               ))}
             </div>
           )}
-          <p className="text-[11px] text-[#f7f4e9] pixel-text-outline tracking-wide">
+          <p className="text-[11px] text-[var(--c-ui-text)] pixel-text-outline tracking-wide">
             Job: {formatWork(detail)}
           </p>
-          <div className="text-[11px] text-[#f7f4e9] pixel-text-outline tracking-wide">
+          <div className="text-[11px] text-[var(--c-ui-text)] pixel-text-outline tracking-wide">
             <span>Home: {formatHome(detail)}</span>
             {detail.home != null && (
               <button
@@ -86,7 +86,7 @@ export function VillagerPanel({ detail }: VillagerPanelProps) {
                 disabled={homeBusy}
                 onClick={onClearHome}
                 title="Clear this villager's home assignment"
-                className="pixel-btn pixel-focus ml-2 px-1.5 py-0.5 disabled:cursor-wait disabled:opacity-40"
+                className="pixel-btn pixel-focus ml-2 px-1 py-0 disabled:cursor-wait disabled:opacity-40"
               >
                 Clear
               </button>

@@ -23,6 +23,7 @@ import { ObjectivesPanel } from './ui/ObjectivesPanel';
 import { ToastStack, type Toast } from './ui/ToastStack';
 import { VisitorPanel } from './ui/VisitorPanel';
 import { VillagerRoster } from './ui/VillagerRoster';
+import { THEME } from './theme/palette';
 
 const DETAIL_POLL_MS = 250;
 const ROSTER_POLL_MS = 500;
@@ -185,12 +186,12 @@ export default function App() {
     const previous = lastResourcesRef.current;
     if (previous) {
       const deltas = [
-        { key: 'wood', label: 'wood', value: snapshot.resources.wood - previous.wood, color: '#d4a85a' },
-        { key: 'stone', label: 'stone', value: snapshot.resources.stone - previous.stone, color: '#a8b0b5' },
-        { key: 'grain', label: 'grain', value: snapshot.resources.grain - previous.grain, color: '#e6c84a' },
-        { key: 'flour', label: 'flour', value: snapshot.resources.flour - previous.flour, color: '#f4e8d0' },
-        { key: 'food', label: 'food', value: snapshot.resources.food - previous.food, color: '#b6f28a' },
-        { key: 'gold', label: 'gold', value: snapshot.resources.gold - previous.gold, color: '#ffd700' },
+        { key: 'wood', label: 'wood', value: snapshot.resources.wood - previous.wood, color: THEME.wheat },
+        { key: 'stone', label: 'stone', value: snapshot.resources.stone - previous.stone, color: THEME.stonePale },
+        { key: 'grain', label: 'grain', value: snapshot.resources.grain - previous.grain, color: THEME.highlight },
+        { key: 'flour', label: 'flour', value: snapshot.resources.flour - previous.flour, color: THEME.uiText },
+        { key: 'food', label: 'food', value: snapshot.resources.food - previous.food, color: THEME.vegPale },
+        { key: 'gold', label: 'gold', value: snapshot.resources.gold - previous.gold, color: THEME.highlight },
       ] as const;
       for (const delta of deltas) {
         if (delta.value > 0) {
@@ -252,9 +253,9 @@ export default function App() {
 
             for (const entry of newEntries) {
               if (entry.body.kind === 'buildingComplete') {
-                pushFloater('Building complete!', '#f4c95d');
+                pushFloater('Building complete!', THEME.highlight);
               } else if (entry.body.kind === 'harvestReady') {
-                pushFloater(`${entry.body.count} crop${entry.body.count === 1 ? '' : 's'} ready`, '#b6f28a');
+                pushFloater(`${entry.body.count} crop${entry.body.count === 1 ? '' : 's'} ready`, THEME.vegPale);
               }
             }
           }
@@ -344,7 +345,7 @@ export default function App() {
   };
 
   return (
-    <main className="flex h-full flex-col bg-[#17211b] text-[#f7f4e9]">
+    <main className="flex h-full flex-col bg-[var(--c-ui-bg)] text-[var(--c-ui-text)]">
       <header className="pixel-panel relative z-20 grid h-12 shrink-0 grid-cols-[auto_1fr_auto] items-center gap-3 px-4">
         <h1 className="text-base border-r border-white/10 pr-4">
           <PixelText text="VILLAGESIM" />
@@ -364,7 +365,7 @@ export default function App() {
             aria-pressed={rosterOpen}
             title="Villager roster (V)"
             onClick={() => setRosterOpen((open) => !open)}
-            className={`pixel-btn pixel-focus px-2 py-1 ${rosterOpen ? 'pixel-btn-active' : ''}`}
+            className={`pixel-btn pixel-focus px-1.5 py-0.5 ${rosterOpen ? 'pixel-btn-active' : ''}`}
           >
             <PixelText text="SIMS" />
           </button>
@@ -374,7 +375,7 @@ export default function App() {
             aria-pressed={showNameTags}
             title="Villager name tags (N)"
             onClick={() => setShowNameTags((show) => !show)}
-            className={`pixel-btn pixel-focus px-2 py-1 ${showNameTags ? 'pixel-btn-active' : ''}`}
+            className={`pixel-btn pixel-focus px-1.5 py-0.5 ${showNameTags ? 'pixel-btn-active' : ''}`}
           >
             <PixelText text="TAGS" />
           </button>
@@ -386,7 +387,7 @@ export default function App() {
             onClick={() => {
               void onSave();
             }}
-            className="pixel-btn pixel-focus px-2 py-1 disabled:cursor-wait disabled:opacity-40"
+            className="pixel-btn pixel-focus px-1.5 py-0.5 disabled:cursor-wait disabled:opacity-40"
           >
             <PixelText text="SAVE" />
           </button>
@@ -398,7 +399,7 @@ export default function App() {
             onClick={() => {
               void onLoad();
             }}
-            className="pixel-btn pixel-focus px-2 py-1 disabled:cursor-wait disabled:opacity-40"
+            className="pixel-btn pixel-focus px-1.5 py-0.5 disabled:cursor-wait disabled:opacity-40"
           >
             <PixelText text="LOAD" />
           </button>

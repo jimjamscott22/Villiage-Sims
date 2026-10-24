@@ -106,14 +106,14 @@ export function VillagerRoster({
           type="button"
           onClick={onClose}
           aria-label="Close villager roster"
-          className="pixel-btn pixel-focus px-1.5 py-0.5"
+          className="pixel-btn pixel-focus px-1 py-0"
         >
           ✕
         </button>
       </header>
       <div className="min-h-0 overflow-auto">
         <table className="w-full border-collapse">
-          <thead className="sticky top-0 bg-[#1c2a21] text-left text-[10px] uppercase tracking-wide text-white/60">
+          <thead className="sticky top-0 bg-[var(--c-ui-bg)] text-left text-[10px] uppercase tracking-wide text-white/60">
             <tr>
               <th className="px-3 py-1">
                 <button type="button" className="pixel-focus" onClick={() => toggleSort('name')}>
