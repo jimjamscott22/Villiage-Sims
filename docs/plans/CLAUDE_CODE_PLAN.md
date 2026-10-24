@@ -1,5 +1,28 @@
 # Claude Code Plan: VillageSim visual consistency pass
 
+## Implementation status
+
+Implemented on `main` in
+[PR #64](https://github.com/jimjamscott22/Villiage-Sims/pull/64), merge commit
+`4e1c497` (reviewed branch head `04de942`).
+
+- [x] A — Single palette source and generated CSS tokens.
+- [x] B — Replace off-palette literals with theme tokens, including the visitor panel integration fix.
+- [x] C — Palette-based fallback colours.
+- [x] D — Discrete, cursor-anchored zoom steps and fit snapping.
+- [x] E — Bitmap canvas text and glyph-based label metrics.
+- [x] F — 6px button/chip borders with padding adjustments.
+- [x] G — Generator outlines for fences, gates, signs, shelter and chickens.
+- [x] H — Four palette merges and regenerated art; atlas layout preserved.
+- [x] I — Source-colour and generated-art palette guards.
+- [x] Combined branch verification: `npm ci`, 378 frontend tests and `npm run build` passed.
+- [x] Merge PR #64 into `main` (`4e1c497`).
+
+Remaining limits: native Tauri and physical trackpad checks were not performed;
+ICO/ICNS and Windows Square tile icons retain the earlier palette. The original
+implementation instructions below are retained for context. Broader product
+recommendations are tracked in [ui-ux-recommendations.md](ui-ux-recommendations.md).
+
 Run inside the VillageSim repo (base commit `f30bcf5`). The spec is `STYLE_GUIDE.md`, which ships with this plan. Its key rules are copied here so this plan stands on its own.
 
 ## Ground rules

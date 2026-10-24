@@ -1,8 +1,16 @@
 # VillageSim Art Style Guide (v1, locked)
 
+Implementation status: the style-lock plan's phases A–I are complete on
+`main` in [PR #64](https://github.com/jimjamscott22/Villiage-Sims/pull/64), merge
+commit `4e1c497` (reviewed branch head `04de942`). See the [phase checklist](CLAUDE_CODE_PLAN.md#implementation-status).
+The proposal labels and pixel counts below describe the original `f30bcf5`
+baseline; they are retained as design history, not a current implementation audit.
+Rules outside phases A–I, such as uniform sprite lighting and future sprite-size
+conventions, have not been newly audited or marked complete.
+
 Based on the repo at commit `f30bcf5`. **[PROPOSAL]** marks a rule that is new. Everything unmarked is already true in the repo.
 
-## 1. Locked palette: 30 tokens (28 art + 2 UI-only)
+## 1. Locked palette: 27 colours (25 art + 2 UI-only)
 
 Starting point: `tools/genart/palette.ts` defines **29** colours (the earlier review said 33; that was a miscount). All 29 appear in the sheets.
 **[PROPOSAL]** Four merges take it to **25 art colours**. Adding `uiBg` and `highlight` gives **27 locked tokens**. `uiText` is an alias of `whitewash`, not a new colour.

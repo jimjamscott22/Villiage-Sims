@@ -299,6 +299,13 @@ single colour-token correction; Rust logic is unchanged by the fix.
 
 ## Next up
 
+Recommendation completion is tracked in
+[`docs/plans/ui-ux-recommendations.md`](docs/plans/ui-ux-recommendations.md).
+Visitor events are implemented on `main`; the separate art-style phases A–I
+are merged into `main` in PR #64 (`4e1c497`). The recommended
+building-inspector / contextual-sidebar / placement-explanation slice remains
+unimplemented. This documentation update does not start that work.
+
 Milestone 11 is implemented. The next engineering priority is running the deferred full checks and
 reviewing Rust/browser-demo parity for the new encounter and leisure state. The next longer-term priority is reducing the Rust/browser-demo parity
 risk and adding the deterministic world-hash and long-running soak tests identified in
