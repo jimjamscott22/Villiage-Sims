@@ -6,8 +6,8 @@
       <script value="tauri" />
       <script value="dev" />
     </scripts>
-    <node-interpreter value="project" />
-    <package-manager value="$USER_HOME$/.nvm/versions/node/v24.14.1/bin/npm" />
+    <node-interpreter value="$USER_HOME$/.nvm/versions/node/v24.22.0/bin/node" />
+    <package-manager value="$USER_HOME$/.nvm/versions/node/v24.22.0/bin/npm" />
     <envs />
     <method v="2" />
   </configuration>
