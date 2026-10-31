@@ -65,8 +65,10 @@ pub enum SimCommand {
         reply: oneshot::Sender<Vec<ChronicleEntryView>>,
     },
     SaveGame {
-        path: PathBuf,
-        reply: oneshot::Sender<Result<(), String>>,
+        dir: PathBuf,
+        id: String,
+        name: String,
+        reply: oneshot::Sender<Result<crate::saves::SaveInfo, String>>,
     },
     LoadGame {
         path: PathBuf,

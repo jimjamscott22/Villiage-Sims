@@ -8,6 +8,7 @@ use crate::sim::buildings::{PlacementResult, PlacementValidity};
 use crate::sim::catalog::Catalog;
 use crate::sim::chronicle::ChronicleEntryView;
 use crate::sim::commands::SimCommand;
+use crate::saves::{self, SaveInfo};
 use crate::snapshot::{TerrainSnapshot, VillagerDetail, WorldInit};
 
 pub struct AppState {
@@ -210,34 +211,33 @@ pub(crate) async fn advance_clock(
         .map_err(|_| "simulation dropped advance_clock".to_string())?
 }
 
-fn validate_slot(slot: u8) -> Result<(), String> {
-    if (1..=3).contains(&slot) {
-        Ok(())
-    } else {
-        Err(format!("invalid save slot {slot}; expected 1, 2, or 3"))
-    }
-}
-
-fn save_slot_path(app: &AppHandle, slot: u8) -> Result<PathBuf, String> {
-    validate_slot(slot)?;
-    let app_data = app
-        .path()
+fn saves_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
         .app_data_dir()
-        .map_err(|error| format!("could not locate app data directory: {error}"))?;
-    Ok(app_data.join("saves").join(format!("slot-{slot}.vsav")))
+        .map(|dir| dir.join("saves"))
+        .map_err(|error| format!("could not locate app data directory: {error}"))
 }
 
+#[tauri::command]
+pub(crate) fn list_saves(app: AppHandle) -> Result<Vec<SaveInfo>, String> {
+    saves::list(&saves_dir(&app)?)
+}
+
+/// `id: None` creates a new save; `Some(id)` overwrites that manual save.
 #[tauri::command]
 pub(crate) async fn save_game(
     app: AppHandle,
     state: State<'_, AppState>,
-    slot: u8,
-) -> Result<(), String> {
-    let path = save_slot_path(&app, slot)?;
+    id: Option<String>,
+    name: String,
+) -> Result<SaveInfo, String> {
+    let dir = saves_dir(&app)?;
+    let name = saves::validate_name(&name)?;
+    let id = saves::resolve_save_target(&dir, id.as_deref(), saves::now_ms())?;
     let (reply, receiver) = oneshot::channel();
     state
         .commands
-        .send(SimCommand::SaveGame { path, reply })
+        .send(SimCommand::SaveGame { dir, id, name, reply })
         .map_err(|_| "simulation command channel closed".to_string())?;
     receiver
         .await
@@ -248,9 +248,13 @@ pub(crate) async fn save_game(
 pub(crate) async fn load_game(
     app: AppHandle,
     state: State<'_, AppState>,
-    slot: u8,
+    id: String,
 ) -> Result<WorldInit, String> {
-    let path = save_slot_path(&app, slot)?;
+    saves::validate_id(&id)?;
+    let path = saves::vsav_path(&saves_dir(&app)?, &id);
+    if !path.exists() {
+        return Err("save not found".into());
+    }
     let (reply, receiver) = oneshot::channel();
     state
         .commands
@@ -259,6 +263,16 @@ pub(crate) async fn load_game(
     receiver
         .await
         .map_err(|_| "simulation dropped load_game".to_string())?
+}
+
+#[tauri::command]
+pub(crate) fn rename_save(app: AppHandle, id: String, name: String) -> Result<SaveInfo, String> {
+    saves::rename(&saves_dir(&app)?, &id, &name)
+}
+
+#[tauri::command]
+pub(crate) fn delete_save(app: AppHandle, id: String) -> Result<(), String> {
+    saves::delete(&saves_dir(&app)?, &id)
 }
 
 #[cfg(test)]
@@ -273,15 +287,5 @@ mod tests {
         let state = AppState::new(Catalog::load_builtin().unwrap(), tx);
         assert_eq!(state.catalog.buildings.len(), 10);
         assert_eq!(state.catalog.crops.len(), 4);
-    }
-
-    #[test]
-    fn save_slots_are_limited_to_three() {
-        assert!(validate_slot(1).is_ok());
-        assert!(validate_slot(3).is_ok());
-        assert_eq!(
-            validate_slot(4).unwrap_err(),
-            "invalid save slot 4; expected 1, 2, or 3"
-        );
     }
 }

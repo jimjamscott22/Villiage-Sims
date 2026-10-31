@@ -1,5 +1,6 @@
 mod commands;
 mod persist;
+mod saves;
 mod sim;
 mod snapshot;
 
@@ -53,8 +54,11 @@ pub fn run() {
             commands::get_chronicle,
             commands::plant_crop,
             commands::advance_clock,
+            commands::list_saves,
             commands::save_game,
-            commands::load_game
+            commands::load_game,
+            commands::rename_save,
+            commands::delete_save
         ])
         .build(tauri::generate_context!())
         .expect("failed to build VillageSim");

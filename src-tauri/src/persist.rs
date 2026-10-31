@@ -92,12 +92,17 @@ pub(crate) fn decode_world(bytes: &[u8]) -> Result<World, String> {
 
 pub(crate) fn save_world(world: &World, path: &Path) -> Result<(), String> {
     let bytes = encode_world(world)?;
+    write_file_atomic(path, &bytes)
+}
+
+/// Writes `bytes` to `path` via a sibling temp file + rename, creating the parent dir.
+pub(crate) fn write_file_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .map_err(|error| format!("could not create save directory: {error}"))?;
     }
     let temporary = temporary_path(path);
-    let result = write_and_replace(path, &temporary, &bytes);
+    let result = write_and_replace(path, &temporary, bytes);
     if result.is_err() {
         let _ = fs::remove_file(&temporary);
     }

@@ -1967,9 +1967,10 @@ impl World {
             return;
         };
         let slot = autosave_slot_for(&self.clock);
-        let path = dir.join(format!("slot-{slot}.vsav"));
-        match crate::persist::save_world(self, &path) {
-            Ok(()) => self.last_autosave_slot = Some(slot),
+        let id = crate::saves::autosave_id(slot);
+        let name = format!("Autosave {slot}");
+        match crate::saves::save_world_with_meta(self, &dir, &id, &name, crate::saves::now_ms()) {
+            Ok(_) => self.last_autosave_slot = Some(slot),
             Err(error) => eprintln!("autosave to slot {slot} failed: {error}"),
         }
     }
@@ -3851,17 +3852,31 @@ mod tests {
         let mut world = grass_world();
         world.set_autosave_dir(Some(dir.clone()));
 
+        // A manual save in the same directory must never be touched by rotation.
+        std::fs::write(dir.join("s-1.vsav"), b"manual").expect("manual save");
+
         world.advance_clock(1, None).unwrap();
         assert_eq!(world.tick_snapshot().last_autosave_slot, Some(2)); // day 2 → slot 2
-        assert!(dir.join("slot-2.vsav").exists());
+        assert!(dir.join("autosave-2.vsav").exists());
+        assert!(dir.join("autosave-2.meta.json").exists());
 
         world.advance_clock(1, None).unwrap();
         assert_eq!(world.tick_snapshot().last_autosave_slot, Some(3)); // day 3 → slot 3
-        assert!(dir.join("slot-3.vsav").exists());
+        assert!(dir.join("autosave-3.vsav").exists());
 
         world.advance_clock(1, None).unwrap();
         assert_eq!(world.tick_snapshot().last_autosave_slot, Some(1)); // day 4 → slot 1
-        assert!(dir.join("slot-1.vsav").exists());
+        assert!(dir.join("autosave-1.vsav").exists());
+        assert!(!dir.join("slot-1.vsav").exists());
+        assert_eq!(std::fs::read(dir.join("s-1.vsav")).unwrap(), b"manual");
+
+        let info = crate::saves::read_info(&dir, "autosave-1").expect("autosave info");
+        assert_eq!(info.name, "Autosave 1");
+        assert_eq!(info.kind, crate::saves::SaveKind::Autosave);
+        assert_eq!(info.day, Some(4));
+        assert_eq!(info.population, Some(world.villagers().len() as u32));
+        let listed = crate::saves::list(&dir).expect("list");
+        assert_eq!(listed.iter().filter(|s| s.kind == crate::saves::SaveKind::Autosave).count(), 3);
 
         let snap = world.tick_snapshot();
         assert_eq!(snap.last_autosave_slot, Some(1));

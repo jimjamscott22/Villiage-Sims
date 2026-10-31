@@ -69,8 +69,20 @@ pub fn handle_command(&mut self, command: SimCommand) {
                 let views: Vec<_> = self.chronicle.entries().map(|e| e.view()).collect();
                 let _ = reply.send(views);
             }
-            SimCommand::SaveGame { path, reply } => {
-                let _ = reply.send(crate::persist::save_world(self, &path));
+            SimCommand::SaveGame {
+                dir,
+                id,
+                name,
+                reply,
+            } => {
+                let result = crate::saves::save_world_with_meta(
+                    self,
+                    &dir,
+                    &id,
+                    &name,
+                    crate::saves::now_ms(),
+                );
+                let _ = reply.send(result);
             }
             SimCommand::LoadGame { path, reply } => {
                 let autosave_dir = self.autosave_dir.clone();
