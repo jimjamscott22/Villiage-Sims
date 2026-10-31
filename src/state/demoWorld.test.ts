@@ -549,9 +549,12 @@ describe('DemoWorld pathfinding', () => {
   });
 
   it('exposes deterministic weather and rotates autosaves on day rollover', () => {
-    const saves = new Map<number, string>();
+    const written: { slot: number; day: number }[] = [];
     const world = new DemoWorld(grassTerrain(16, 16));
-    world.bindAutosave(saves);
+    world.bindAutosave((slot, state, summary) => {
+      expect(typeof state).toBe('string');
+      written.push({ slot, day: summary.day });
+    });
 
     expect(world.snapshot().clock.weather).toBe(
       demoWeatherFor(42, 1, 0, 1),
@@ -559,15 +562,18 @@ describe('DemoWorld pathfinding', () => {
 
     world.advanceClock(1, null);
     expect(world.snapshot().lastAutosaveSlot).toBe(2);
-    expect(saves.has(2)).toBe(true);
 
     world.advanceClock(1, null);
     expect(world.snapshot().lastAutosaveSlot).toBe(3);
-    expect(saves.has(3)).toBe(true);
 
     world.advanceClock(1, null);
     expect(world.snapshot().lastAutosaveSlot).toBe(1);
-    expect(saves.has(1)).toBe(true);
+    expect(written).toEqual([
+      { slot: 2, day: 2 },
+      { slot: 3, day: 3 },
+      { slot: 1, day: 4 },
+    ]);
+    expect(world.saveSummary()).toMatchObject({ year: 1, season: 0, day: 4 });
   });
 
   it('picks auto-plant crops by season and seed cost, matching the Rust sim', () => {

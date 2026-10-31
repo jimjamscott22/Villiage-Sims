@@ -1,11 +1,13 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { DemoWorld, DEMO_CATALOG } from './demoWorld';
+import { DemoSaveStore } from './demoSaves';
 import type {
   Catalog,
   ChronicleEntry,
   PlacementResult,
   PlacementValidity,
+  SaveInfo,
   TerrainSnapshot,
   TickListener,
   TickSnapshot,
@@ -41,8 +43,11 @@ interface Transport {
   getVillagerRoster(): Promise<VillagerDetail[]>;
   plantCrop(kind: string, x: number, y: number): Promise<void>;
   advanceClock(days: number, season: number | null): Promise<void>;
-  saveGame(slot: number): Promise<void>;
-  loadGame(slot: number): Promise<WorldInit>;
+  listSaves(): Promise<SaveInfo[]>;
+  saveGame(id: string | null, name: string): Promise<SaveInfo>;
+  loadGame(id: string): Promise<WorldInit>;
+  renameSave(id: string, name: string): Promise<SaveInfo>;
+  deleteSave(id: string): Promise<void>;
 }
 
 class BrowserTransport implements Transport {
@@ -50,12 +55,12 @@ class BrowserTransport implements Transport {
   private elapsed = 0;
   private listeners = new Set<TickListener>();
   private timer: number | null = null;
-  private readonly saves = new Map<number, string>();
+  private readonly saves = new DemoSaveStore();
   private world: DemoWorld;
 
   constructor() {
     this.world = new DemoWorld(generateDemoTerrain());
-    this.world.bindAutosave(this.saves);
+    this.bindWorldAutosave();
   }
 
   async getTerrain(): Promise<TerrainSnapshot> {
@@ -132,20 +137,32 @@ class BrowserTransport implements Transport {
     this.emit(this.world.snapshot());
   }
 
-  async saveGame(slot: number): Promise<void> {
-    validateSlot(slot);
-    this.saves.set(slot, this.world.exportState());
+  async listSaves(): Promise<SaveInfo[]> {
+    return this.saves.list();
   }
 
-  async loadGame(slot: number): Promise<WorldInit> {
-    validateSlot(slot);
-    const saved = this.saves.get(slot);
-    if (saved == null) throw new Error(`save slot ${slot} is empty`);
-    this.world = DemoWorld.importState(saved);
-    this.world.bindAutosave(this.saves);
+  async saveGame(id: string | null, name: string): Promise<SaveInfo> {
+    return this.saves.save(id, name, this.world.exportState(), this.world.saveSummary());
+  }
+
+  async loadGame(id: string): Promise<WorldInit> {
+    this.world = DemoWorld.importState(this.saves.read(id));
+    this.bindWorldAutosave();
     this.elapsed = 0;
     this.emit(this.world.snapshot());
     return this.world.worldInit();
+  }
+
+  async renameSave(id: string, name: string): Promise<SaveInfo> {
+    return this.saves.rename(id, name);
+  }
+
+  async deleteSave(id: string): Promise<void> {
+    this.saves.delete(id);
+  }
+
+  private bindWorldAutosave(): void {
+    this.world.bindAutosave((slot, state, summary) => this.saves.writeAutosave(slot, state, summary));
   }
 
   advance(ms: number): void {
@@ -161,12 +178,6 @@ class BrowserTransport implements Transport {
 
   private emit(snapshot: TickSnapshot): void {
     this.listeners.forEach((listener) => listener(snapshot));
-  }
-}
-
-function validateSlot(slot: number): void {
-  if (!Number.isInteger(slot) || slot < 1 || slot > 3) {
-    throw new Error(`invalid save slot ${slot}; expected 1, 2, or 3`);
   }
 }
 
@@ -191,8 +202,11 @@ const tauriTransport: Transport = {
   getVillagerRoster: () => invoke<VillagerDetail[]>('get_villager_roster'),
   plantCrop: (kind, x, y) => invoke('plant_crop', { kind, x, y }),
   advanceClock: (days, season) => invoke('advance_clock', { days, season }),
-  saveGame: (slot) => invoke('save_game', { slot }),
-  loadGame: (slot) => invoke<WorldInit>('load_game', { slot }),
+  listSaves: () => invoke<SaveInfo[]>('list_saves'),
+  saveGame: (id, name) => invoke<SaveInfo>('save_game', { id, name }),
+  loadGame: (id) => invoke<WorldInit>('load_game', { id }),
+  renameSave: (id, name) => invoke<SaveInfo>('rename_save', { id, name }),
+  deleteSave: (id) => invoke('delete_save', { id }),
 };
 
 export const transport: Transport = isTauri() ? tauriTransport : browserTransport;

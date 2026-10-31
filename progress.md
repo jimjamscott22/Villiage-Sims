@@ -98,6 +98,19 @@ npm run dev
 - Candidate future additions are catalogued in
   [`docs/props-and-assets-backlog.md`](docs/props-and-assets-backlog.md).
 
+## Save manager
+
+- Replaced the fixed "Slot 1" SAVE/LOAD with an overlay (`src/ui/SaveDialog.tsx`) backed by unlimited
+  named saves. Rust `src-tauri/src/saves.rs` owns ids (`s-<unix_ms>`, `autosave-1..3`), names
+  (1–40 chars), `<id>.meta.json` sidecars, and list/rename/delete; the `.vsav` format and
+  `SAVE_VERSION` are unchanged, and legacy `slot-*.vsav` files list as manual saves.
+- Daily autosaves write `autosave-<n>` + sidecar and never touch manual saves.
+- Tauri commands are id-based: `list_saves`, `save_game`, `load_game`, `rename_save`, `delete_save`.
+  The browser demo mirrors them via `DemoSaveStore` (`src/state/demoSaves.ts`).
+- Global game hotkeys now ignore typing targets and modal dialogs (`src/ui/hotkeys.ts`).
+- Spec: `docs/superpowers/specs/2026-10-01-save-manager-design.md`. Browser/Tauri smoke checks from
+  the plan have not been run yet.
+
 ## Verification status
 
 The focused social/leisure Rust scenarios passed during implementation. The full Rust and browser suites, frontend build, and browser interaction pass are intentionally deferred for a later run.

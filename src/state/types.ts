@@ -210,3 +210,25 @@ export type TickListener = (snapshot: TickSnapshot) => void;
 
 export const SEASON_NAMES = ['Spring', 'Summer', 'Autumn', 'Winter'] as const;
 export const WEATHER_NAMES = ['Clear', 'Rain', 'Storm'] as const;
+
+export type SaveKind = 'manual' | 'autosave';
+
+export interface SaveInfo {
+  id: string;
+  name: string;
+  kind: SaveKind;
+  /** Unix milliseconds (wall clock) when written. */
+  savedAt: number;
+  year: number | null;
+  season: number | null;
+  day: number | null;
+  population: number | null;
+}
+
+/** In-game summary recorded alongside a save. */
+export interface SaveSummary {
+  year: number;
+  season: number;
+  day: number;
+  population: number;
+}

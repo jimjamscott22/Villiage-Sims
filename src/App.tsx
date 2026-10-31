@@ -17,6 +17,9 @@ import { ClockBar } from './ui/ClockBar';
 import { PixelText } from './ui/PixelText';
 import { ResourceBar } from './ui/ResourceBar';
 import { FloatingText, type Floater } from './ui/FloatingText';
+import { shouldIgnoreHotkey } from './ui/hotkeys';
+import { SaveDialog } from './ui/SaveDialog';
+import { nextCurrentSave, resumeSpeedAfterDialog, type CurrentSave, type SaveEvent } from './state/saves';
 import { ObjectivesPanel } from './ui/ObjectivesPanel';
 import { ToastStack, type Toast } from './ui/ToastStack';
 import { VillagerRoster } from './ui/VillagerRoster';
@@ -28,13 +31,6 @@ function sameLabels(a: ReadonlyMap<number, string>, b: ReadonlyMap<number, strin
   if (a.size !== b.size) return false;
   for (const [id, label] of a) if (b.get(id) !== label) return false;
   return true;
-}
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-  );
 }
 
 export default function App() {
@@ -49,8 +45,10 @@ export default function App() {
   const [villagerDetail, setVillagerDetail] = useState<VillagerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [worldKey, setWorldKey] = useState(0);
-  const [persistenceBusy, setPersistenceBusy] = useState(false);
-  const [persistenceStatus, setPersistenceStatus] = useState('Slot 1 · Not saved this session');
+  const [persistenceStatus, setPersistenceStatus] = useState('Not saved this session');
+  const [saveDialog, setSaveDialog] = useState<'save' | 'load' | null>(null);
+  const [currentSave, setCurrentSave] = useState<CurrentSave>(null);
+  const resumeSpeedRef = useRef<number | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
   const [showNameTags, setShowNameTags] = useState(true);
   const [roster, setRoster] = useState<VillagerDetail[] | null>(null);
@@ -93,7 +91,7 @@ export default function App() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || event.altKey || isTypingTarget(event.target)) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || shouldIgnoreHotkey(event)) return;
       const key = event.key.toLowerCase();
       if (key === 'v') setRosterOpen((open) => !open);
       else if (key === 'n') setShowNameTags((show) => !show);
@@ -281,51 +279,62 @@ export default function App() {
     }
   };
 
-  const onSave = async () => {
-    setPersistenceBusy(true);
-    try {
-      await transport.saveGame(1);
-      setPersistenceStatus('Slot 1 · Saved');
-      setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setPersistenceBusy(false);
-    }
+  // Clears every piece of UI state that belonged to the previous world.
+  const resetAfterWorldSwap = () => {
+    setSelectedKind(null);
+    setSelectedCrop(null);
+    setSelectedBuildingId(null);
+    setSelectedVillagerId(null);
+    setVillagerDetail(null);
+    rosterGenerationRef.current += 1;
+    rosterInFlightRef.current = false;
+    tagLabelsRef.current = new Map();
+    setTagLabels(tagLabelsRef.current);
+    setRoster(null);
+    setRotation(0);
+    setChronicle([]);
+    setToasts([]);
+    setFloaters([]);
+    setWinterWarning(false);
+    setCompletedObjectives([]);
+    chronicleSeqRef.current = -1;
+    toastSeqRef.current = -1;
+    lastResourcesRef.current = null;
+    chronicleRequestRef.current += 1; // invalidate any in-flight fetch from the old world
+    setWorldKey((key) => key + 1);
   };
 
-  const onLoad = async () => {
-    if (!window.confirm('Load Slot 1? Unsaved progress will be lost.')) return;
-    setPersistenceBusy(true);
-    try {
-      await transport.loadGame(1);
-      setSelectedKind(null);
-      setSelectedCrop(null);
-      setSelectedBuildingId(null);
-      setSelectedVillagerId(null);
-      setVillagerDetail(null);
-      rosterGenerationRef.current += 1;
-      rosterInFlightRef.current = false;
-      tagLabelsRef.current = new Map();
-      setTagLabels(tagLabelsRef.current);
-      setRoster(null);
-      setRotation(0);
-      setChronicle([]);
-      setToasts([]);
-      setFloaters([]);
-      setWinterWarning(false);
-      setCompletedObjectives([]);
-      chronicleSeqRef.current = -1;
-      toastSeqRef.current = -1;
-      lastResourcesRef.current = null;
-      chronicleRequestRef.current += 1; // invalidate any in-flight fetch from the old world
-      setWorldKey((key) => key + 1);
-      setPersistenceStatus('Slot 1 · Loaded');
-      setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setPersistenceBusy(false);
+  const openSaveDialog = (focus: 'save' | 'load') => {
+    if (saveDialog) return;
+    const speed = clock?.speed ?? 0;
+    resumeSpeedRef.current = resumeSpeedAfterDialog(speed);
+    if (speed > 0) void onSetSpeed(0);
+    setSaveDialog(focus);
+  };
+
+  const closeSaveDialog = () => {
+    setSaveDialog(null);
+    const speed = resumeSpeedRef.current;
+    resumeSpeedRef.current = null;
+    if (speed != null) void onSetSpeed(speed);
+  };
+
+  const onSaveEvent = (event: SaveEvent) => {
+    setCurrentSave((current) => nextCurrentSave(current, event));
+    if (event.type === 'saved') {
+      setPersistenceStatus(`Saved · ${event.info.name}`);
+      pushFloater(`Saved "${event.info.name}"`, '#f4c95d');
+      closeSaveDialog();
+    } else if (event.type === 'loaded') {
+      resetAfterWorldSwap();
+      setPersistenceStatus(`Loaded · ${event.info.name}`);
+      pushFloater(`Loaded "${event.info.name}"`, '#b6f28a');
+      closeSaveDialog();
+    } else if (event.type === 'renamed' && event.info.id === currentSave?.id) {
+      // Keep the "Saved · " / "Loaded · " prefix, swap only the name.
+      setPersistenceStatus((status) => status.replace(/ · .*$/, ` · ${event.info.name}`));
+    } else if (event.type === 'deleted' && event.id === currentSave?.id) {
+      setPersistenceStatus('Not saved this session');
     }
   };
 
@@ -367,24 +376,18 @@ export default function App() {
           <button
             type="button"
             data-testid="save-game"
-            disabled={persistenceBusy}
             title={persistenceStatus}
-            onClick={() => {
-              void onSave();
-            }}
-            className="pixel-btn pixel-focus px-2 py-1 disabled:cursor-wait disabled:opacity-40"
+            onClick={() => openSaveDialog('save')}
+            className="pixel-btn pixel-focus px-2 py-1"
           >
             <PixelText text="SAVE" />
           </button>
           <button
             type="button"
             data-testid="load-game"
-            disabled={persistenceBusy}
             title={persistenceStatus}
-            onClick={() => {
-              void onLoad();
-            }}
-            className="pixel-btn pixel-focus px-2 py-1 disabled:cursor-wait disabled:opacity-40"
+            onClick={() => openSaveDialog('load')}
+            className="pixel-btn pixel-focus px-2 py-1"
           >
             <PixelText text="LOAD" />
           </button>
@@ -443,6 +446,14 @@ export default function App() {
             }
           />
           <FloatingText floaters={floaters} onDismiss={dismissFloater} />
+          {saveDialog && (
+            <SaveDialog
+              focus={saveDialog}
+              currentSave={currentSave}
+              onSaveEvent={onSaveEvent}
+              onClose={closeSaveDialog}
+            />
+          )}
         </div>
         <div className="flex min-h-0 w-56 shrink-0 flex-col">
           <BuildMenu

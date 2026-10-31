@@ -21,6 +21,7 @@ import {
 } from './spatial';
 import type { ShorelineTile, TerrainProp } from './tilemap';
 import { bakeTerrain, shorelineTiles, terrainProps } from './tilemap';
+import { shouldIgnoreHotkey } from '../ui/hotkeys';
 
 const TICK_MS = 50;
 const FOAM_TICKS_PER_FRAME = 8;
@@ -670,6 +671,7 @@ export function Canvas({
     };
 
     const onKeyDown = async (event: KeyboardEvent) => {
+      if (shouldIgnoreHotkey(event)) return;
       if (event.key.toLowerCase() === 'f') {
         if (document.fullscreenElement) await document.exitFullscreen();
         else {
