@@ -183,6 +183,13 @@ impl Clock {
         }
     }
 
+    /// Duration to the next debug day boundary, rounded to the nearest logic tick.
+    /// Read fractional minutes so a jump does not count the current minute twice;
+    /// rounding also avoids a one-tick overshoot from floating-point noise.
+    pub(crate) fn ticks_until_midnight(&self) -> u32 {
+        ((MINUTES_PER_DAY - self.minute_accum) / MINUTES_PER_TICK).round() as u32
+    }
+
     /// Jump forward one calendar day (debug / tests), resetting the minute clock.
     pub fn force_day_rollover(&mut self) -> Rollover {
         self.minute_accum = 0.0;

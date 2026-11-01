@@ -36,7 +36,9 @@ pub(crate) fn check_population_dynamics(&mut self) {
         }
 
         // Birth checks
-        let capacity = self.housing_capacity();
+        let capacity = self.housing_capacity().saturating_sub(u32::from(
+            self.visits.active.is_some_and(|v| v.visitor == super::super::visitors::VisitorKind::Grower)
+        ));
         if (self.villagers.len() as u32) < capacity
             && self.clock.tick % 200 == 0
             && !self.villagers.is_empty()

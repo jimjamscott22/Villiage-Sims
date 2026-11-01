@@ -1,4 +1,8 @@
-/** The complete VillageSim art palette. No color outside this table may appear in art. */
+/**
+ * The complete VillageSim art palette (25 colours). No color outside this
+ * table may appear in art. Merged away in the style lock: stoneLight →
+ * sandMid, sandPale → whitewash, uiRecess → uiPanel, terraDeep → terraDark.
+ */
 export const PALETTE = {
   // sea
   seaDeepest: '#0e3f52',
@@ -10,7 +14,6 @@ export const PALETTE = {
   sandShadow: '#8a7455',
   sandMid: '#c9b483',
   sandLight: '#e0cfa0',
-  sandPale: '#f2e8c8',
   // vegetation
   vegDarkest: '#2a4430',
   vegDark: '#3d5f39',
@@ -20,11 +23,9 @@ export const PALETTE = {
   // architecture
   stoneShadow: '#6b5f4e',
   stoneMid: '#9c8b70',
-  stoneLight: '#b8a68c',
   stonePale: '#dcd2bd',
   whitewash: '#f2ece0',
   // terracotta
-  terraDeep: '#7a3320',
   terraDark: '#a54428',
   terraMid: '#c05a34',
   terraLight: '#e08a5a',
@@ -35,10 +36,25 @@ export const PALETTE = {
   // ui
   uiPanel: '#1b3038',
   uiRaised: '#26454f',
-  uiRecess: '#14242a',
 } as const;
 
 export type PaletteName = keyof typeof PALETTE;
+
+/**
+ * UI-only tokens. They never appear in generated art (the rasterizer only
+ * accepts `PALETTE`), but the app's CSS and canvas overlays may use them.
+ * `uiText` is an alias of `whitewash`, not a new colour.
+ */
+export const UI_TOKENS = {
+  uiBg: '#17211b',
+  highlight: '#f4c95d',
+  uiText: PALETTE.whitewash,
+} as const;
+
+/** Every colour the app may use: the art palette plus the UI-only tokens. */
+export const THEME = { ...PALETTE, ...UI_TOKENS } as const;
+
+export type ThemeToken = keyof typeof THEME;
 
 export type Rgba = [number, number, number, number];
 

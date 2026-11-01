@@ -125,6 +125,10 @@ declarative pixel data + material recipes; the generator rasterizes sprite sheet
 dev` works without running the generator. After changing anything under `tools/genart/`, run
 `npm run art` — a drift test (`tools/genart/genart.test.ts`) regenerates the atlas and compares
 decoded pixels against the committed output (not raw PNG bytes, since zlib output varies by
-Node version) and fails if they diverge. Only the 29 colors in `tools/genart/palette.ts` may
-appear in generated art; the rasterizer throws otherwise. If the atlas fails to load at runtime,
+Node version) and fails if they diverge. Only the 25 colors in `tools/genart/palette.ts` may
+appear in generated art; the rasterizer throws otherwise. App code uses the same source via
+`src/theme/palette.ts` (`THEME`, which adds the UI-only `uiBg`/`highlight`/`uiText` tokens) and the
+generated `src/theme/palette.css` (`var(--c-*)`); `src/theme/palette.lint.test.ts` fails on any
+other hex or `rgb()` literal in `src` (only `DEBUG_MISSING` #ff00ff is exempt). Camera zoom is
+limited to `ZOOM_STEPS` and canvas text uses the `font.strip` bitmap font (`render/bitmapText.ts`). If the atlas fails to load at runtime,
 rendering falls back to flat colors rather than breaking.

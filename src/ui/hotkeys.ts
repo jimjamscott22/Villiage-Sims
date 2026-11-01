@@ -16,5 +16,8 @@ export function isHotkeyBlocked(target: unknown, modalOpen: boolean): boolean {
 
 /** Global game hotkeys must not fire while typing or behind a modal dialog. */
 export function shouldIgnoreHotkey(event: KeyboardEvent): boolean {
-  return isHotkeyBlocked(event.target, document.querySelector('[aria-modal="true"]') !== null);
+  return isHotkeyBlocked(
+    event.target,
+    document.querySelector('[aria-modal="true"], dialog[open]') !== null,
+  );
 }

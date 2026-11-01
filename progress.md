@@ -1,6 +1,6 @@
 # VillageSim progress & handoff
 
-Last updated: 2026-09-13 (M11 socializing and purposeful movement implemented; tests deferred by request).
+Last updated: 2026-10-22 (manual seed costs and viewport synchronization audit fixes; verification below).
 
 ## Status
 
@@ -91,7 +91,9 @@ npm run dev
   (spring-only), `prop.stump`/`prop.deadfall`/`prop.mushroom` (forest edge) on grass;
   `prop.boulder` on rock; `prop.palm`, `prop.cactus` (inland), `prop.reeds`, `prop.shoreRock`,
   `prop.driftwood` (shoreline) on sand; `prop.lilypad` on calm open shallow water;
-  `prop.campfire` (two-frame flame flicker) sparsely on open grass.
+  `prop.campfire` (two-frame flame flicker) sparsely on open grass; `prop.sunflowers` (summer-only)
+  on open grass; `prop.shells` on beach sand touching water; `prop.fishSplash` (four-frame leap,
+  per-tile phase offset) on sparse deep water.
 - `well` — a 1×1 amenity building (15 stone / 5 wood), unlocked at population 4, no jobs.
 - `fence`, `gate`, `signpost` — 1×1 zero-job decorative buildings.
 - `storehouse` — 2×2 wood/stone counterpart to the grain-only granary, with the same `haul` job.
@@ -113,9 +115,209 @@ npm run dev
 
 ## Verification status
 
-The focused social/leisure Rust scenarios passed during implementation. The full Rust and browser suites, frontend build, and browser interaction pass are intentionally deferred for a later run.
+The original M11 handoff deferred the full checks. PR #56 now has passing automated checks; see the follow-up validation below. Live Tauri/browser interaction verification remains unrun.
+
+## Simulation review follow-ups (handoff, 2026-09-29)
+
+Branch `fix/sim-review-followups` works through `docs/rust-simulation-review-2026-09-02.md`; the
+"Resolution status" table there is the source of truth. Resolved: R2, R3, R5, R6, R7. Partly resolved:
+R1 (nearest pickup, cargo resume; still needs an explicit pickup/delivery phase and reservations) and
+R4 (in-place workers end when built over; still needs reachable stand tiles, haul entrances, gate
+pass-through). Open: R8. Each fix has a Rust regression in `src-tauri/src/sim/world_review_tests.rs`
+and a mirrored case in `src/state/demoWorld.test.ts`.
+
+State at the original local handoff, before opening PR #56: working tree clean; Rust lib tests 163,
+Vitest 265, `tsc -b` and `cargo check` pass. Not run: `npm run build` (the review notes an unrelated `tools/genart/app-icon.test.ts`
+TS2554 error) and any live Tauri or browser session. The branch is not pushed and has no PR.
+
+Suggested next: decision-explanation diagnostics (current action, job id, pickup/delivery endpoint,
+scores, interruption reason) before tuning utility curves; then the R1 and R4 remainders. Gate
+behaviour (can villagers walk through gates?) needs a product decision first, as does R8. Also open:
+replay/determinism coverage across seasons and player commands.
+
+## PR #56 storm cargo and claim follow-ups (2026-09-30)
+
+`ad73f48` routes demo `applyStormDamage()` through `clearReleasedWorkClaims` and `releaseJobAt`.
+The September 29 Codex finding was valid: clearing only `currentJob` stranded carried cargo.
+Three cases in `demoWorld.test.ts` now cover working, moving and eating haulers, returning the
+exact cargo once, clearing removed claims, stopping affected work travel, preserving meals and
+unrelated haulers, and preventing double refunds. The existing Rust fixes are preserved; later R1/R5 refinements are described below.
+
+`8c279fa` also fixes a new Codex R2 finding: `beginWork` now releases the previous job's
+reservation when selecting a different job, without returning cargo during a haul-slot switch.
+A regression verifies that another villager can reclaim the old farm slot.
+
+`171eda1` addresses two later Rust review findings, mirrored in the demo: carrying haulers are
+admitted and moved using the delivery endpoint, and failed resumption returns cargo through the
+central cleanup. A finished recipe without room retains its pending batch but becomes
+non-actionable so its producer can haul and then resume. Rust and demo regressions cover reachable
+delivery despite a blocked job tile, failed-delivery cargo return, and single-worker production
+recovery with exact output conservation. Earlier Rust fixes remain in place.
+
+[CI run 36767376700](https://github.com/jimjamscott22/Villiage-Sims/actions/runs/36767376700)
+passed on code commit `171eda1` (including all four review fixes): Rust lib tests **166**, Vitest **273** (30 files), Rust Clippy
+with `--all-targets -- -D warnings`, and `npm run build` (`tsc -b && vite build`).
+The app-icon error from the September 2 review did not recur in CI.
+Standalone `cargo check` and `npx tsc -b` were previously reported passing; they were not
+separately rerun here. Local `npm run build` and live Tauri/browser verification remain unrun.
+
+R7 is resolved in Rust and the demo. The scoped fixes are ready to merge on automated evidence;
+the R1/R4 remainders, R8 decisions and live interaction checks remain outstanding.
+
+## Chicken flock addition (2026-10-01)
+
+Implemented the requested small first release:
+
+- Append-only `chicken_shelter` catalog entry (15 wood, 1×1, immediately usable),
+  mirrored in the demo. Both simulations enforce one shelter and an adjacent exit.
+- Persisted Pip/curious, Mabel/sleepy, Poppy/social; bounded seeded wandering,
+  pecking, scratching, resting, following, passing-villager tilt/scurry, click hop
+  with five-second cooldown, dusk return and sleep. Roosts use reachable free tiles
+  on the shelter perimeter. Newly placed chickens explore for one minute before
+  early-morning sleep, to make the midnight-start village immediately enjoyable.
+- Chickens do not reserve occupancy. Placement under them relocates them to free
+  local ground; routes re-check obstacle and diagonal-flank validity.
+- One morning basket at 06:00, three-basket cap, individually identified baskets
+  worth 3 food. Repeated collection is rejected by the simulation. No feeding,
+  breeding, illness, slaughter, upgrades, extra species, or neglect penalties.
+- Visible Rust chicken snapshots, frontend interpolation, atlas poses and y-sort,
+  hover names/activities, individual clicks and optional quiet synthesized clucks.
+  Shelter placement exits build mode automatically. Button and Delete demolition
+  share an in-game confirmation explaining flock/basket removal.
+- Desktop save version **7** freezes and migrates version **6**, retaining older
+  version 3–5 migrations. Demo save version **4** accepts older versions 1–3.
+  All chicken positions, names, personality, RNG/timers and baskets persist.
+
+Verification: frontend **298 tests**, Rust **185 lib tests**, `npm run build`, and
+Rust Clippy `--all-targets -- -D warnings` passed. Tests cover first-minute variety,
+water/building avoidance, home range, dusk/dawn, reactions and cooldowns, collection
+retries/cap, construction under animals, save byte equality and deterministic
+continuation, v6 migration, interpolation and atlas/culling. `npm run art` regenerated
+committed entity assets; decoded-pixel drift tests passed.
+
+Browser smoke on port **5174** (5173 was occupied) visually verified placement,
+three chicken sprites, Pip's hover/hop, the one-shelter menu restriction, and Save.
+No VillageSim console errors were observed. The first native confirmation dialog
+stalled the browser tool; it was replaced with an accessible in-game dialog. Further
+live clicks, including the final dialog/keyboard cancellation and Load, remain
+unverified because the original browser dialog continued blocking automation.
+Egg collection/dusk/load are covered by automated simulation tests, not a full
+live gameplay session. Native Tauri interaction and subjective audio quality remain
+unverified; run `npm run tauri dev` for desktop acceptance and `npm run dev` for
+browser acceptance. Browser checks included narrow and desktop layouts, but no
+complete mobile interaction sweep.
+
+## Chimney smoke and mill dust (2026-10-02)
+
+The existing three-frame smoke/dust atlas cells are now correctly attached to the
+bakery chimney and mill base. Offsets use the building sprite origin and account
+for both atlas anchors; effects share the owner's drawing depth so they stay above
+their own building without covering nearer entities. Completed buildings emit
+decorative effects regardless of production activity. Sim ticks drive animation
+(so pausing freezes it); reduced motion keeps frame zero. Construction, storm
+reconstruction, demolition and viewport culling omit effects through the existing
+building rendering path. No simulation, catalog, save-format or art changes.
+
+Verification: **299 frontend tests** and `npm run build` passed. Regression coverage
+checks exact anchors/depth, draw ordering, frame progression, rotation, reduced
+motion, construction, demolition and culling. A temporary browser preview using
+the actual atlas and scene renderer visually verified all three frames, reduced
+motion and construction, with no console warnings/errors. The preview was removed
+after inspection. Native Tauri gameplay and full placement/production interactions
+were not run; Rust checks were not rerun because only frontend rendering changed.
+
+## Audit fixes (2026-10-22)
+
+Resolved findings **3 and 5** from `docs/audits/2026-10-03-bugs-and-performance.md`:
+
+- Manual planting now pays the crop's declared seed cost in Rust and browser-demo, using the
+  existing farm-buffer-first / stockpile-fallback transaction. Invalid placements and insufficient
+  inputs allocate no crop and consume no resources or crop ids. Existing planting fixtures now
+  supply seeds explicitly; regressions cover every crop, exhausted inputs, local-first spending,
+  validation order and atomic multi-resource spending.
+- Camera movement now uses a trailing 100 ms throttle so sustained edge scrolling and dragging
+  cannot indefinitely delay the simulation's culling rectangle. Effective resizes synchronize
+  immediately; `ResizeObserver` covers layout-only changes. Explicit focus remains immediate,
+  and unmount cancels the timer and disconnects the observer.
+
+Verification: **315 frontend tests**, production build and **188 Rust simulation/persistence
+tests** passed. Rust used a temporary harness importing actual repository modules and locked
+direct dependency versions because native GTK/WebKit libraries are unavailable; native Tauri
+checks were not run. Strict Clippy reports the same 14 warnings on a clean baseline under Rust
+1.99.1; with the two existing lint categories allowed, all remaining warnings are denied and
+the check passes. Browser transport probes confirmed updates during continuous edge scrolling
+and dragging, final camera rectangles, zoom, window/container resize and immediate roster focus
+at desktop and compact sizes. No application console errors or warnings. Independent review
+found no actionable issues. See the audit's resolution notes for exact counts and limitations.
+
+Still open: hauling latency (finding 1), disconnected births (2), and water-search cooldown
+persistence (4). No catalog or save-format changes were made.
+
+## Visitors with interesting offers (2026-10-23)
+
+Implemented the approved first release on `feature/visitor-offers`:
+
+- Shared authored content for Rowan (12 food → 8 grain), Lark (6 food → +0.20
+  Social, capped at full), and Mira (Green Thumb resident requiring spare
+  population capacity, a real vacant completed reachable home and a free spawn).
+- Deterministic integer-tick schedule: first arrival after one game hour, a
+  three-hour stay, and six hours between departure and the next arrival.
+  Rotation repeats; a settled Mira does not return. Decline/expiry has no penalty.
+  Rust births reserve one population slot during Mira's visit; existing homes
+  are not evicted. Browser-demo still does not simulate births/deaths.
+- Authoritative transactional decisions recheck resources, visit identity,
+  housing, and arrival access. Duplicate/stale responses cannot double-spend or
+  spawn. Global snapshots expose current terms and unmet requirements.
+- Accessible pixel offer panel, arrival toast, exact terms, live simulation-time
+  countdown, busy/error handling, keyboard controls, and compact-width layout.
+- Visitor arrival/outcome Chronicle entries persist. Desktop save version **8**
+  freezes/migrates **7** and retains **3–6** migrations. Demo save version **5**
+  accepts **1–4** and now preserves its Chronicle. Old saves start visits fresh.
+
+Verification: **330 frontend tests**, production build, and **201 actual Rust
+simulation/persistence tests** passed. Rust check and Clippy with baseline lint
+categories allowed passed through a temporary harness importing the repository's
+actual `sim`, `snapshot`, and `persist` modules and pinning direct dependencies to
+`Cargo.lock`. Native `cargo check` is blocked by unavailable GLib/GTK development
+libraries; desktop IPC/webview interaction remains unverified locally. Strict
+Clippy on Rust 1.99.1 reports the same **14** pre-existing `manual_is_multiple_of`
+and `collapsible_if` warnings on both the immutable baseline and feature tree;
+with only those categories allowed, warnings remain denied and the check passes.
+
+Independent whole-branch review found one debug-clock fractional-minute issue.
+Matching Rust/demo regressions first failed, then passed after both runtimes
+used fractional time rounded to the nearest tick. Midnight departures use the
+new date. The existing floating-point calendar itself was not redesigned.
+
+Playwright/Chromium checked `http://127.0.0.1:5173/?test=1` at **1440×1000** and
+**390×844**: first arrival, exact merchant debit/reward by keyboard, offer save/load,
+Pause/3×, decline, musician Social reward, unmet housing, constructing three huts,
+recruitment/home assignment, settled-resident and cooldown save/load, unanswered
+expiry, and fractional debug-day advancement. The visitor panel fits the compact
+viewport; the older header/resource row retains its existing compact clipping.
+Screenshots were inspected outside the repository. No application runtime errors;
+the sole console error was the existing missing `/favicon.ico` (404). Browser
+skill was read, but no callable Browser runtime was available, so the approved
+browser checks used installed Chromium and temporary Playwright tooling. No new
+project dependencies or art assets.
+
+## PR #64 visitor palette compatibility (2026-10-23)
+
+Updated the style-lock branch with current `main`, including visitor offers, and
+replaced the visitor introduction's off-palette `#e2ddcd` with `--c-ui-text`.
+The existing palette guard reproduced the integration failure before the change.
+Afterward, all **378 frontend tests** (37 files) and `npm run build` passed using
+a clean `npm ci` install. No new browser or native Tauri checks were run for this
+single colour-token correction; Rust logic is unchanged by the fix.
 
 ## Next up
+
+Recommendation completion is tracked in
+[`docs/plans/ui-ux-recommendations.md`](docs/plans/ui-ux-recommendations.md).
+Visitor events are implemented on `main`; the separate art-style phases A–I
+are merged into `main` in PR #64 (`4e1c497`). The recommended
+building-inspector / contextual-sidebar / placement-explanation slice remains
+unimplemented. This documentation update does not start that work.
 
 Milestone 11 is implemented. The next engineering priority is running the deferred full checks and
 reviewing Rust/browser-demo parity for the new encounter and leisure state. The next longer-term priority is reducing the Rust/browser-demo parity

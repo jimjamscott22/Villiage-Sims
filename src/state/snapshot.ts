@@ -30,6 +30,12 @@ export class SnapshotBuffer {
     });
 
     return {
+      ...this.current,
+      chickens: this.current.chickens?.map(c => {
+        const previous = this.previous?.chickens?.find(p => p.id === c.id && p.shelterId === c.shelterId);
+        if (!previous || Math.hypot(previous.x - c.x, previous.y - c.y) > 64) return c;
+        return { ...c, x: previous.x + (c.x - previous.x) * alpha, y: previous.y + (c.y - previous.y) * alpha };
+      }),
       tick: this.current.tick,
       villagers,
       buildings: this.current.buildings,

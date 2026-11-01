@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateDemoTerrain } from './demoTerrain';
-import { DEMO_CATALOG, DemoWorld, demoWeatherFor } from './demoWorld';
+import { DEMO_CATALOG, DemoWorld, demoWeatherFor, type DemoVillager } from './demoWorld';
 
 function grassTerrain(width = 16, height = 16) {
   return {
@@ -57,6 +57,68 @@ function jobIdFor(world: DemoWorld, site: number, kind: string): number {
   if (!job) throw new Error(`missing ${kind} job for ${site}`);
   return job.id;
 }
+
+describe('manual planting seed costs', () => {
+  it('rejects depleted seeds without changing crops, inventories or the next id', () => {
+    const world = new DemoWorld(grassTerrain());
+    const farmId = completeBuilding(world, 'farm', 2, 2);
+    const farm = world.buildings.find((entry) => entry.id === farmId)!;
+    world.resources.grain = 0;
+    world.resources.food = 0;
+    const internals = world as unknown as { nextCropId: number };
+    const nextId = internals.nextCropId;
+    const resources = { ...world.resources };
+
+    for (const kind of ['wheat', 'strawberry', 'peas', 'carrot']) {
+      expect(() => world.plantCrop(kind, 2, 2)).toThrow('insufficient seeds');
+    }
+
+    expect(world.crops).toHaveLength(0);
+    expect(world.resources).toEqual(resources);
+    expect(farm.inventory).toEqual({});
+    expect(internals.nextCropId).toBe(nextId);
+  });
+
+  it('spends farm seeds first, falls back to stockpile and rejects exhausted supplies', () => {
+    const world = new DemoWorld(grassTerrain());
+    const farmId = completeBuilding(world, 'farm', 2, 2);
+    const farm = world.buildings.find((entry) => entry.id === farmId)!;
+    inventoryAdd(farm.inventory, 'grain', 1);
+    world.resources.grain = 1;
+
+    world.plantCrop('wheat', 2, 2);
+    expect(inventoryGet(farm.inventory, 'grain')).toBe(0);
+    expect(world.resources.grain).toBe(1);
+    world.plantCrop('wheat', 3, 2);
+    expect(world.resources.grain).toBe(0);
+    expect(() => world.plantCrop('wheat', 2, 3)).toThrow('insufficient seeds');
+    expect(world.crops).toHaveLength(2);
+    expect(world.crops.map((crop) => crop.id)).toEqual([1, 2]);
+  });
+
+  it.each(['strawberry', 'peas', 'carrot'])('charges the declared food seed cost for %s', (kind) => {
+    const world = new DemoWorld(grassTerrain());
+    completeBuilding(world, 'farm', 2, 2);
+    world.resources.food = 1;
+    world.plantCrop(kind, 2, 2);
+    expect(world.resources.food).toBe(0);
+    expect(world.crops[0].kind).toBe(kind);
+  });
+
+  it('validates requests before spending seeds', () => {
+    const world = new DemoWorld(grassTerrain());
+    completeBuilding(world, 'farm', 2, 2);
+    world.placeBuilding('farm', 6, 6, 0);
+    world.resources.grain = 3;
+    world.plantCrop('wheat', 2, 2);
+    expect(() => world.plantCrop('wheat', 2, 2)).toThrow('tile already has a crop');
+    expect(() => world.plantCrop('wheat', 0, 0)).toThrow('tile is not on a completed farm');
+    expect(() => world.plantCrop('wheat', 6, 6)).toThrow('tile is not on a completed farm');
+    expect(() => world.plantCrop('unknown', 3, 2)).toThrow('unknown crop');
+    expect(world.resources.grain).toBe(2);
+    expect(world.crops).toHaveLength(1);
+  });
+});
 
 describe('DemoWorld pathfinding', () => {
   it('spawns five idle villagers with starting food and walks on order', () => {
@@ -182,6 +244,7 @@ describe('DemoWorld pathfinding', () => {
     const world = new DemoWorld(terrain);
     world.placeBuilding('farm', 2, 2, 0);
     for (let i = 0; i < 30; i += 1) world.advance();
+    world.resources.grain = 1;
     world.plantCrop('wheat', 2, 2);
     expect(world.snapshot().crops).toHaveLength(1);
     world.advanceClock(0, 3);
@@ -253,7 +316,7 @@ describe('DemoWorld pathfinding', () => {
   });
 
   it('loads the M8 demo catalog with flour storage and recipes', () => {
-    expect(DEMO_CATALOG.buildings).toHaveLength(10);
+    expect(DEMO_CATALOG.buildings).toHaveLength(11);
     // Building kind is an index into this list, so new entries must be appended.
     // This must stay in lockstep with src-tauri/data/buildings.json.
     expect(DEMO_CATALOG.buildings.map((entry) => entry.id)).toEqual([
@@ -267,6 +330,7 @@ describe('DemoWorld pathfinding', () => {
       'gate',
       'signpost',
       'storehouse',
+      'chicken_shelter',
     ]);
     expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'storehouse')?.stores).toEqual(['wood', 'stone']);
     expect(DEMO_CATALOG.buildings.find((entry) => entry.id === 'granary')?.stores).toEqual(['grain', 'flour', 'food']);
@@ -286,6 +350,7 @@ describe('DemoWorld pathfinding', () => {
   it('harvests ready wheat into farm inventory without counting it in totals', () => {
     const world = new DemoWorld(grassTerrain());
     const farmId = completeBuilding(world, 'farm', 2, 2);
+    world.resources.grain = 1;
     world.plantCrop('wheat', 2, 2);
     world.crops[0].stage = 3;
 
@@ -536,7 +601,7 @@ describe('DemoWorld pathfinding', () => {
       width: 16,
       height: 16,
       tick: 75,
-      saveVersion: 3,
+      saveVersion: 5,
     });
   });
 
@@ -544,7 +609,7 @@ describe('DemoWorld pathfinding', () => {
     const state = JSON.parse(new DemoWorld(grassTerrain()).exportState()) as Record<string, unknown>;
     state.version = 99;
     expect(() => DemoWorld.importState(JSON.stringify(state))).toThrow(
-      'unsupported save version 99 (expected 3)',
+      'unsupported save version 99 (expected 5)',
     );
   });
 
@@ -759,5 +824,449 @@ describe('simulation review regressions', () => {
     const farm = completeBuilding(world, 'farm', 8, 2);
     inventoryAdd(world.buildings.find((b) => b.id === farm)!.inventory, 'grain', 5);
     expect(internals.findHaulTask([8, 0])).toMatchObject({ from: farm, to: reachable, resource: 'grain' });
+  });
+  it('releases a stale farm claim when selecting other work so another villager can take it', () => {
+    const world = new DemoWorld(grassTerrain(24, 24));
+    const internals = world as unknown as {
+      villagers: DemoVillager[];
+      crops: Array<{ watered: boolean }>;
+      jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+      farmFootprintTiles(site: number): Array<[number, number]>;
+      maybeDecide(index: number): void;
+      beginWork(index: number, jobId: number): void;
+    };
+    world.resources.grain = 20;
+    const farm = completeBuilding(world, 'farm', 8, 8);
+    const otherFarm = completeBuilding(world, 'farm', 14, 14);
+    for (const [x, y] of internals.farmFootprintTiles(farm)) world.plantCrop('wheat', x, y);
+    for (const crop of internals.crops) crop.watered = true;
+    const stale = internals.jobs.find((job) => job.site === farm && job.kind === 'tend_crops')!;
+    const worker = internals.villagers[0];
+    stale.claimedBy = worker.id;
+    Object.assign(worker, {
+      x: 16, y: 16, state: 'idle', currentJob: stale.id, currentAction: 'work',
+    });
+
+    internals.maybeDecide(0);
+
+    const selected = internals.jobs.find((job) => job.id === worker.currentJob)!;
+    expect(selected.site).toBe(otherFarm);
+    expect(selected.claimedBy).toBe(worker.id);
+    expect(stale.claimedBy).toBeNull();
+    expect(internals.jobs.filter((job) => job.claimedBy === worker.id)).toHaveLength(1);
+
+    // Make the previous farm actionable again: its original slot must be available.
+    internals.crops[0].watered = false;
+    internals.beginWork(1, stale.id);
+    expect(internals.villagers[1].currentJob).toBe(stale.id);
+    expect(stale.claimedBy).toBe(internals.villagers[1].id);
+    expect(selected.claimedBy).toBe(worker.id);
+    internals.beginWork(0, selected.id);
+    expect(selected.claimedBy).toBe(worker.id);
+    expect(internals.jobs.filter((job) => job.claimedBy === worker.id)).toHaveLength(1);
+  });
+
+  it('resumes cargo delivery when the original haul job tile is unreachable', () => {
+    const terrain = grassTerrain(24, 24);
+    const world = new DemoWorld(terrain);
+    const internals = world as unknown as {
+      villagers: DemoVillager[];
+      jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+      beginWork(index: number, jobId: number): void;
+    };
+    const blocked = completeBuilding(world, 'granary', 3, 3);
+    const reachable = completeBuilding(world, 'granary', 14, 3);
+    for (let y = 1; y <= 6; y += 1) {
+      for (let x = 1; x <= 6; x += 1) {
+        if (x === 1 || x === 6 || y === 1 || y === 6) terrain.tiles[y * 24 + x] = 5;
+      }
+    }
+    const previous = internals.jobs.find((job) => job.site === blocked && job.kind === 'haul')!;
+    const next = internals.jobs.find((job) => job.site === reachable && job.kind === 'haul')!;
+    const worker = internals.villagers[0];
+    previous.claimedBy = worker.id;
+    const cargo = { resource: 'grain', amount: 3, dest: reachable };
+    Object.assign(worker, {
+      x: 16, y: 16, state: 'idle', currentJob: previous.id, carrying: cargo,
+    });
+    const grainBefore = world.resources.grain;
+
+    internals.beginWork(0, next.id);
+
+    expect(previous.claimedBy).toBe(worker.id);
+    expect(next.claimedBy).toBeNull();
+    expect(worker.currentJob).toBe(previous.id);
+    expect(worker.carrying).toEqual(cargo);
+    expect(world.resources.grain).toBe(grainBefore);
+  });
+
+  it.each([false, true])('returns cargo when delivery is unreachable (existing claim: %s)', (claimed) => {
+    const terrain = grassTerrain(24, 24);
+    const world = new DemoWorld(terrain);
+    const internals = world as unknown as {
+      villagers: DemoVillager[];
+      jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+      beginWork(index: number, jobId: number): void;
+    };
+    const granary = completeBuilding(world, 'granary', 3, 3);
+    for (let y = 1; y <= 6; y += 1) {
+      for (let x = 1; x <= 6; x += 1) {
+        if (x === 1 || x === 6 || y === 1 || y === 6) terrain.tiles[y * 24 + x] = 5;
+      }
+    }
+    const haul = internals.jobs.find((job) => job.site === granary && job.kind === 'haul')!;
+    const worker = internals.villagers[0];
+    haul.claimedBy = claimed ? worker.id : null;
+    Object.assign(worker, {
+      x: 16, y: 16, state: 'idle', currentJob: claimed ? haul.id : null,
+      carrying: { resource: 'grain', amount: 3, dest: granary },
+    });
+    const before = world.resources.grain;
+
+    internals.beginWork(0, haul.id);
+
+    expect(worker.currentJob).toBeNull();
+    expect(haul.claimedBy).toBeNull();
+    expect(worker.carrying).toBeNull();
+    expect(world.resources.grain).toBe(before + 3);
+    internals.beginWork(0, haul.id);
+    expect(world.resources.grain).toBe(before + 3);
+  });
+
+  it('releases a blocked producer so the only worker can haul and finish the pending batch', () => {
+    const world = new DemoWorld(grassTerrain(16, 16));
+    const internals = world as unknown as {
+      villagers: DemoVillager[];
+      jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+      buildingStandTile(site: number): [number, number];
+      jobActionable(job: unknown, index: number): boolean;
+      tickVillagerAt(index: number): void;
+    };
+    internals.villagers.splice(1);
+    const bakery = completeBuilding(world, 'bakery', 4, 4);
+    const building = world.buildings.find((entry) => entry.id === bakery)!;
+    const produce = internals.jobs.find((job) => job.site === bakery && job.kind === 'produce')!;
+    const haul = internals.jobs.find((job) => job.site === bakery && job.kind === 'haul')!;
+    building.inventory.food = 30;
+    building.recipeTicks = 2;
+    expect(internals.jobActionable(produce, 0)).toBe(true);
+    building.recipeTicks = 1;
+    expect(internals.jobActionable(produce, 0)).toBe(false);
+    building.inventory.food = 29;
+    expect(internals.jobActionable(produce, 0)).toBe(false);
+    building.inventory.food = 28;
+    expect(internals.jobActionable(produce, 0)).toBe(true);
+    building.inventory.food = 30;
+    const worker = internals.villagers[0];
+    const [x, y] = internals.buildingStandTile(bakery);
+    produce.claimedBy = worker.id;
+    Object.assign(worker, {
+      x: x * 32 + 16, y: y * 32 + 16, state: 'working',
+      currentJob: produce.id, currentAction: 'work', workTicksRemaining: 40,
+    });
+
+    internals.tickVillagerAt(0);
+
+    expect(worker.currentJob).toBeNull();
+    expect(produce.claimedBy).toBeNull();
+    expect(building.recipeTicks).toBe(1);
+    const before = world.resources.food;
+    let hauled = false;
+    for (let i = 0; i < 2000 && building.recipeTicks !== 0; i += 1) {
+      internals.tickVillagerAt(0);
+      hauled ||= worker.currentJob === haul.id;
+    }
+    expect(hauled).toBe(true);
+    expect(building.recipeTicks).toBe(0);
+    const carried = worker.carrying?.resource === 'food' ? worker.carrying.amount : 0;
+    expect(world.resources.food + (building.inventory.food ?? 0) + carried).toBe(before + 32);
+    expect(internals.villagers).toHaveLength(1);
+  });
+
+  it('repaths when a new building blocks a flank of a diagonal step', () => {
+    const world = new DemoWorld(grassTerrain());
+    const internals = world as unknown as {
+      villagers: Array<{ id: number; x: number; y: number; path: Array<[number, number]> | null }>;
+      invalidatePathsIfNeeded(): void;
+    };
+    const villager = internals.villagers[0];
+    const tile = 32;
+    villager.x = tile / 2;
+    villager.y = tile / 2;
+    world.moveVillagerTo(1, 1, villager.id);
+    expect(villager.path).toEqual([[1, 1]]);
+    completeBuilding(world, 'fence', 1, 0);
+    internals.invalidatePathsIfNeeded();
+    expect(villager.path).not.toEqual([[1, 1]]);
+  });
+  it('returns carried cargo when the hauled site is demolished', () => {
+    const world = new DemoWorld(grassTerrain(32, 32));
+    const internals = world as unknown as {
+      villagers: Array<{
+        id: number;
+        currentJob: number | null;
+        carrying: { resource: string; amount: number; dest: unknown } | null;
+      }>;
+      jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+    };
+    const granary = completeBuilding(world, 'granary', 20, 20);
+    completeBuilding(world, 'farm', 2, 2);
+    const haul = internals.jobs.find((job) => job.kind === 'haul')!;
+    const villager = internals.villagers[0];
+    villager.currentJob = haul.id;
+    haul.claimedBy = villager.id;
+    villager.carrying = { resource: 'grain', amount: 3, dest: { building: granary } };
+    const grainBefore = world.resources.grain;
+    world.demolish(haul.site);
+    expect(villager.currentJob).toBeNull();
+    expect(villager.carrying).toBeNull();
+    expect(world.resources.grain).toBeGreaterThanOrEqual(grainBefore + 3);
+  });
+  it.each(['working', 'moving', 'eating'] as const)(
+    'returns cargo exactly once when a storm removes a %s hauler claim',
+    (state) => {
+      const world = new DemoWorld(grassTerrain(32, 32));
+      const internals = world as unknown as {
+        villagers: DemoVillager[];
+        jobs: Array<{ id: number; kind: string; site: number; claimedBy: number | null }>;
+        clock: { day: number };
+        applyDailyWeather(): void;
+      };
+      const granary = completeBuilding(world, 'granary', 20, 20);
+      const otherGranary = completeBuilding(world, 'granary', 6, 6);
+      const haul = internals.jobs.find((job) => job.site === granary && job.kind === 'haul')!;
+      const otherHaul = internals.jobs.find((job) => job.site === otherGranary && job.kind === 'haul')!;
+      const villager = internals.villagers[0];
+      const otherVillager = internals.villagers[1];
+      haul.claimedBy = villager.id;
+      Object.assign(villager, {
+        currentJob: haul.id,
+        carrying: { resource: 'grain', amount: 3, dest: granary },
+        state,
+        currentAction: state === 'eating' ? 'eat' : 'work',
+        purpose: state === 'moving' ? 'work' : null,
+        target: state === 'moving' ? [19, 20] : null,
+        path: state === 'moving' ? [[19, 20]] : null,
+        activityTicks: 20,
+      });
+      otherHaul.claimedBy = otherVillager.id;
+      Object.assign(otherVillager, {
+        currentJob: otherHaul.id,
+        carrying: { resource: 'flour', amount: 4, dest: otherGranary },
+        state: 'moving',
+        currentAction: 'work',
+        purpose: 'work',
+        target: [5, 6],
+        path: [[5, 6]],
+      });
+      const otherBefore = structuredClone(otherVillager);
+      const grainBefore = world.resources.grain;
+      const flourBefore = world.resources.flour;
+
+      // Seed 42, spring day 16 is a storm that damages the first of two buildings.
+      internals.clock.day = 15;
+      world.advanceClock(1, null);
+
+      expect(world.snapshot().clock).toMatchObject({ day: 16, weather: 2 });
+      expect(world.buildings.find((building) => building.id === granary)).toMatchObject({
+        complete: false,
+        progressTicks: DEMO_CATALOG.buildings.find((def) => def.id === 'granary')!.buildTicks / 2,
+      });
+      expect(world.buildings.find((building) => building.id === otherGranary)?.complete).toBe(true);
+      expect(internals.jobs.some((job) => job.site === granary)).toBe(false);
+      expect(villager.currentJob).toBeNull();
+      expect(villager.carrying).toBeNull();
+      expect(world.resources.grain).toBe(grainBefore + 3);
+      expect(world.resources.flour).toBe(flourBefore);
+      expect(villager).toMatchObject({
+        state: state === 'eating' ? 'eating' : 'idle',
+        currentAction: state === 'eating' ? 'eat' : null,
+        purpose: null,
+        target: null,
+        path: null,
+        activityTicks: 20,
+      });
+      expect(otherVillager).toEqual(otherBefore);
+      expect(otherHaul.claimedBy).toBe(otherVillager.id);
+
+      // Reapplying weather on the same date cannot deposit the abandoned cargo twice.
+      internals.applyDailyWeather();
+      expect(villager.currentJob).toBeNull();
+      expect(villager.carrying).toBeNull();
+      expect(world.resources.grain).toBe(grainBefore + 3);
+      expect(world.resources.flour).toBe(flourBefore);
+      expect(otherVillager).toEqual(otherBefore);
+      expect(otherHaul.claimedBy).toBe(otherVillager.id);
+    },
+  );
+
+  it('ends a worked-in-place job when a building covers the worker tile', () => {
+    const world = new DemoWorld(grassTerrain(16, 16));
+    const internals = world as unknown as {
+      villagers: Array<{ id: number; x: number; y: number; currentJob: number | null; state: string }>;
+      jobs: Array<{ id: number; kind: string; tile: [number, number]; claimedBy: number | null }>;
+      refreshGatherJobs(): void;
+      tickWorking(index: number): void;
+    };
+    world.nodes = [{ tile: [8, 8], resource: 'wood', amount: 5, max: 5, regenAcc: 0 }];
+    internals.refreshGatherJobs();
+    const job = internals.jobs.find((entry) => entry.kind === 'gather')!;
+    const villager = internals.villagers[0];
+    const tile = 32;
+    villager.x = job.tile[0] * tile + tile / 2;
+    villager.y = job.tile[1] * tile + tile / 2;
+    villager.currentJob = job.id;
+    job.claimedBy = villager.id;
+    villager.state = 'working';
+
+    completeBuilding(world, 'fence', job.tile[0], job.tile[1]);
+    internals.tickWorking(0);
+
+    expect(villager.currentJob).toBeNull();
+    expect(villager.state).toBe('idle');
+  });
+  it('holds a ripe crop and a finished recipe until the buffer has room', () => {
+    const world = new DemoWorld(grassTerrain(16, 16));
+    const internals = world as unknown as {
+      crops: Array<{ kindIndex: number; stage: number; x: number; y: number; watered: boolean }>;
+      jobs: Array<{ id: number; kind: string; site: number }>;
+      tendHarvestReadyCrop(jobId: number): void;
+      tickProduce(jobId: number): void;
+      farmNeedsTending(id: number): boolean;
+      farmFootprintTiles(id: number): Array<[number, number]>;
+    };
+    const farm = completeBuilding(world, 'farm', 4, 4);
+    const farmJob = internals.jobs.find((job) => job.site === farm && job.kind === 'tend_crops')!;
+    const farmInv = world.buildings.find((b) => b.id === farm)!.inventory;
+    const tiles = internals.farmFootprintTiles(farm);
+    internals.crops = tiles.map(([x, y]) => ({ kindIndex: 0, stage: 99, x, y, watered: true }));
+    inventoryAdd(farmInv, 'grain', 30);
+    expect(internals.farmNeedsTending(farm)).toBe(false);
+    internals.tendHarvestReadyCrop(farmJob.id);
+    expect(internals.crops).toHaveLength(tiles.length);
+    expect(inventoryGet(farmInv, 'grain')).toBe(30);
+    farmInv.grain = 20;
+    internals.tendHarvestReadyCrop(farmJob.id);
+    expect(internals.crops).toHaveLength(tiles.length - 1);
+
+    const bakery = completeBuilding(world, 'bakery', 10, 10);
+    const bakeJob = internals.jobs.find((job) => job.site === bakery && job.kind === 'produce')!;
+    const building = world.buildings.find((b) => b.id === bakery)!;
+    inventoryAdd(building.inventory, 'flour', 30);
+    building.recipeTicks = 1;
+    internals.tickProduce(bakeJob.id);
+    expect(building.recipeTicks).toBe(1);
+    expect(inventoryGet(building.inventory, 'food')).toBe(0);
+    building.inventory.flour = 20;
+    internals.tickProduce(bakeJob.id);
+    expect(building.recipeTicks).toBe(0);
+    expect(inventoryGet(building.inventory, 'food')).toBe(2);
+  });
+});
+
+describe('assigned homes and sleep journeys', () => {
+  function tiredWorld() {
+    const world = new DemoWorld(grassTerrain());
+    const internals = world as unknown as {
+      villagers: Array<{
+        id: number;
+        needs: { energy: number; hunger: number; thirst: number; social: number };
+      }>;
+    };
+    for (const v of internals.villagers) {
+      v.needs.energy = 0;
+      v.needs.hunger = 1;
+      v.needs.thirst = 1;
+      v.needs.social = 1;
+    }
+    return { world, internals };
+  }
+
+  it('auto-fills hut beds two per hut', () => {
+    const world = new DemoWorld(grassTerrain());
+    const first = completeBuilding(world, 'hut', 1, 1);
+    const second = completeBuilding(world, 'hut', 10, 10);
+    world.advance();
+    const homes = world.snapshot().villagers.map((v) => v.home);
+    expect(homes.filter((h) => h === first)).toHaveLength(2);
+    expect(homes.filter((h) => h === second)).toHaveLength(2);
+    expect(homes.filter((h) => h == null)).toHaveLength(1);
+  });
+
+  it('walks home to sleep, rests beside the hut, then leaves', () => {
+    const world = new DemoWorld(grassTerrain());
+    const hut = completeBuilding(world, 'hut', 1, 1);
+    world.advance(); // settle auto-fill before anyone gets tired
+    const internals = world as unknown as {
+      villagers: Array<{
+        id: number;
+        x: number;
+        y: number;
+        needs: { energy: number; hunger: number; thirst: number; social: number };
+      }>;
+    };
+    const first = internals.villagers[0];
+    first.needs.energy = 0;
+    first.needs.hunger = 1;
+    first.needs.thirst = 1;
+    first.needs.social = 1;
+    world.advance();
+    let view = villagerById(world, first.id);
+    expect(view.home).toBe(hut);
+    expect(view.purpose).toBe(4); // home
+    expect(view.state).toBe(1);
+
+    for (let i = 0; i < 400 && villagerById(world, first.id).state !== 4; i += 1) world.advance();
+    view = villagerById(world, first.id);
+    expect(view.state).toBe(4);
+    expect(world.getVillagerDetail(first.id).home).toBe(hut);
+
+    for (let i = 0; i < 150 && villagerById(world, first.id).state === 4; i += 1) world.advance();
+    expect(villagerById(world, first.id).state).toBe(0);
+    expect(world.getVillagerDetail(first.id).home).toBe(hut);
+  });
+
+  it('sleeps in place without a home', () => {
+    const { world } = tiredWorld();
+    world.advance();
+    expect(villagerById(world, 1).state).toBe(4);
+    expect(villagerById(world, 1).destination).toBeUndefined();
+  });
+
+  it('reassigns homes and clears them on demolish', () => {
+    const world = new DemoWorld(grassTerrain());
+    const oldHut = completeBuilding(world, 'hut', 1, 1);
+    completeBuilding(world, 'hut', 10, 10);
+    const spareHut = completeBuilding(world, 'hut', 5, 12);
+    world.advance();
+    expect(world.getVillagerDetail(1).home).toBe(oldHut);
+
+    world.assignHome(1, spareHut);
+    expect(world.getVillagerDetail(1).home).toBe(spareHut);
+    expect(world.getVillagerDetail(1).homeBuilding).toBe('hut');
+    expect(() => world.assignHome(999, spareHut)).toThrow();
+    expect(() => world.assignHome(2, 9999)).toThrow();
+
+    world.demolish(spareHut);
+    expect(world.getVillagerDetail(1).home).toBeNull();
+  });
+
+  it('names workplaces and residences on detail and building views', () => {
+    const world = new DemoWorld(grassTerrain());
+    const hut = completeBuilding(world, 'hut', 1, 1);
+    const farm = completeBuilding(world, 'farm', 10, 10);
+    world.resources.grain = 4;
+    for (let i = 0; i < 60; i += 1) world.advance();
+    const detail = world.getVillagerDetail(1);
+    expect(detail.home).toBe(hut);
+    expect(detail.homeBuilding).toBe('hut');
+    expect(detail.homeTile).toEqual([1, 1]);
+    const hutView = world.snapshot().buildings.find((b) => b.id === hut)!;
+    expect(hutView.residents).toContain(1);
+    expect(detail.jobSite).toBe(farm);
+    expect(detail.jobSiteName).toBe('farm');
+    expect(detail.jobSiteTile).toEqual([10, 10]);
+    const farmView = world.snapshot().buildings.find((b) => b.id === farm)!;
+    expect(farmView.workers).toContain(1);
   });
 });

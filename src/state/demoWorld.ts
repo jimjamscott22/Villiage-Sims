@@ -1,4 +1,6 @@
+import { ChickenGround, newFlock, tickFlock, relocateChickens, chickenViews, basketViews, clickChicken, collectEggs, validateFlock, type Flock } from './chickens';
 import { DemoSocial, type Encounter } from './demoSocial';
+import { initialVisits, advanceVisits, finishVisit, validateVisits, VISITOR_DEFINITIONS, type Visits } from './visitors';
 import type { Behavior } from './demoLeisure';
 import { findPath, terrainPassable } from './pathfind';
 import type {
@@ -19,6 +21,8 @@ import type {
   TickSnapshot,
   VillagerDetail,
   WorldInit,
+  VisitorView,
+  VisitDecision,
 } from './types';
 
 const DEMO_CROPS: CropDef[] = [
@@ -204,6 +208,7 @@ export const DEMO_CATALOG: Catalog = {
         minPopulation: 5,
       },
     },
+    { id: 'chicken_shelter', name: 'Chicken Shelter', footprint: [1, 1], cost: { wood: 15 }, buildTicks: 0, category: 'amenity', validTerrain: ['grass', 'sand'], jobs: [] },
   ],
   crops: DEMO_CROPS,
   traits: [
@@ -262,7 +267,7 @@ const DRINK_TICKS = 40;
 const SLEEP_TICKS = 100;
 const WANDER_RADIUS = 6;
 const DEMO_SEED = 42;
-export const DEMO_SAVE_VERSION = 3;
+export const DEMO_SAVE_VERSION = 5;
 
 /** Match Rust `weather::mix` — unsigned 64-bit wrapping. */
 function mixU64(a: bigint | number, b: number, c: number, d: number): bigint {
@@ -304,7 +309,7 @@ function demoStormDamageIndex(
 }
 
 type ActionKind = 'eat' | 'sleep' | 'work' | 'socialize' | 'wander' | 'drink';
-type MovePurpose = 'player' | 'work' | 'wander' | 'drink';
+type MovePurpose = 'player' | 'work' | 'wander' | 'drink' | 'home';
 type AgentStateName =
   | 'idle' | 'moving' | 'working' | 'eating' | 'sleeping' | 'socializing' | 'drinking';
 type DemoJobKind = 'tend_crops' | 'gather' | 'haul' | 'produce';
@@ -568,6 +573,8 @@ export interface DemoVillager {
   traits: string[];
   thought: string | null;
   thoughtTtl: number;
+  /** Assigned residence building id; null means homeless (sleeps in place). */
+  home: number | null;
   /** Ticks before searching for water again after none was reachable (Rust: runtime-only). */
   waterSearchCooldown?: number;
 }
@@ -583,6 +590,10 @@ interface DemoClock {
 }
 
 interface DemoSaveState {
+  visits: Visits;
+  chronicleEntries: ChronicleEntry[];
+  chronicleNextSeq: number;
+  flock: Flock | null;
   encounters: Encounter[];
   behavior: Record<number, Behavior>;
   version: number;
@@ -638,6 +649,7 @@ function purposeByte(v: DemoVillager): number | undefined {
     case 'work': return 1;
     case 'wander': return 2;
     case 'drink': return 3;
+    case 'home': return 4;
   }
 }
 
@@ -660,6 +672,7 @@ function stateLabel(v: DemoVillager): string {
       if (v.purpose === 'work') return 'Going to work';
       if (v.purpose === 'wander') return 'Wandering';
       if (v.purpose === 'drink') return 'Fetching water';
+      if (v.purpose === 'home') return 'Going home';
       return 'Moving';
     case 'working': return 'Working';
     case 'eating': return 'Eating';
@@ -693,6 +706,8 @@ export class DemoWorld {
   buildings: DemoBuilding[] = [];
   crops: DemoCrop[] = [];
   nodes: ResourceNode[] = [];
+  flock: Flock | null = null;
+  private visits = initialVisits();
   private occupancy: Array<number | null>;
   private nextId = 1;
   private nextCropId = 1;
@@ -890,6 +905,7 @@ export class DemoWorld {
         traits: i === 0 ? ['fast_walker'] : i === 1 ? ['green_thumb'] : ['strong_back'],
         thought: null,
         thoughtTtl: 0,
+        home: null,
       });
     }
   }
@@ -971,6 +987,10 @@ export class DemoWorld {
   exportState(): string {
     const state: DemoSaveState = {
       version: DEMO_SAVE_VERSION,
+      visits: this.visits,
+      chronicleEntries: this.chronicleEntries,
+      chronicleNextSeq: this.chronicleNextSeq,
+      flock: this.flock,
       encounters: this.social.encounters,
       behavior: this.social.leisure.behavior,
       seed: this.seed,
@@ -999,7 +1019,7 @@ export class DemoWorld {
       throw new Error(`could not decode save: ${cause instanceof Error ? cause.message : String(cause)}`);
     }
     if (state == null || typeof state !== 'object') throw new Error('could not decode save: invalid data');
-    if (state.version !== DEMO_SAVE_VERSION && state.version !== 1 && state.version !== 2) {
+    if (state.version !== DEMO_SAVE_VERSION && state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4) {
       throw new Error(`unsupported save version ${String(state.version)} (expected ${DEMO_SAVE_VERSION})`);
     }
     if (state.seed !== DEMO_SEED) throw new Error('save header seed does not match the demo world');
@@ -1027,6 +1047,10 @@ export class DemoWorld {
     world.nextJobId = state.nextJobId;
     world.nextVillagerId = state.nextVillagerId;
     world.villagers = state.villagers;
+    // Saves predate assigned residences: start homeless; ticks refill beds.
+    for (const v of world.villagers) {
+      if (typeof v.home !== 'number') v.home = null;
+    }
     if (state.version < 3) {
       // Versions 1–2 predate thirst and health: start both full.
       for (const v of world.villagers) {
@@ -1037,6 +1061,13 @@ export class DemoWorld {
     }
     world.jobs = state.jobs;
     world.clock = state.clock;
+    world.flock = state.version < 4 ? null : state.flock;
+    const shelters = world.buildings.filter(b => DEMO_CATALOG.buildings[b.kindIndex]?.id === 'chicken_shelter');
+    if (shelters.length > 1 || shelters.length !== Number(world.flock != null)) throw new Error('save has inconsistent chicken shelter');
+    if (world.flock) {
+      if (shelters[0].id !== world.flock.shelterId || shelters[0].x !== world.flock.home[0] || shelters[0].y !== world.flock.home[1]) throw new Error('save has invalid flock home');
+      validateFlock(world.flock, world.chickenGround());
+    }
     if (state.version === 1) {
       for (const v of world.villagers) if (v.state === 'socializing') { world.clearToIdle(v); v.currentAction = null; }
     } else {
@@ -1045,8 +1076,14 @@ export class DemoWorld {
       world.social.leisure.behavior = state.behavior;
       world.social.validate();
     }
-    world.chronicleEntries = [];
-    world.chronicleNextSeq = 0;
+    world.visits = state.version < 5 ? initialVisits() : state.visits;
+    validateVisits(world.visits);
+    if (state.version >= 5 && (!Array.isArray(state.chronicleEntries) || state.chronicleEntries.length > 200
+      || !Number.isSafeInteger(state.chronicleNextSeq) || state.chronicleNextSeq < 0)) {
+      throw new Error('save has invalid chronicle');
+    }
+    world.chronicleEntries = state.version < 5 ? [] : state.chronicleEntries;
+    world.chronicleNextSeq = state.version < 5 ? 0 : state.chronicleNextSeq;
     world.unlocked = world.satisfiedUnlocks();
     return world;
   }
@@ -1065,13 +1102,16 @@ export class DemoWorld {
     this.clock.tick += 1;
     this.clock.minuteAccum += MINUTES_PER_TICK;
     this.clock.minute = Math.floor(this.clock.minuteAccum);
+    let dayRolled = false;
     if (this.clock.minuteAccum >= MINUTES_PER_DAY) {
+      dayRolled = true;
       this.clock.minuteAccum -= MINUTES_PER_DAY;
       this.clock.minute = Math.floor(this.clock.minuteAccum);
       this.rollDay();
       this.onDayRollover();
     }
 
+    this.advanceVisitors(1);
     const newlyComplete: number[] = [];
     for (const building of this.buildings) {
       if (building.complete) continue;
@@ -1095,6 +1135,7 @@ export class DemoWorld {
       this.advertiseJobsFor(id);
     }
 
+    if (this.flock) tickFlock(this.flock, this.chickenGround(), this.clock.minute, this.chickenDate(), this.villagers.filter(v => v.state === 'moving'));
     this.tickCrops();
     this.tickNodes();
     this.refreshGatherJobs();
@@ -1114,7 +1155,111 @@ export class DemoWorld {
     this.social.tick();
     this.checkUnlocks();
     this.checkObjectives();
+    // New beds (completed huts) settle here so Sleep journeys read fresh homes.
+    this.assignHomes();
+    // Save only once the whole tick is committed (mirrors Rust `World::advance`).
+    if (dayRolled) this.maybeAutosave();
     return this.snapshot();
+  }
+
+  private advanceVisitors(ticks: number, jump = false): void {
+    for (const event of advanceVisits(this.visits, ticks)) {
+      const savedClock = this.clock;
+      if (jump && event.offset === ticks) {
+        this.clock = { ...savedClock };
+        this.clock.day += 1;
+        if (this.clock.day > DAYS_PER_SEASON) {
+          this.clock.day = 1; this.clock.season = (this.clock.season + 1) % 4;
+          if (this.clock.season === 0) this.clock.year += 1;
+        }
+      }
+      this.pushChronicle(null, {
+        kind: 'visitorEvent', visitor: event.visitor,
+        name: VISITOR_DEFINITIONS.find(d => d.id === event.visitor)!.name, outcome: event.outcome,
+      });
+      this.clock = savedClock;
+    }
+  }
+
+  private visitorHome(): { home: number; tile: [number, number] } | null {
+    const first = [...this.villagers].sort((a, b) => a.id - b.id)[0];
+    const anchor = first ? this.posToTile(first.x, first.y) : this.stockpileStand();
+    if (!anchor) return null;
+    const used = this.villagers.map(v => this.posToTile(v.x, v.y));
+    for (const home of [...this.buildings].sort((a, b) => a.id - b.id)) {
+      if (this.homeCapacityOf(home) <= this.homeResidents(home.id).length) continue;
+      const stand = this.homeStandTile(home.id);
+      if (!stand || !this.computePath(anchor, stand)) continue;
+      const tile = this.findSpawnTile(stand[0], stand[1], used, this.reachableFrom(stand));
+      if (tile) return { home: home.id, tile };
+    }
+    return null;
+  }
+
+  private visitorUnavailableReason(): string | null {
+    const visit = this.visits.active;
+    if (!visit) return 'This visitor\'s offer is no longer available';
+    if (visit.visitor !== 'grower') {
+      const def = VISITOR_DEFINITIONS.find(d => d.id === visit.visitor)!;
+      const cost = def.cost.food ?? 0;
+      return this.deriveTotals().food >= cost ? null : `Requires ${cost} food`;
+    }
+    if (this.villagers.length >= this.housingCapacity()) {
+      return 'Requires spare population capacity and a vacant bed in completed housing';
+    }
+    if (!Number.isSafeInteger(this.nextVillagerId + 1) || this.visits.growerSettled) return 'This resident cannot join the village';
+    return this.visitorHome() ? null : 'Requires a vacant bed in completed, reachable housing and a free arrival tile';
+  }
+
+  private visitorView(): VisitorView | null {
+    const visit = this.visits.active;
+    if (!visit) return null;
+    const def = VISITOR_DEFINITIONS.find(d => d.id === visit.visitor)!;
+    const unavailableReason = this.visitorUnavailableReason();
+    return {
+      visitId: visit.id, visitor: visit.visitor, name: def.name, title: def.title,
+      introduction: def.introduction, cost: def.cost as Record<string, number>, reward: def.reward,
+      remainingMinutes: Math.ceil(this.visits.remainingTicks * 60 / 1000),
+      canAccept: unavailableReason === null, unavailableReason,
+    };
+  }
+
+  respondToVisitor(visitId: number, decision: VisitDecision): void {
+    const visit = this.visits.active;
+    if (!visit || visit.id !== visitId) throw new Error('This visitor\'s offer is no longer available');
+    if (decision !== 'accept' && decision !== 'decline') throw new Error('Invalid visitor response');
+    let focus: [number, number] | null = null;
+    if (decision === 'accept') {
+      const reason = this.visitorUnavailableReason();
+      if (reason) throw new Error(reason);
+      if (visit.visitor === 'grower') {
+        const arrival = this.visitorHome();
+        if (!arrival) throw new Error('No reachable housing or arrival tile');
+        const [x, y] = this.tileCenter(...arrival.tile);
+        this.villagers.push({
+          id: this.nextVillagerId++, name: 'Mira', x, y, state: 'idle', purpose: null,
+          target: null, path: null, repathCooldown: 0, needs: fullNeeds(), currentJob: null,
+          workTicksRemaining: 0, activityTicks: 0, currentAction: null, carrying: null,
+          traits: ['green_thumb'], thought: null, thoughtTtl: 0, home: arrival.home,
+        });
+        this.visits.growerSettled = true;
+        focus = arrival.tile;
+      } else {
+        const def = VISITOR_DEFINITIONS.find(d => d.id === visit.visitor)!;
+        if (!this.withdrawCost(def.cost as Record<string, number>)) throw new Error('insufficient food');
+        if (visit.visitor === 'merchant') this.depositToStockpile('grain', 8);
+        else for (const v of this.villagers) {
+          v.needs.social = Math.min(1, v.needs.social + 0.2); recomputeHappiness(v.needs);
+        }
+      }
+    }
+    finishVisit(this.visits);
+    this.pushChronicle(focus, {
+      kind: 'visitorEvent', visitor: visit.visitor,
+      name: VISITOR_DEFINITIONS.find(d => d.id === visit.visitor)!.name,
+      outcome: decision === 'accept' ? 'accepted' : 'declined',
+    });
+    this.checkUnlocks(); this.checkObjectives();
   }
 
   housingCapacity(): number {
@@ -1127,6 +1272,122 @@ export class DemoWorld {
       }
     }
     return base + extra;
+  }
+
+  /** Beds a building offers; only completed housing counts (mirrors Rust). */
+  private homeCapacityOf(building: DemoBuilding): number {
+    if (!building.complete) return 0;
+    return DEMO_CATALOG.buildings[building.kindIndex]?.houses ?? 0;
+  }
+
+  private validHome(buildingId: number): boolean {
+    const building = this.buildings.find((b) => b.id === buildingId);
+    return building != null && this.homeCapacityOf(building) > 0;
+  }
+
+  /** Drop links to lost residences; release interrupted walks home. */
+  private clearInvalidHomes(): void {
+    const live = new Set(
+      this.buildings.filter((b) => this.homeCapacityOf(b) > 0).map((b) => b.id),
+    );
+    for (const villager of this.villagers) {
+      if (villager.home != null && !live.has(villager.home)) villager.home = null;
+      if (
+        villager.home == null
+        && villager.state === 'moving'
+        && villager.purpose === 'home'
+      ) {
+        this.clearToIdle(villager);
+        if (villager.currentAction === 'sleep') villager.currentAction = null;
+      }
+    }
+  }
+
+  /** Fill free beds in villager-id onto building-id order (mirrors Rust). */
+  private assignHomes(): void {
+    this.clearInvalidHomes();
+    const occupancy = new Map<number, number>();
+    for (const v of this.villagers) {
+      if (v.home != null) occupancy.set(v.home, (occupancy.get(v.home) ?? 0) + 1);
+    }
+    const homes = this.buildings
+      .filter((b) => this.homeCapacityOf(b) > 0)
+      .map((b) => b.id)
+      .sort((a, b) => a - b);
+    const homeless = [...this.villagers].sort((a, b) => a.id - b.id).filter((v) => v.home == null);
+    for (const villager of homeless) {
+      const choice = homes.find((id) => {
+        const building = this.buildings.find((b) => b.id === id)!;
+        return (occupancy.get(id) ?? 0) < this.homeCapacityOf(building);
+      });
+      if (choice == null) return;
+      villager.home = choice;
+      occupancy.set(choice, (occupancy.get(choice) ?? 0) + 1);
+    }
+  }
+
+  /**
+   * Player reassignment among completed residences (`null` clears).
+   * Mirrors Rust `assign_home`, including the mid-journey repath release.
+   */
+  assignHome(villagerId: number, buildingId: number | null): void {
+    const villager = this.villagers.find((v) => v.id === villagerId);
+    if (!villager) throw new Error(`unknown villager ${villagerId}`);
+    if (buildingId != null) {
+      const building = this.buildings.find((b) => b.id === buildingId);
+      if (!building || this.homeCapacityOf(building) === 0) {
+        throw new Error(`building ${buildingId} is not a completed residence`);
+      }
+      const used = this.villagers.filter(
+        (v) => v.home === buildingId && v.id !== villagerId,
+      ).length;
+      if (used >= this.homeCapacityOf(building)) {
+        throw new Error(`building ${buildingId} has no free bed`);
+      }
+      villager.home = buildingId;
+    } else {
+      villager.home = null;
+    }
+    if (villager.state === 'moving' && villager.purpose === 'home') {
+      this.clearToIdle(villager);
+      if (villager.currentAction === 'sleep') villager.currentAction = null;
+    }
+  }
+
+  private homeStandTile(buildingId: number): [number, number] | null {
+    return this.buildingStandTile(buildingId);
+  }
+
+  private homeResidents(buildingId: number): number[] {
+    return this.villagers
+      .filter((v) => v.home === buildingId)
+      .map((v) => v.id)
+      .sort((a, b) => a - b);
+  }
+
+  private siteWorkers(buildingId: number): number[] {
+    const workers = this.jobs
+      .filter((job) => job.site === buildingId && job.claimedBy != null)
+      .map((job) => job.claimedBy!);
+    return [...new Set(workers)].sort((a, b) => a - b);
+  }
+
+  private homeView(v: DemoVillager): { id: number; name: string; tile: [number, number] } | null {
+    if (v.home == null || !this.validHome(v.home)) return null;
+    const building = this.buildings.find((b) => b.id === v.home)!;
+    const def = DEMO_CATALOG.buildings[building.kindIndex];
+    return { id: building.id, name: def.id, tile: [building.x, building.y] };
+  }
+
+  private jobSiteView(v: DemoVillager): { id: number; name: string; tile: [number, number] } | null {
+    if (v.currentJob == null) return null;
+    const job = this.jobs.find((j) => j.id === v.currentJob);
+    if (!job) return null;
+    const building = this.buildings.find((b) => b.id === job.site);
+    if (!building) return null;
+    const def = DEMO_CATALOG.buildings[building.kindIndex];
+    if (!def) return null;
+    return { id: building.id, name: def.id, tile: [building.x, building.y] };
   }
 
   private winterWarning(): boolean {
@@ -1179,12 +1440,17 @@ export class DemoWorld {
         partnerId: this.social.pair(v.id) ? (this.social.pair(v.id)!.a === v.id ? this.social.pair(v.id)!.b : this.social.pair(v.id)!.a) : undefined,
         destination: this.viewDestination(v),
         purpose: purposeByte(v),
+        home: v.home != null && this.validHome(v.home) ? v.home : undefined,
         social: v.needs.social,
       })),
       buildings: this.buildingViews(),
+      chickenShelterId: this.flock?.shelterId ?? null,
+      chickens: chickenViews(this.flock),
+      eggBaskets: basketViews(this.flock, this.terrain.tileSize),
       crops,
       resources,
       housingCapacity: this.housingCapacity(),
+      visitor: this.visitorView(),
       clock,
       chronicleSeq: this.chronicleNextSeq,
       unlocked: [...this.unlocked],
@@ -1200,6 +1466,8 @@ export class DemoWorld {
     const job = villager.currentJob != null
       ? this.jobs.find((entry) => entry.id === villager.currentJob) ?? null
       : null;
+    const jobSite = this.jobSiteView(villager);
+    const home = this.homeView(villager);
     return {
       id: villager.id,
       name: villager.name,
@@ -1213,6 +1481,11 @@ export class DemoWorld {
       happiness: villager.needs.happiness,
       jobKind: job?.kind ?? null,
       jobSite: job?.site ?? null,
+      jobSiteName: jobSite?.name ?? null,
+      jobSiteTile: jobSite?.tile ?? null,
+      home: home?.id ?? null,
+      homeBuilding: home?.name ?? null,
+      homeTile: home?.tile ?? null,
       traits: villager.traits ?? [],
       tile: this.posToTile(villager.x, villager.y),
       thought: villager.thought ?? undefined,
@@ -1339,10 +1612,6 @@ export class DemoWorld {
         lastError = 'no path';
         continue;
       }
-      if (villager.carrying) {
-        this.depositToStockpile(villager.carrying.resource, villager.carrying.amount);
-        villager.carrying = null;
-      }
       this.social.cancel(villager.id);
       this.social.leisure.clear(villager);
       this.releaseJobAt(index);
@@ -1369,10 +1638,22 @@ export class DemoWorld {
       .map((entry) => entry.index);
   }
 
+  private chickenGround(): ChickenGround { return new ChickenGround(this.terrain, this.occupancy); }
+  private chickenDate(): number { return (this.clock.year * 4 + this.clock.season) * 28 + this.clock.day; }
+  clickChicken(shelterId: number, id: number): boolean { return clickChicken(this.flock, shelterId, id); }
+  collectEggs(shelterId: number, id: number): number {
+    const amount = collectEggs(this.flock, shelterId, id);
+    this.depositToStockpile('food', amount); return amount;
+  }
+
   validatePlacement(kind: string, x: number, y: number, rotation: number): PlacementValidity {
     const kindIndex = DEMO_CATALOG.buildings.findIndex((building) => building.id === kind);
     if (kindIndex < 0) return { valid: false, reason: `unknown building '${kind}'` };
     const def = DEMO_CATALOG.buildings[kindIndex];
+    if (kind === 'chicken_shelter') {
+      if (this.flock) return { valid: false, reason: 'Only one chicken shelter per village' };
+      if (!this.chickenGround().hasExit([x, y])) return { valid: false, reason: 'The shelter needs adjacent walkable ground' };
+    }
     const [fw, fh] = rotatedFootprint(def, rotation);
     for (const [tx, ty] of footprintTiles(x, y, fw, fh)) {
       if (tx < 0 || ty < 0 || tx >= this.terrain.width || ty >= this.terrain.height) {
@@ -1416,7 +1697,13 @@ export class DemoWorld {
       inventory: {},
       recipeTicks: 0,
     });
+    if (kind === 'chicken_shelter') {
+      this.buildings[this.buildings.length - 1].complete = true;
+      this.flock = newFlock(id, [x, y], this.seed, this.clock.minute < 360 ? this.chickenDate() - 1 : this.chickenDate(), this.chickenGround());
+      this.pushChronicle([x, y], { kind: 'buildingComplete', id, building: kind });
+    }
     this.invalidatePathsIfNeeded();
+    if (this.flock) relocateChickens(this.flock, this.chickenGround());
     return { id };
   }
 
@@ -1441,20 +1728,24 @@ export class DemoWorld {
       this.depositToStockpile(key, amount);
     }
     this.buildings.splice(index, 1);
+    if (this.flock?.shelterId === entityId) this.flock = null;
     const released = this.jobs
       .filter((job) => job.site === entityId && job.claimedBy != null)
       .map((job) => job.claimedBy!);
     this.jobs = this.jobs.filter((job) => job.site !== entityId);
+    this.clearReleasedWorkClaims(released);
     for (const villager of this.villagers) {
-      if (released.includes(villager.id)) {
-        villager.currentJob = null;
-        if (
-          villager.state === 'working'
-          || (villager.state === 'moving' && villager.purpose === 'work')
-        ) {
-          this.clearToIdle(villager);
-        }
-      } else if (villager.currentJob != null && !this.jobs.some((job) => job.id === villager.currentJob)) {
+      // Residence links die with the building; walks home are released.
+      if (villager.home === entityId) villager.home = null;
+      if (
+        villager.home == null
+        && villager.state === 'moving'
+        && villager.purpose === 'home'
+      ) {
+        this.clearToIdle(villager);
+        if (villager.currentAction === 'sleep') villager.currentAction = null;
+      }
+      if (villager.currentJob != null && !this.jobs.some((job) => job.id === villager.currentJob)) {
         villager.currentJob = null;
       }
     }
@@ -1463,9 +1754,13 @@ export class DemoWorld {
   plantCrop(kind: string, x: number, y: number): void {
     const kindIndex = DEMO_CROPS.findIndex((crop) => crop.id === kind);
     if (kindIndex < 0) throw new Error(`unknown crop '${kind}'`);
-    if (this.completedFarmAt(x, y) == null) throw new Error('tile is not on a completed farm');
+    const farmId = this.completedFarmAt(x, y);
+    if (farmId == null) throw new Error('tile is not on a completed farm');
     if (this.crops.some((crop) => crop.x === x && crop.y === y)) {
       throw new Error('tile already has a crop');
+    }
+    if (!this.spendSeedCost(farmId, DEMO_CROPS[kindIndex].seedCost ?? {})) {
+      throw new Error('insufficient seeds');
     }
     const id = this.nextCropId;
     this.nextCropId += 1;
@@ -1484,10 +1779,13 @@ export class DemoWorld {
 
   advanceClock(days: number, season: number | null): void {
     for (let i = 0; i < days; i += 1) {
+      // Match Rust: round fractional clock duration to the nearest logic tick.
+      this.advanceVisitors(Math.round((MINUTES_PER_DAY - this.clock.minuteAccum) / MINUTES_PER_TICK), true);
       this.clock.minuteAccum = 0;
       this.clock.minute = 0;
       this.rollDay();
       this.onDayRollover();
+      this.maybeAutosave();
     }
     if (season != null) {
       if (season < 0 || season > 3) throw new Error(`invalid season ${season}`);
@@ -1498,7 +1796,6 @@ export class DemoWorld {
   private onDayRollover(): void {
     this.clearAllCropWater();
     this.applyDailyWeather();
-    this.maybeAutosave();
   }
 
   private applyDailyWeather(): void {
@@ -1530,17 +1827,10 @@ export class DemoWorld {
       .filter((job) => job.site === buildingId && job.claimedBy != null)
       .map((job) => job.claimedBy!);
     this.jobs = this.jobs.filter((job) => job.site !== buildingId);
-    for (const villager of this.villagers) {
-      if (!released.includes(villager.id)) continue;
-      villager.currentJob = null;
-      if (
-        villager.state === 'working'
-        || (villager.state === 'moving' && villager.purpose === 'work')
-      ) {
-        this.clearToIdle(villager);
-        if (villager.currentAction === 'work') villager.currentAction = null;
-      }
-    }
+    // A storm-damaged residence stops housing until repaired (mirrors Rust:
+    // the next assignHomes clears the link and releases walks home).
+    this.clearInvalidHomes();
+    this.clearReleasedWorkClaims(released);
   }
 
   private maybeAutosave(): void {
@@ -1743,15 +2033,19 @@ export class DemoWorld {
     const villager = this.villagers[index];
     if (villager.currentJob != null) {
       const job = this.jobs.find((entry) => entry.id === villager.currentJob);
-      if (job) {
+      // A claim that has gone stale is re-scored like any other job.
+      if (job && this.jobActionable(job, index)) {
         const dist = Math.abs(job.tile[0] - from[0]) + Math.abs(job.tile[1] - from[1]);
         return { kind: 'work', score: scoreWork(job.priority, dist), jobId: job.id };
       }
     }
     const best = this.jobs
-      .filter(job => job.claimedBy == null && this.social.leisure.connected(from, job.tile) && this.jobActionable(job, index))
+      .filter(job => (job.claimedBy == null || job.claimedBy === villager.id)
+        && this.social.leisure.connected(from, job.tile) && this.jobActionable(job, index))
       .map(job => ({ job, score: scoreWork(job.priority, Math.abs(job.tile[0] - from[0]) + Math.abs(job.tile[1] - from[1])) }))
       .sort((a, b) => b.score - a.score || a.job.id - b.job.id)[0];
+    // No usable work: drop a stale Work action so hysteresis cannot pin it.
+    if (!best && villager.currentAction === 'work') villager.currentAction = null;
     return { kind: 'work', score: best?.score ?? 0, jobId: best?.job.id ?? null };
   }
 
@@ -1900,14 +2194,41 @@ export class DemoWorld {
   }
 
   private beginSleep(index: number): void {
+    // Mirrors Rust `begin_sleep_at`: walk home when housed and reachable,
+    // otherwise rest in place.
     const villager = this.villagers[index];
+    const start = this.posToTile(villager.x, villager.y);
+    if (villager.home != null && this.validHome(villager.home)) {
+      const tile = this.homeStandTile(villager.home);
+      if (tile != null) {
+        if (tile[0] === start[0] && tile[1] === start[1]) {
+          this.startSleeping(villager);
+          return;
+        }
+        const path = this.computePath(start, tile);
+        if (path) {
+          villager.state = 'moving';
+          villager.purpose = 'home';
+          villager.target = tile;
+          villager.path = path;
+          villager.currentAction = 'sleep';
+          this.setThought(index, 'Going home...');
+          return;
+        }
+      }
+    }
+    this.startSleeping(villager);
+  }
+
+  private startSleeping(villager: DemoVillager): void {
     villager.path = null;
     villager.target = null;
     villager.purpose = null;
     villager.state = 'sleeping';
     villager.activityTicks = SLEEP_TICKS;
     villager.currentAction = 'sleep';
-    this.setThought(index, actionThought('sleep'));
+    villager.thought = actionThought('sleep');
+    villager.thoughtTtl = 40;
   }
 
   private beginSocialize(index: number): void {
@@ -1937,23 +2258,37 @@ export class DemoWorld {
       const job = this.jobs.find((entry) => entry.id === candidate);
       if (!job || (job.claimedBy != null && job.claimedBy !== villager.id)) continue;
       if (!this.jobActionable(job, index)) continue;
-      if (!this.computePath(from, job.tile)) continue;
+      const target = this.workTarget(job, index);
+      if (!target || !this.computePath(from, target)) continue;
       if (this.claimId(candidate, villager.id)) {
         claimed = candidate;
         break;
       }
     }
     if (claimed == null) {
-      if (existing != null) this.releaseJobAt(index);
+      this.releaseJobAt(index);
       villager.currentAction = null;
       return;
+    }
+
+    // Match Rust: changing work slots releases the old reservation while retaining haul cargo.
+    if (existing != null && existing !== claimed) {
+      const previousJob = this.jobs.find((entry) => entry.id === existing);
+      if (previousJob?.claimedBy === villager.id) previousJob.claimedBy = null;
     }
 
     villager.currentJob = claimed;
     villager.currentAction = 'work';
     const job = this.jobs.find((entry) => entry.id === claimed)!;
     this.setThought(index, jobThought(job.kind));
-    this.beginMoveToJob(index, job.tile, claimed);
+    const tile = this.workTarget(job, index)!;
+    this.beginMoveToJob(index, tile, claimed);
+  }
+
+  /** Use the delivery endpoint for both admission and movement when resuming cargo. */
+  private workTarget(job: DemoJob, index: number): [number, number] | null {
+    const carrying = this.villagers[index].carrying;
+    return job.kind === 'haul' && carrying ? this.endpointStandTile(carrying.dest) : job.tile;
   }
 
   private jobActionable(job: DemoJob, villagerIndex: number): boolean {
@@ -1969,9 +2304,15 @@ export class DemoWorld {
       case 'produce': {
         const building = this.buildings.find((entry) => entry.id === job.site);
         if (!building || !building.complete) return false;
-        if (building.recipeTicks > 0) return true;
         const recipe = DEMO_CATALOG.buildings[building.kindIndex]?.recipe;
-        return recipe != null && Object.entries(recipe.inputs).every(
+        if (!recipe) return false;
+        if (building.recipeTicks === 1) {
+          // Keep the pending batch, but free the worker to haul until output fits.
+          return productionFreeCapacity(building.inventory)
+            >= Object.values(recipe.outputs).reduce((sum, amount) => sum + amount, 0);
+        }
+        if (building.recipeTicks > 1) return true;
+        return Object.entries(recipe.inputs).every(
           ([resource, amount]) => inventoryGet(building.inventory, resource) >= amount,
         );
       }
@@ -1987,9 +2328,18 @@ export class DemoWorld {
       const crop = this.crops.find((entry) => entry.x === x && entry.y === y);
       if (!crop) return canPlant;
       const def = DEMO_CROPS[crop.kindIndex];
-      return crop.stage >= def.stages - 1
-        || (!crop.watered && def.seasons.includes(season));
+      const ripe = crop.stage >= def.stages - 1;
+      return (ripe && this.harvestFits(buildingId, def))
+        || (!ripe && !crop.watered && def.seasons.includes(season));
     });
+  }
+
+  /** A harvest commits the crop, so it waits until the whole yield fits the farm buffer. */
+  private harvestFits(buildingId: number, def: (typeof DEMO_CROPS)[number]): boolean {
+    const building = this.buildings.find((entry) => entry.id === buildingId);
+    if (!building) return false;
+    const total = Object.values(def.yield ?? {}).reduce((sum, amount) => sum + amount, 0);
+    return productionFreeCapacity(building.inventory) >= total;
   }
 
   private claimId(jobId: number, villagerId: number): boolean {
@@ -2077,6 +2427,15 @@ export class DemoWorld {
       if (villager.currentAction === 'work') {
         villager.currentAction = null;
       }
+      return;
+    }
+    // Haulers roam between endpoints; every other job is worked in place, so a
+    // building placed on the worker's tile ends the shift.
+    const [vx, vy] = this.posToTile(villager.x, villager.y);
+    if (job.kind !== 'haul' && !this.isPassable(vx, vy)) {
+      this.releaseJobAt(index);
+      this.clearToIdle(villager);
+      villager.currentAction = null;
       return;
     }
     switch (job.kind) {
@@ -2217,7 +2576,8 @@ export class DemoWorld {
     const cropIndex = this.crops.findIndex((crop) => {
       const def = DEMO_CROPS[crop.kindIndex];
       return tiles.some(([tx, ty]) => crop.x === tx && crop.y === ty)
-        && crop.stage >= def.stages - 1;
+        && crop.stage >= def.stages - 1
+        && this.harvestFits(job.site, def);
     });
     if (cropIndex < 0) return;
     const crop = this.crops[cropIndex];
@@ -2350,7 +2710,7 @@ export class DemoWorld {
     for (const villagerId of released) {
       const villager = this.villagers.find((entry) => entry.id === villagerId);
       if (!villager) continue;
-      villager.currentJob = null;
+      this.releaseJobAt(this.villagers.indexOf(villager));
       if (villager.state === 'working' || (villager.state === 'moving' && villager.purpose === 'work')) {
         this.clearToIdle(villager);
         if (villager.currentAction === 'work') villager.currentAction = null;
@@ -2471,7 +2831,16 @@ export class DemoWorld {
     return best ? { id: best.id, free: best.free } : null;
   }
 
+  /** Among usable tasks the pickup nearest the worker wins; ties keep the earliest. */
   private findHaulTask(workerTile: [number, number]): HaulTask | null {
+    const distTo = (tile: [number, number]): number =>
+      Math.abs(tile[0] - workerTile[0]) + Math.abs(tile[1] - workerTile[1]);
+    const candidates: Array<{ dist: number; task: HaulTask }> = [];
+    const nearest = (): HaulTask | null => {
+      let best: { dist: number; task: HaulTask } | null = null;
+      for (const entry of candidates) if (!best || entry.dist < best.dist) best = entry;
+      return best ? best.task : null;
+    };
     for (const source of this.buildings) {
       if (!source.complete) continue;
       const def = DEMO_CATALOG.buildings[source.kindIndex];
@@ -2483,24 +2852,34 @@ export class DemoWorld {
         if (def.recipe && !(resource in def.recipe.outputs)) continue;
         const storage = this.nearestStorageFor(resource, sourceStand);
         if (storage) {
-          return {
-            resource,
-            amount: Math.min(available, CARRY_STACK_MAX, storage.free),
-            from: source.id,
-            to: storage.id,
-          };
+          candidates.push({
+            dist: distTo(sourceStand),
+            task: {
+              resource,
+              amount: Math.min(available, CARRY_STACK_MAX, storage.free),
+              from: source.id,
+              to: storage.id,
+            },
+          });
+          break;
         }
         const stockpile = this.stockpileStand();
         if (stockpileAccepts(resource) && stockpile && this.computePath(sourceStand, stockpile)) {
-          return {
-            resource,
-            amount: Math.min(available, CARRY_STACK_MAX),
-            from: source.id,
-            to: 'stockpile',
-          };
+          candidates.push({
+            dist: distTo(sourceStand),
+            task: {
+              resource,
+              amount: Math.min(available, CARRY_STACK_MAX),
+              from: source.id,
+              to: 'stockpile',
+            },
+          });
+          break;
         }
       }
     }
+    const pickup = nearest();
+    if (pickup) return pickup;
 
     for (const dest of this.buildings) {
       if (!dest.complete) continue;
@@ -2519,12 +2898,15 @@ export class DemoWorld {
           const stockpile = this.stockpileStand();
           if (available > 0 && stockpile
             && this.computePath(workerTile, stockpile) && this.computePath(stockpile, destStand)) {
-            return {
-              resource,
-              amount: Math.min(available, needed, room, CARRY_STACK_MAX),
-              from: 'stockpile',
-              to: dest.id,
-            };
+            candidates.push({
+              dist: distTo(stockpile),
+              task: {
+                resource,
+                amount: Math.min(available, needed, room, CARRY_STACK_MAX),
+                from: 'stockpile',
+                to: dest.id,
+              },
+            });
           }
         }
         for (const source of this.buildings) {
@@ -2535,16 +2917,20 @@ export class DemoWorld {
           const sourceStand = this.buildingStandTile(source.id);
           if (!storageAccepts(sourceDef, resource) || !sourceStand
             || !this.computePath(workerTile, sourceStand) || !this.computePath(sourceStand, destStand)) continue;
-          return {
-            resource,
-            amount: Math.min(available, needed, room, CARRY_STACK_MAX),
-            from: source.id,
-            to: dest.id,
-          };
+          candidates.push({
+            dist: distTo(sourceStand),
+            task: {
+              resource,
+              amount: Math.min(available, needed, room, CARRY_STACK_MAX),
+              from: source.id,
+              to: dest.id,
+            },
+          });
+          break;
         }
       }
     }
-    return null;
+    return nearest();
   }
 
   private tickProduce(jobId: number): void {
@@ -2566,16 +2952,15 @@ export class DemoWorld {
       }
       return;
     }
-    building.recipeTicks -= 1;
-    if (building.recipeTicks === 0) {
-      let free = productionFreeCapacity(building.inventory);
+    if (building.recipeTicks === 1) {
+      // Finishing: hold the completed batch until the whole output fits.
+      const total = Object.values(recipe.outputs).reduce((sum, amount) => sum + amount, 0);
+      if (productionFreeCapacity(building.inventory) < total) return;
       for (const [resource, amount] of Object.entries(recipe.outputs)) {
-        if (free === 0) break;
-        const added = Math.min(amount, free);
-        inventoryAdd(building.inventory, resource, added);
-        free -= added;
+        inventoryAdd(building.inventory, resource, amount);
       }
     }
+    building.recipeTicks -= 1;
   }
 
   private tickHaul(index: number): void {
@@ -2632,10 +3017,6 @@ export class DemoWorld {
     }
     this.releaseJobAt(index);
     villager.repathCooldown = REPATH_COOLDOWN_TICKS;
-    if (villager.carrying) {
-      this.depositToStockpile(villager.carrying.resource, villager.carrying.amount);
-      villager.carrying = null;
-    }
     this.clearToIdle(villager);
   }
 
@@ -2695,6 +3076,10 @@ export class DemoWorld {
       villager.state = 'idle';
       return;
     }
+    if (purpose === 'home') {
+      this.startSleeping(villager);
+      return;
+    }
     if (villager.currentJob != null && this.jobs.some((job) => job.id === villager.currentJob)) {
       villager.purpose = null;
       villager.state = 'working';
@@ -2743,7 +3128,19 @@ export class DemoWorld {
 
   private pathIsBlocked(index: number, target: [number, number]): boolean {
     if (!this.isPassable(target[0], target[1])) return true;
-    return (this.villagers[index].path ?? []).some(([x, y]) => !this.isPassable(x, y));
+    const villager = this.villagers[index];
+    let from = this.posToTile(villager.x, villager.y);
+    for (const to of villager.path ?? []) {
+      if (!this.isPassable(to[0], to[1]) || !this.edgeIsLegal(from, to)) return true;
+      from = to;
+    }
+    return false;
+  }
+
+  /** Diagonal steps need both orthogonal flanks walkable (no corner-cutting). */
+  private edgeIsLegal(from: [number, number], to: [number, number]): boolean {
+    const diagonal = from[0] !== to[0] && from[1] !== to[1];
+    return !diagonal || (this.isPassable(to[0], from[1]) && this.isPassable(from[0], to[1]));
   }
 
   private clearToIdle(villager: DemoVillager): void {
@@ -2753,12 +3150,18 @@ export class DemoWorld {
     villager.path = null;
   }
 
+  /** Every job abandonment funnels here so carried cargo is never stranded. */
   private releaseJobAt(index: number): void {
     const villager = this.villagers[index];
-    if (villager.currentJob == null) return;
-    const job = this.jobs.find((entry) => entry.id === villager.currentJob);
-    if (job && job.claimedBy === villager.id) job.claimedBy = null;
-    villager.currentJob = null;
+    if (villager.currentJob != null) {
+      const job = this.jobs.find((entry) => entry.id === villager.currentJob);
+      if (job && job.claimedBy === villager.id) job.claimedBy = null;
+      villager.currentJob = null;
+    }
+    if (villager.carrying) {
+      this.depositToStockpile(villager.carrying.resource, villager.carrying.amount);
+      villager.carrying = null;
+    }
   }
 
   private computePath(start: [number, number], goal: [number, number]): Array<[number, number]> | null {
@@ -2902,6 +3305,8 @@ export class DemoWorld {
         state: building.complete ? 2 : 1,
         progress,
         status: this.buildingStatus(building),
+        residents: this.homeResidents(building.id),
+        workers: this.siteWorkers(building.id),
       };
     });
   }

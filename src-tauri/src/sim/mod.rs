@@ -19,6 +19,7 @@ pub mod agents;
 pub mod buildings;
 pub mod catalog;
 pub mod chronicle;
+pub mod chickens;
 pub mod clock;
 pub mod commands;
 pub mod crops;
@@ -32,6 +33,7 @@ pub mod terrain;
 pub mod utility;
 pub mod weather;
 pub mod world;
+pub mod visitors;
 
 const TICK_INTERVAL: Duration = Duration::from_millis(50);
 

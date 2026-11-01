@@ -21,6 +21,7 @@ const KIND_STYLES: Record<ChronicleBody['kind'], string> = {
   buildingUnlocked: 'border-sky-700/60 bg-sky-950/90 text-sky-100',
   harvestReady: 'border-lime-700/60 bg-lime-950/90 text-lime-100',
   seasonTurned: 'border-violet-700/60 bg-violet-950/90 text-violet-100',
+  visitorEvent: 'border-amber-700/60 bg-amber-950/90 text-amber-100',
 };
 
 export function ToastStack({ toasts, onDismiss, onFocus }: ToastStackProps) {
@@ -51,7 +52,7 @@ function ToastItem({ toast, onDismiss, onFocus }: ToastItemProps) {
   }, [toast.id, onDismiss]);
 
   const clickable = toast.tile != null;
-  const style = KIND_STYLES[toast.kind] ?? 'border-white/20 bg-[#1a1510]/95 text-white/90';
+  const style = KIND_STYLES[toast.kind] ?? 'border-white/20 bg-[var(--c-ui-bg)]/95 text-white/90';
 
   return (
     <button

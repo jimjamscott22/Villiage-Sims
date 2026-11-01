@@ -88,6 +88,61 @@ describe('hoverTargetAt', () => {
     });
   });
 
+  it('names the home hut on a housed villager', () => {
+    const target = hoverTargetAt({
+      snapshot: snapshot({
+        villagers: [
+          { id: 1, x: 80, y: 80, state: 4, home: 7 },
+        ],
+      }),
+      catalog,
+      worldX: 80,
+      worldY: 80,
+      tileSize: 32,
+      zoom: 1,
+    });
+
+    expect(target).toEqual({
+      kind: 'villager',
+      id: 1,
+      title: 'Villager #1',
+      detail: 'Sleeping · Home #7',
+    });
+  });
+
+  it('counts residents and workers on a completed hut', () => {
+    const target = hoverTargetAt({
+      snapshot: snapshot({
+        buildings: [
+          {
+            id: 7,
+            kind: 0,
+            x: 2,
+            y: 2,
+            rot: 0,
+            state: 2,
+            progress: 100,
+            status: 0,
+            residents: [1, 2],
+            workers: [3],
+          },
+        ],
+      }),
+      catalog,
+      worldX: 2 * 32 + 16,
+      worldY: 2 * 32 + 16,
+      tileSize: 32,
+      zoom: 1,
+    });
+
+    expect(target).toEqual({
+      kind: 'building',
+      id: 7,
+      title: 'Farm',
+      detail: 'Working · 2 residents · 1 worker',
+    });
+  });
+
   it('shows crop growth above its farm footprint', () => {
     const target = hoverTargetAt({
       snapshot: snapshot({

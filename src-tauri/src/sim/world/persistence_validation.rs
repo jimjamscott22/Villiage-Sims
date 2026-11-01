@@ -3,6 +3,7 @@ use super::*;
 
 impl super::World {
 pub(crate) fn prepare_after_load(&mut self) -> Result<(), String> {
+        self.visits.validate()?;
         if self.width == 0 || self.height == 0 || self.tile_size == 0 {
             return Err("save has invalid world dimensions".into());
         }
@@ -56,6 +57,18 @@ pub(crate) fn prepare_after_load(&mut self) -> Result<(), String> {
             return Err("save has an invalid next building id".into());
         }
 
+        let shelters: Vec<_> = self.buildings.iter().filter(|building| {
+            self.catalog.get(building.kind_index).is_some_and(|def| def.id == "chicken_shelter")
+        }).collect();
+        if shelters.len() > 1 || shelters.len() != usize::from(self.flock.is_some()) {
+            return Err("save has inconsistent chicken shelter".into());
+        }
+        if let Some(flock) = &self.flock {
+            if shelters[0].id != flock.shelter_id || shelters[0].origin != flock.home {
+                return Err("save has invalid flock home".into());
+            }
+            flock.validate(&self.chicken_ground())?;
+        }
         let mut crop_ids = BTreeSet::new();
         for crop in &self.crops {
             if crop.id == 0 || !crop_ids.insert(crop.id) {
@@ -124,6 +137,11 @@ pub(crate) fn prepare_after_load(&mut self) -> Result<(), String> {
         self.job_board
             .validate_loaded(&villager_ids, &building_ids)?;
 
+        // Residence links must point at live housing; anything else is dropped
+        // (demolished mid-save is impossible, but storm damage and catalog drift
+        // are not). Auto-fill runs on the next ticks, not here, so a load
+        // round-trips byte-for-byte.
+        self.clear_invalid_homes();
         self.validate_behavior()?;
         self.leisure_cache = Default::default();
         self.viewport = Viewport {

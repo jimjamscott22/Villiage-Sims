@@ -55,7 +55,8 @@ describe('committed app-icon.png', () => {
     const expected = renderAppIcon();
     expect(decoded.width).toBe(expected.width);
     expect(decoded.height).toBe(expected.height);
-    expect(Array.from(decoded.rgba)).toEqual(Array.from(expected.rgba));
+    // Byte comparison: toEqual on a 4M-element array is slow enough to time out under load.
+    expect(Buffer.from(decoded.rgba).equals(Buffer.from(expected.rgba))).toBe(true);
   });
 });
 
@@ -68,7 +69,7 @@ describe('Tauri desktop icon', () => {
       const expected = rasterForIconSize(size);
       expect(decoded.width, file).toBe(expected.width);
       expect(decoded.height, file).toBe(expected.height);
-      expect(Array.from(decoded.rgba)).toEqual(Array.from(expected.rgba));
+      expect(Buffer.from(decoded.rgba).equals(Buffer.from(expected.rgba)), file).toBe(true);
     }
   });
 

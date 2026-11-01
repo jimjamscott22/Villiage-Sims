@@ -132,6 +132,26 @@ pub(crate) async fn move_villager_to(
 }
 
 #[tauri::command]
+pub(crate) async fn assign_home(
+    state: State<'_, AppState>,
+    villager_id: u32,
+    building_id: Option<u32>,
+) -> Result<(), String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::AssignHome {
+            villager_id,
+            building_id,
+            reply,
+        })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped assign_home".to_string())?
+}
+
+#[tauri::command]
 pub(crate) async fn get_villager_detail(
     state: State<'_, AppState>,
     id: u32,
@@ -285,7 +305,56 @@ mod tests {
     fn app_state_holds_catalog() {
         let (tx, _rx) = mpsc::channel();
         let state = AppState::new(Catalog::load_builtin().unwrap(), tx);
-        assert_eq!(state.catalog.buildings.len(), 10);
+        assert_eq!(state.catalog.buildings.len(), 11);
         assert_eq!(state.catalog.crops.len(), 4);
     }
+}
+
+#[tauri::command]
+pub(crate) async fn click_chicken(
+    state: State<'_, AppState>,
+    shelter_id: u32,
+    id: u32,
+) -> Result<bool, String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::ClickChicken {
+            shelter_id,
+            id,
+            reply,
+        })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped click_chicken".to_string())?
+}
+#[tauri::command]
+pub(crate) async fn collect_eggs(
+    state: State<'_, AppState>,
+    shelter_id: u32,
+    id: u32,
+) -> Result<u32, String> {
+    let (reply, receiver) = oneshot::channel();
+    state
+        .commands
+        .send(SimCommand::CollectEggs {
+            shelter_id,
+            id,
+            reply,
+        })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver
+        .await
+        .map_err(|_| "simulation dropped collect_eggs".to_string())?
+}
+
+#[tauri::command]
+pub(crate) async fn respond_to_visitor(
+    state: State<'_, AppState>, visit_id: u32, decision: crate::sim::visitors::VisitDecision,
+) -> Result<(), String> {
+    let (reply, receiver) = oneshot::channel();
+    state.commands.send(SimCommand::RespondToVisitor { visit_id, decision, reply })
+        .map_err(|_| "simulation command channel closed".to_string())?;
+    receiver.await.map_err(|_| "simulation dropped visitor response".to_string())?
 }

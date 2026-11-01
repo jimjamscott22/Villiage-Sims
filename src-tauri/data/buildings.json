@@ -136,5 +136,15 @@
     "unlock_conditions": {
       "min_population": 5
     }
+  },
+  {
+    "id": "chicken_shelter",
+    "name": "Chicken Shelter",
+    "footprint": [1, 1],
+    "cost": { "wood": 15 },
+    "build_ticks": 0,
+    "category": "amenity",
+    "valid_terrain": ["grass", "sand"],
+    "jobs": []
   }
 ]

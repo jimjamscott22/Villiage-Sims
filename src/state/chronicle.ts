@@ -30,6 +30,10 @@ export function formatEntry(entry: ChronicleEntry, catalog: Catalog | null): str
       const where = site ? ` at ${site}` : '';
       return `${body.count} ${noun} ready${where}`;
     }
+    case 'visitorEvent': {
+      const endings = { arrived: 'arrived with an offer', accepted: 'offer accepted', declined: 'offer declined', expired: 'departed; offer expired' };
+      return `${body.name}: ${endings[body.outcome]}`;
+    }
     case 'seasonTurned':
       return `${seasonName(body.season)} of year ${body.year} begins`;
     default: {

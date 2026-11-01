@@ -43,12 +43,20 @@ mod leisure;
 #[path = "legacy_v3.rs"]
 pub(crate) mod legacy_v3;
 mod commands_handler;
+mod homes;
 mod persistence_validation;
 mod population;
 mod progression;
 #[path = "legacy_v4.rs"]
 pub(crate) mod legacy_v4;
+#[path = "legacy_v5.rs"]
+pub(crate) mod legacy_v5;
+#[path = "legacy_v6.rs"]
+pub(crate) mod legacy_v6;
 use social::{Encounter, Behavior};
+#[path = "legacy_v7.rs"]
+pub(crate) mod legacy_v7;
+mod visitors;
 
 const VIEWPORT_MARGIN_TILES: f32 = 4.0;
 const TICKS_PER_SECOND: f32 = 20.0;
@@ -95,6 +103,8 @@ pub struct World {
     behavior: BTreeMap<u32, Behavior>,
     #[serde(skip)]
     leisure_cache: leisure::LeisureCache,
+    pub(crate) flock: Option<super::chickens::Flock>,
+    pub(crate) visits: super::visitors::Visits,
     #[serde(skip)]
     pub(crate) viewport: Viewport,
     /// When set, day rollover writes a rotating autosave into this directory.
@@ -136,6 +146,8 @@ impl World {
             encounters: Vec::new(),
             behavior: BTreeMap::new(),
             leisure_cache: Default::default(),
+            flock: None,
+            visits: Default::default(),
             viewport: Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -154,6 +166,75 @@ impl World {
     }
 
 
+    pub(crate) fn chicken_ground(&self) -> super::chickens::Ground<'_> {
+        super::chickens::Ground {
+            width: self.width,
+            height: self.height,
+            tile_size: self.tile_size,
+            tiles: &self.tiles,
+            occupancy: &self.occupancy,
+        }
+    }
+    fn chicken_date(&self) -> u32 {
+        (self.clock.year * 4 + self.clock.season.as_u8() as u32) * 28 + self.clock.day
+    }
+    fn relocate_covered_chickens(&mut self) {
+        if let Some(mut flock) = self.flock.take() {
+            flock.relocate(&self.chicken_ground());
+            self.flock = Some(flock);
+        }
+    }
+    fn tick_chickens(&mut self) {
+        if let Some(mut flock) = self.flock.take() {
+            let walkers: Vec<_> = self
+                .villagers
+                .iter()
+                .filter(|v| matches!(v.state, AgentState::MovingTo { .. }))
+                .map(|v| v.pos)
+                .collect();
+            flock.tick(
+                &self.chicken_ground(),
+                self.clock.minute,
+                self.chicken_date(),
+                &walkers,
+            );
+            self.flock = Some(flock);
+        }
+    }
+    fn chicken_views(&self) -> Vec<super::chickens::ChickenView> {
+        let margin = VIEWPORT_MARGIN_TILES * self.tile_size as f32;
+        self.flock
+            .as_ref()
+            .map(|f| {
+                f.views()
+                    .into_iter()
+                    .filter(|c| {
+                        c.x >= self.viewport.x - margin
+                            && c.y >= self.viewport.y - margin
+                            && c.x <= self.viewport.x + self.viewport.w + margin
+                            && c.y <= self.viewport.y + self.viewport.h + margin
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+    pub fn click_chicken(&mut self, shelter_id: u32, id: u32) -> Result<bool, String> {
+        self.flock
+            .as_mut()
+            .filter(|f| f.shelter_id == shelter_id)
+            .ok_or("chicken shelter missing")?
+            .click(id)
+    }
+    pub fn collect_eggs(&mut self, shelter_id: u32, id: u32) -> Result<u32, String> {
+        let amount = self
+            .flock
+            .as_mut()
+            .filter(|f| f.shelter_id == shelter_id)
+            .ok_or("chicken shelter missing")?
+            .collect(id)?;
+        self.deposit_to_stockpile("food", amount);
+        Ok(amount)
+    }
     pub fn default_world() -> Self {
         Self::generate(
             DEFAULT_WIDTH,
@@ -203,7 +284,9 @@ impl World {
         if rollover.season {
             self.record_season_turn();
         }
+        self.advance_visitors(1, false);
         self.complete_buildings();
+        self.tick_chickens();
         self.tick_crops();
         self.tick_nodes();
         self.refresh_gather_jobs();
@@ -217,9 +300,17 @@ impl World {
         }
         self.tick_encounters();
         self.check_population_dynamics();
+        // New beds (completed huts), newborns, and freed beds (deaths) settle
+        // here so Sleep journeys always read fresh assignments.
+        self.assign_homes();
         self.cancel_invalid_encounters();
         self.check_unlocks();
         self.check_objectives();
+        // Save only once the whole tick is committed, so loading a daily
+        // autosave resumes at a tick boundary rather than mid-tick.
+        if rollover.day {
+            self.maybe_autosave();
+        }
     }
 
     pub fn housing_capacity(&self) -> u32 {
@@ -390,6 +481,7 @@ impl World {
                     partner_id: self.encounter_for(v.id).map(|p| if p.a == v.id { p.b } else { p.a }),
                     destination: self.view_destination(v),
                     purpose: self.view_purpose(v),
+                    home: v.home.filter(|id| self.valid_home(*id)),
                     social: v.needs.social,
                     id: v.id,
                     x: v.pos.0,
@@ -400,9 +492,13 @@ impl World {
                 })
                 .collect(),
             buildings: self.building_views(),
+            chicken_shelter_id: self.flock.as_ref().map(|f|f.shelter_id),
+            chickens: self.chicken_views(),
+            egg_baskets: self.flock.as_ref().map(|f| f.basket_views(self.tile_size)).unwrap_or_default(),
             crops: self.crops.iter().map(Crop::view).collect(),
             resources: derive_totals(&self.resources, &building_inventories, &self.catalog),
             housing_capacity: self.housing_capacity(),
+            visitor: self.visitor_view(),
             clock: self.clock.view(self.current_weather().as_u8()),
             chronicle_seq: self.chronicle().seq(),
             unlocked: self.unlocked().iter().cloned().collect(),
@@ -442,6 +538,14 @@ impl World {
             .and_then(|job_id| self.job_board.get(job_id))
             .map(|job| (Some(job.kind.as_str().to_string()), Some(job.site)))
             .unwrap_or((None, None));
+        let (job_site_name, job_site_tile) = self
+            .job_site_view(villager)
+            .map(|(_, name, tile)| (Some(name), Some(tile)))
+            .unwrap_or((None, None));
+        let (home, home_building, home_tile) = self
+            .home_view(villager)
+            .map(|(id, name, tile)| (Some(id), Some(name), Some(tile)))
+            .unwrap_or((None, None, None));
         Ok(VillagerDetail {
             id: villager.id,
             name: villager.name.clone(),
@@ -455,6 +559,11 @@ impl World {
             happiness: villager.needs.happiness,
             job_kind,
             job_site,
+            job_site_name,
+            job_site_tile,
+            home,
+            home_building,
+            home_tile,
             traits: villager.traits.clone(),
             tile: self.pos_to_tile(villager.pos),
             thought: villager.thought.clone(),
@@ -506,9 +615,6 @@ impl World {
                 last_err = "no path".into();
                 continue;
             };
-            if let Some(carrying) = self.villagers[index].carrying.take() {
-                self.deposit_to_stockpile(&carrying.resource, carrying.amount);
-            }
             self.cancel_encounter(self.villagers[index].id);
             self.clear_leisure(index);
             self.release_job_at(index);
@@ -800,7 +906,14 @@ impl World {
     }
 
     /// Skip unavailable routes so one isolated pickup cannot block other deliveries.
+    ///
+    /// Among usable tasks the pickup nearest the worker wins, so a worker standing at
+    /// stocked goods takes them rather than walking to an earlier-listed building.
     fn find_haul_task(&self, worker_tile: (i32, i32)) -> Option<HaulTask> {
+        let dist_to = |tile: (i32, i32)| {
+            (tile.0 - worker_tile.0).abs() + (tile.1 - worker_tile.1).abs()
+        };
+        let mut candidates: Vec<(i32, HaulTask)> = Vec::new();
         for source in &self.buildings {
             if source.state != BuildState::Complete {
                 continue;
@@ -829,26 +942,37 @@ impl World {
                     continue;
                 }
                 if let Some((storage_id, free)) = self.nearest_storage_for(resource, source_stand) {
-                    return Some(HaulTask {
-                        resource: resource.clone(),
-                        amount: (*available).min(CARRY_STACK_MAX).min(free),
-                        from: HaulEndpoint::Building(source.id),
-                        to: HaulEndpoint::Building(storage_id),
-                    });
+                    candidates.push((
+                        dist_to(source_stand),
+                        HaulTask {
+                            resource: resource.clone(),
+                            amount: (*available).min(CARRY_STACK_MAX).min(free),
+                            from: HaulEndpoint::Building(source.id),
+                            to: HaulEndpoint::Building(storage_id),
+                        },
+                    ));
+                    break;
                 }
                 if Self::stockpile_accepts(resource)
                     && self.stockpile_stand().is_some_and(|stand| {
                         self.compute_path(source_stand, stand).is_some()
                     })
                 {
-                    return Some(HaulTask {
-                        resource: resource.clone(),
-                        amount: (*available).min(CARRY_STACK_MAX),
-                        from: HaulEndpoint::Building(source.id),
-                        to: HaulEndpoint::Stockpile,
-                    });
+                    candidates.push((
+                        dist_to(source_stand),
+                        HaulTask {
+                            resource: resource.clone(),
+                            amount: (*available).min(CARRY_STACK_MAX),
+                            from: HaulEndpoint::Building(source.id),
+                            to: HaulEndpoint::Stockpile,
+                        },
+                    ));
+                    break;
                 }
             }
+        }
+        if let Some(best) = Self::nearest_task(&mut candidates) {
+            return Some(best);
         }
 
         for dest in &self.buildings {
@@ -882,12 +1006,15 @@ impl World {
                                 && self.compute_path(stand, dest_stand).is_some()
                         })
                     {
-                        return Some(HaulTask {
-                            resource: resource.clone(),
-                            amount: available.min(needed).min(room).min(CARRY_STACK_MAX),
-                            from: HaulEndpoint::Stockpile,
-                            to: HaulEndpoint::Building(dest.id),
-                        });
+                        candidates.push((
+                            dist_to(self.stockpile_stand().unwrap_or(worker_tile)),
+                            HaulTask {
+                                resource: resource.clone(),
+                                amount: available.min(needed).min(room).min(CARRY_STACK_MAX),
+                                from: HaulEndpoint::Stockpile,
+                                to: HaulEndpoint::Building(dest.id),
+                            },
+                        ));
                     }
                 }
                 for source in &self.buildings {
@@ -912,17 +1039,31 @@ impl World {
                     {
                         continue;
                     }
-                    return Some(HaulTask {
-                        resource: resource.clone(),
-                        amount: available.min(needed).min(room).min(CARRY_STACK_MAX),
-                        from: HaulEndpoint::Building(source.id),
-                        to: HaulEndpoint::Building(dest.id),
-                    });
+                    candidates.push((
+                        dist_to(source_stand),
+                        HaulTask {
+                            resource: resource.clone(),
+                            amount: available.min(needed).min(room).min(CARRY_STACK_MAX),
+                            from: HaulEndpoint::Building(source.id),
+                            to: HaulEndpoint::Building(dest.id),
+                        },
+                    ));
+                    break;
                 }
             }
         }
 
-        None
+        Self::nearest_task(&mut candidates)
+    }
+
+    /// Smallest distance wins; ties keep the earliest candidate for determinism.
+    fn nearest_task(candidates: &mut Vec<(i32, HaulTask)>) -> Option<HaulTask> {
+        let best = candidates
+            .iter()
+            .enumerate()
+            .min_by_key(|(i, (dist, _))| (*dist, *i))
+            .map(|(i, _)| i)?;
+        Some(candidates.swap_remove(best).1)
     }
 
     fn tick_villager_at(&mut self, index: usize) {
@@ -1057,7 +1198,12 @@ impl World {
         let mut scored = score_all(&ctx);
         // Advertised jobs may currently have no inputs or be disconnected. Such
         // jobs must not win repeatedly and prevent useful leisure movement.
-        if self.villagers[index].current_job.is_none() {
+        // A claim that has gone stale (e.g. nothing left to tend) is re-scored the same way.
+        let claim_usable = self.villagers[index]
+            .current_job
+            .and_then(|job_id| self.job_board.get(job_id))
+            .is_some_and(|job| self.job_actionable(job, index));
+        if !claim_usable {
             let id = self.villagers[index].id;
             let best = self.job_board.jobs().iter()
                 .filter(|j| j.claimed_by.is_none() || j.claimed_by == Some(id))
@@ -1067,6 +1213,10 @@ impl World {
             if let Some(work) = scored.iter_mut().find(|a| a.kind == ActionKind::Work) {
                 work.job_id = best.map(|b| b.0);
                 work.score = best.map_or(0.0, |b| b.1);
+            }
+            // No usable work: drop a stale Work action so hysteresis cannot pin it.
+            if best.is_none() && self.villagers[index].current_action == Some(ActionKind::Work) {
+                self.villagers[index].current_action = None;
             }
         }
         let density = self.hut_density(from);
@@ -1108,10 +1258,7 @@ impl World {
         match kind {
             ActionKind::Eat => self.begin_eat(index),
             ActionKind::Drink => self.begin_drink(index),
-            ActionKind::Sleep => {
-                self.villagers[index].begin_sleeping();
-                self.villagers[index].set_thought(kind.thought(), 40);
-            }
+            ActionKind::Sleep => self.begin_sleep_at(index),
             ActionKind::Socialize => {
                 if !self.begin_encounter(index) { self.behavior.entry(self.villagers[index].id).or_default().cooldown = 100; }
             }
@@ -1248,13 +1395,11 @@ impl World {
             };
             (job.claimed_by.is_none() || job.claimed_by == Some(villager_id))
                 && self.job_actionable(job, index)
-                && self.compute_path(from, job.tile).is_some()
+                && self.work_target(job, index)
+                    .is_some_and(|tile| self.compute_path(from, tile).is_some())
         });
         let Some(job_id) = reachable else {
-            if let Some(existing) = existing {
-                self.job_board.release(existing, villager_id);
-                self.villagers[index].current_job = None;
-            }
+            self.release_job_at(index);
             self.villagers[index].current_action = None;
             return;
         };
@@ -1271,7 +1416,18 @@ impl World {
         self.villagers[index].current_action = Some(ActionKind::Work);
         let job = self.job_board.get(job_id).expect("claimed job");
         self.villagers[index].set_thought(job.kind.thought(), 40);
-        self.begin_move_to_job(index, job.tile, job_id);
+        let tile = self.work_target(job, index).expect("reachable work target");
+        self.begin_move_to_job(index, tile, job_id);
+    }
+
+    /// Validate and start resumed hauling at its delivery, not the advertised job tile.
+    fn work_target(&self, job: &crate::sim::jobs::Job, index: usize) -> Option<(i32, i32)> {
+        if job.kind == JobKind::Haul {
+            if let Some(carrying) = &self.villagers[index].carrying {
+                return self.endpoint_stand_tile(carrying.dest);
+            }
+        }
+        Some(job.tile)
     }
 
     fn job_actionable(&self, job: &crate::sim::jobs::Job, villager_index: usize) -> bool {
@@ -1299,9 +1455,6 @@ impl World {
                 if building.state != BuildState::Complete {
                     return false;
                 }
-                if building.recipe_ticks > 0 {
-                    return true;
-                }
                 let Some(recipe) = self
                     .catalog
                     .get(building.kind_index)
@@ -1309,6 +1462,14 @@ impl World {
                 else {
                     return false;
                 };
+                if building.recipe_ticks == 1 {
+                    // Keep the pending batch, but free the worker to haul until output fits.
+                    return production_free_capacity(&building.inventory)
+                        >= recipe.outputs.values().sum();
+                }
+                if building.recipe_ticks > 1 {
+                    return true;
+                }
                 recipe.inputs.iter().all(|(resource, amount)| {
                     inventory_get(&building.inventory, resource) >= *amount
                 })
@@ -1450,6 +1611,12 @@ impl World {
     fn on_arrived(&mut self, index: usize, purpose: MovePurpose, _target: (i32, i32)) {
         self.villagers[index].path = None;
         match purpose {
+            MovePurpose::Home => {
+                // Arrived at the hut perimeter: rest there, then emerge back
+                // into normal decisioning when the rest completes.
+                self.villagers[index].begin_sleeping();
+                self.villagers[index].set_thought(ActionKind::Sleep.thought(), 40);
+            }
             MovePurpose::Wander => {
                 self.villagers[index].state = AgentState::Idle;
                 if self.encounter_for(self.villagers[index].id).is_none() { self.arrive_leisure(index); }
@@ -1492,6 +1659,15 @@ impl World {
             }
             return;
         };
+        // Haulers roam between endpoints; every other job is worked in place, so
+        // a building placed on the worker's tile ends the shift.
+        let (vx, vy) = self.pos_to_tile(self.villagers[index].pos);
+        if job_record.kind != JobKind::Haul && !self.is_passable(vx, vy) {
+            self.release_job_at(index);
+            self.villagers[index].clear_path_to_idle();
+            self.villagers[index].current_action = None;
+            return;
+        }
         match job_record.kind {
             JobKind::TendCrops => self.tick_tend_crops(job, ticks_remaining),
             JobKind::Gather => self.tick_gather(job, ticks_remaining),
@@ -1601,18 +1777,17 @@ impl World {
             return;
         }
 
-        self.buildings[index].recipe_ticks -= 1;
-        if self.buildings[index].recipe_ticks == 0 {
-            let mut free = production_free_capacity(&self.buildings[index].inventory);
+        if self.buildings[index].recipe_ticks == 1 {
+            // Finishing: hold the completed batch until the whole output fits.
+            let total: u32 = recipe.outputs.values().sum();
+            if production_free_capacity(&self.buildings[index].inventory) < total {
+                return;
+            }
             for (resource, amount) in &recipe.outputs {
-                if free == 0 {
-                    break;
-                }
-                let added = (*amount).min(free);
-                inventory_add(&mut self.buildings[index].inventory, resource, added);
-                free -= added;
+                inventory_add(&mut self.buildings[index].inventory, resource, *amount);
             }
         }
+        self.buildings[index].recipe_ticks -= 1;
     }
 
     fn tick_haul(&mut self, index: usize) {
@@ -1673,18 +1848,25 @@ impl World {
             None => {
                 self.release_job_at(index);
                 self.villagers[index].repath_cooldown = REPATH_COOLDOWN_TICKS;
-                if let Some(carrying) = self.villagers[index].carrying.take() {
-                    self.deposit_to_stockpile(&carrying.resource, carrying.amount);
-                }
                 self.villagers[index].clear_path_to_idle();
             }
         }
     }
 
+    /// Every way a villager gives up a job funnels through here: the claim is
+    /// released and any carried shipment goes back to the stockpile, so cargo
+    /// is never stranded on a worker with no Haul job to deliver it.
     fn release_job_at(&mut self, index: usize) {
         if let Some(job_id) = self.villagers[index].current_job.take() {
             let villager_id = self.villagers[index].id;
             self.job_board.release(job_id, villager_id);
+        }
+        self.return_cargo_to_stockpile(index);
+    }
+
+    fn return_cargo_to_stockpile(&mut self, index: usize) {
+        if let Some(carrying) = self.villagers[index].carrying.take() {
+            self.deposit_to_stockpile(&carrying.resource, carrying.amount);
         }
     }
 
@@ -1713,10 +1895,22 @@ impl World {
         if !self.is_passable(target.0, target.1) {
             return true;
         }
-        match &self.villagers[index].path {
-            Some(path) => path.iter().any(|&(x, y)| !self.is_passable(x, y)),
-            None => false,
-        }
+        let Some(path) = &self.villagers[index].path else {
+            return false;
+        };
+        let mut from = self.pos_to_tile(self.villagers[index].pos);
+        path.iter().any(|&to| {
+            let blocked = !self.is_passable(to.0, to.1) || !self.edge_is_legal(from, to);
+            from = to;
+            blocked
+        })
+    }
+
+    /// A diagonal step is only legal while both orthogonal flanks are walkable
+    /// (mirrors the no-corner-cutting rule in `pathfind::successors`).
+    fn edge_is_legal(&self, from: (i32, i32), to: (i32, i32)) -> bool {
+        let diagonal = from.0 != to.0 && from.1 != to.1;
+        !diagonal || (self.is_passable(to.0, from.1) && self.is_passable(from.0, to.1))
     }
 
     fn invalidate_paths_if_needed(&mut self) {
@@ -1892,6 +2086,8 @@ impl World {
                     state: building.state.as_u8(),
                     progress: building.state.progress_byte(def.build_ticks),
                     status: self.building_status(building, def).as_u8(),
+                    residents: self.home_residents(building.id),
+                    workers: self.site_workers(building.id),
                 })
             })
             .collect()
@@ -1905,11 +2101,15 @@ impl World {
 
     pub fn advance_clock(&mut self, days: u32, season: Option<u8>) -> Result<(), String> {
         for _ in 0..days {
+            // Advance opportunities to midnight before daily effects/autosave.
+            let ticks = self.clock.ticks_until_midnight();
+            self.advance_visitors(ticks, true);
             let rollover = self.clock.force_day_rollover();
             self.on_day_rollover();
             if rollover.season {
                 self.record_season_turn();
             }
+            self.maybe_autosave();
         }
         if let Some(value) = season {
             self.clock.set_season(value)?;
@@ -1917,11 +2117,11 @@ impl World {
         Ok(())
     }
 
-    /// Shared day-boundary effects: reset crop water, apply today's weather, autosave.
+    /// Shared day-boundary effects: reset crop water and apply today's weather.
+    /// Autosaving is left to the caller, after its own processing has finished.
     fn on_day_rollover(&mut self) {
         self.clear_all_crop_water();
         self.apply_daily_weather();
-        self.maybe_autosave();
     }
 
     fn apply_daily_weather(&mut self) {
@@ -2046,23 +2246,22 @@ impl World {
 
     fn clear_released_work_claims(&mut self, released: Vec<u32>) {
         for villager_id in released {
-            for villager in &mut self.villagers {
-                if villager.id != villager_id {
-                    continue;
-                }
-                villager.current_job = None;
-                if matches!(
-                    villager.state,
-                    AgentState::Working { .. }
-                        | AgentState::MovingTo {
-                            purpose: MovePurpose::Work,
-                            ..
-                        }
-                ) {
-                    villager.clear_path_to_idle();
-                    if villager.current_action == Some(ActionKind::Work) {
-                        villager.current_action = None;
+            let Some(index) = self.villagers.iter().position(|v| v.id == villager_id) else {
+                continue;
+            };
+            self.release_job_at(index);
+            let villager = &mut self.villagers[index];
+            if matches!(
+                villager.state,
+                AgentState::Working { .. }
+                    | AgentState::MovingTo {
+                        purpose: MovePurpose::Work,
+                        ..
                     }
+            ) {
+                villager.clear_path_to_idle();
+                if villager.current_action == Some(ActionKind::Work) {
+                    villager.current_action = None;
                 }
             }
         }
@@ -2204,9 +2403,22 @@ impl World {
                 return can_plant;
             };
             self.catalog.get_crop(crop.kind_index).is_some_and(|def| {
-                crop.stage >= def.max_stage() || (!crop.watered && def.grows_in(self.clock.season))
+                (crop.stage >= def.max_stage() && self.harvest_fits(building_id, def))
+                    || (crop.stage < def.max_stage()
+                        && !crop.watered
+                        && def.grows_in(self.clock.season))
             })
         })
+    }
+
+    /// A harvest commits the crop, so it only happens when the farm buffer can
+    /// take the whole yield; otherwise the ripe crop waits for room.
+    fn harvest_fits(&self, building_id: u32, def: &crate::sim::crops::CropDef) -> bool {
+        let Some(building) = self.buildings.iter().find(|b| b.id == building_id) else {
+            return false;
+        };
+        let total: u32 = def.r#yield.values().sum();
+        production_free_capacity(&building.inventory) >= total
     }
 
     fn tend_water_crops(&mut self, job_id: u32) {
@@ -2228,10 +2440,9 @@ impl World {
         let tiles = self.farm_footprint_tiles(job.site);
         let Some(crop_index) = self.crops.iter().position(|crop| {
             tiles.contains(&crop.tile)
-                && self
-                    .catalog
-                    .get_crop(crop.kind_index)
-                    .is_some_and(|def| crop.stage >= def.max_stage())
+                && self.catalog.get_crop(crop.kind_index).is_some_and(|def| {
+                    crop.stage >= def.max_stage() && self.harvest_fits(job.site, def)
+                })
         }) else {
             return;
         };
@@ -2820,6 +3031,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 2, 2).unwrap();
         assert_eq!(world.crops().len(), 1);
         assert!(world.plant_crop("wheat", 2, 2).is_err());
@@ -2852,6 +3064,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 3, 3).unwrap();
         world.advance_clock(0, Some(Season::Winter as u8)).unwrap();
         world.crops[0].watered = true;
@@ -2970,6 +3183,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 2;
         world.plant_crop("wheat", 2, 2).unwrap();
         world.plant_crop("wheat", 3, 2).unwrap();
         assert_eq!(world.crops().len(), 2);
@@ -2984,6 +3198,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 2, 2).unwrap();
         world.crops[0].watered = true;
         world.advance_clock(1, None).unwrap();
@@ -3010,6 +3225,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 4, 4).unwrap();
         let snap = world.tick_snapshot();
         assert_eq!(snap.clock.day, 1);
@@ -3159,6 +3375,7 @@ mod tests {
     fn tend_crops_harvests_ready_crop_into_farm_inventory() {
         let mut world = grass_world();
         let farm_id = place_complete(&mut world, "farm", 2, 2);
+        world.resources.grain = 1;
         world.plant_crop("wheat", 2, 2).unwrap();
         let wheat = world.catalog().find_crop("wheat").unwrap().1;
         world.crops[0].stage = wheat.max_stage();
@@ -3707,6 +3924,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 2, 2).unwrap();
         world.crops[0].watered = true;
         // seed 1 / spring day 2 is Rain (see weather::tests / hash).
@@ -3723,6 +3941,7 @@ mod tests {
         for _ in 0..30 {
             world.advance();
         }
+        world.resources.grain = 1;
         world.plant_crop("wheat", 2, 2).unwrap();
         world.crops[0].watered = true;
         // Advance to spring day 3 (Clear for seed 1).
@@ -3908,6 +4127,224 @@ mod tests {
         let mut world = grass_world();
         world.advance_clock(1, None).unwrap();
         assert_eq!(world.tick_snapshot().last_autosave_slot, None);
+    }
+
+    #[test]
+    fn free_beds_autofill_up_to_hut_capacity() {
+        let mut world = grass_world();
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(hut));
+        let detail = world.villager_detail(1).unwrap();
+        assert_eq!(detail.home, Some(hut));
+        assert_eq!(detail.home_building.as_deref(), Some("hut"));
+        assert_eq!(detail.home_tile, Some((4, 4)));
+    }
+
+    #[test]
+    fn five_villagers_share_huts_two_beds_each() {
+        let mut world = World::generate(8, 8, 32, 1);
+        world.tiles = vec![Terrain::Grass as u8; 64];
+        world.occupancy = vec![None; 64];
+        assert_eq!(world.villagers.len(), 5);
+        let first = place_complete(&mut world, "hut", 1, 1);
+        let second = place_complete(&mut world, "hut", 5, 5);
+        world.advance();
+        let mut homes: Vec<_> = world.villagers.iter().map(|v| v.home).collect();
+        homes.sort();
+        assert_eq!(homes, vec![None, Some(first), Some(first), Some(second), Some(second)]);
+        // Capacity never overfills, and assignments are stable tick to tick.
+        world.advance();
+        let again: Vec<_> = world.villagers.iter().map(|v| v.home).collect();
+        assert_eq!(homes, {
+            let mut sorted = again.clone();
+            sorted.sort();
+            sorted
+        });
+    }
+
+    #[test]
+    fn exhausted_housed_villager_walks_home_sleeps_then_leaves() {
+        use crate::sim::utility::SLEEP_TICKS;
+
+        let mut world = grass_world();
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(hut));
+
+        world.villagers[0].needs.energy = 0.0;
+        world.villagers[0].needs.hunger = 1.0;
+        world.villagers[0].needs.thirst = 1.0;
+        world.villagers[0].needs.social = 1.0;
+        world.advance();
+        assert!(
+            matches!(
+                world.villagers[0].state,
+                AgentState::MovingTo {
+                    purpose: MovePurpose::Home,
+                    ..
+                }
+            ),
+            "expected a walk home, got {:?}",
+            world.villagers[0].state
+        );
+        let view = world
+            .tick_snapshot()
+            .villagers
+            .into_iter()
+            .find(|v| v.id == 1)
+            .expect("villager in snapshot");
+        assert_eq!(view.home, Some(hut));
+        assert_eq!(view.purpose, Some(MovePurpose::Home.as_u8()));
+
+        advance_until(&mut world, 300, |w| {
+            matches!(w.villagers[0].state, AgentState::Sleeping { .. })
+        });
+        let (hx, hy) = world.pos_to_tile(world.villagers[0].pos);
+        let stand = world.home_stand_tile(hut).expect("hut stand tile");
+        assert_eq!((hx, hy), stand, "rest happens beside the hut");
+
+        advance_until(&mut world, SLEEP_TICKS + 5, |w| {
+            w.villagers[0].state == AgentState::Idle
+        });
+        assert_eq!(world.villagers[0].needs.energy, 1.0);
+        assert_eq!(world.villagers[0].home, Some(hut), "rest keeps the home");
+    }
+
+    #[test]
+    fn homeless_villager_sleeps_in_place() {
+        let mut world = grass_world();
+        assert_eq!(world.villagers[0].home, None);
+        world.villagers[0].needs.energy = 0.0;
+        world.villagers[0].needs.hunger = 1.0;
+        world.villagers[0].needs.thirst = 1.0;
+        world.villagers[0].needs.social = 1.0;
+        let start = world.pos_to_tile(world.villagers[0].pos);
+        world.advance();
+        assert!(
+            matches!(world.villagers[0].state, AgentState::Sleeping { .. }),
+            "expected in-place rest, got {:?}",
+            world.villagers[0].state
+        );
+        assert_eq!(world.pos_to_tile(world.villagers[0].pos), start);
+    }
+
+    #[test]
+    fn player_reassignment_redirects_the_next_sleep() {
+        let mut world = grass_world();
+        let old_hut = place_complete(&mut world, "hut", 1, 1);
+        // Second hut's tile must be free: the first hut occupies (1, 1).
+        let new_hut = place_complete(&mut world, "hut", 5, 5);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(old_hut));
+
+        world.assign_home(1, Some(new_hut)).expect("reassign home");
+        assert_eq!(world.villagers[0].home, Some(new_hut));
+
+        world.villagers[0].needs.energy = 0.0;
+        world.villagers[0].needs.hunger = 1.0;
+        world.villagers[0].needs.thirst = 1.0;
+        world.villagers[0].needs.social = 1.0;
+        world.advance();
+        let AgentState::MovingTo { target, purpose } = world.villagers[0].state.clone() else {
+            panic!("expected a walk to the new home, got {:?}", world.villagers[0].state);
+        };
+        assert_eq!(purpose, MovePurpose::Home);
+        assert_eq!(target, world.home_stand_tile(new_hut).expect("new stand tile"));
+    }
+
+    #[test]
+    fn assign_home_rejects_unknown_full_and_unfinished_huts() {
+        let mut world = grass_world();
+        assert!(world.assign_home(999, None).is_err());
+        assert!(world.assign_home(1, Some(777)).is_err());
+
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        world.unlocked.insert("hut".to_string());
+        let unfinished = world.place_building("hut", 6, 6, 0).unwrap().id;
+        assert!(world.assign_home(1, Some(unfinished)).is_err());
+
+        // Fill both beds with other villagers, then the last claim fails.
+        world.populate_for_test(3);
+        world.advance();
+        let residents = world.home_residents(hut);
+        assert_eq!(residents.len(), 2);
+        let homeless = world.villagers.iter().find(|v| v.home.is_none()).unwrap().id;
+        assert!(world.assign_home(homeless, Some(hut)).is_err());
+        // Clearing is always allowed.
+        world.assign_home(1, None).expect("clear home");
+        assert_eq!(world.villagers.iter().find(|v| v.id == 1).unwrap().home, None);
+    }
+
+    #[test]
+    fn demolished_home_leaves_villager_homeless_until_refilled() {
+        let mut world = grass_world();
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(hut));
+
+        world.demolish(hut).expect("demolish home");
+        assert_eq!(world.villagers[0].home, None);
+
+        world.villagers[0].needs.energy = 0.0;
+        world.villagers[0].needs.hunger = 1.0;
+        world.villagers[0].needs.thirst = 1.0;
+        world.villagers[0].needs.social = 1.0;
+        world.advance();
+        assert!(
+            matches!(world.villagers[0].state, AgentState::Sleeping { .. }),
+            "expected in-place rest after losing home, got {:?}",
+            world.villagers[0].state
+        );
+
+        let replacement = place_complete(&mut world, "hut", 5, 5);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(replacement));
+    }
+
+    #[test]
+    fn homes_survive_a_save_round_trip() {
+        let mut world = grass_world();
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        world.advance();
+        assert_eq!(world.villagers[0].home, Some(hut));
+        let bytes = crate::persist::encode_world(&world).expect("encode");
+        let loaded = crate::persist::decode_world(&bytes).expect("decode");
+        assert_eq!(loaded.villagers[0].home, Some(hut));
+        assert_eq!(
+            crate::persist::encode_world(&loaded).expect("re-encode"),
+            bytes
+        );
+    }
+
+    #[test]
+    fn building_views_name_residents_and_workers() {
+        let mut world = grass_world();
+        let hut = place_complete(&mut world, "hut", 4, 4);
+        let farm = place_complete(&mut world, "farm", 5, 1);
+        world.resources.grain = 4;
+        advance_until(&mut world, 200, |w| {
+            matches!(w.villagers[0].state, AgentState::Working { .. })
+                | matches!(
+                    w.villagers[0].state,
+                    AgentState::MovingTo {
+                        purpose: MovePurpose::Work,
+                        ..
+                    }
+                )
+        });
+        let views = world.tick_snapshot().buildings;
+        let hut_view = views.iter().find(|b| b.id == hut).expect("hut view");
+        assert_eq!(hut_view.residents, vec![1]);
+        assert!(hut_view.workers.is_empty());
+        let farm_view = views.iter().find(|b| b.id == farm).expect("farm view");
+        assert!(farm_view.residents.is_empty());
+        let detail = world.villager_detail(1).unwrap();
+        if detail.job_site == Some(farm) {
+            assert_eq!(detail.job_site_name.as_deref(), Some("farm"));
+            assert!(detail.job_site_tile.is_some());
+            assert_eq!(farm_view.workers, vec![1]);
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-import type { Catalog, TickSnapshot, VillagerView } from '../state/types';
+import type { BuildingView, Catalog, TickSnapshot, VillagerView } from '../state/types';
 import { intentLabel } from './intentOverlay';
 
 const VILLAGER_STATE_LABELS = [
@@ -20,7 +20,8 @@ const BUILDING_STATUS_LABELS = [
 ] as const;
 
 export interface HoverTarget {
-  kind: 'villager' | 'building' | 'crop';
+  kind: 'villager' | 'building' | 'crop' | 'chicken' | 'eggBasket';
+  shelterId?: number;
   id: number;
   title: string;
   detail: string;
@@ -40,10 +41,23 @@ function rotatedFootprint(footprint: [number, number], rotation: number): [numbe
 }
 
 function villagerHoverDetail(villager: VillagerView): string {
+  let label: string;
   if (villager.state === 1 && (villager.purpose != null || villager.activity != null || villager.destination)) {
-    return intentLabel(villager);
+    label = intentLabel(villager);
+  } else {
+    label = VILLAGER_STATE_LABELS[villager.state ?? 0] ?? 'Unknown activity';
   }
-  return VILLAGER_STATE_LABELS[villager.state ?? 0] ?? 'Unknown activity';
+  return villager.home != null ? `${label} · Home #${villager.home}` : label;
+}
+
+function buildingHoverDetail(building: BuildingView): string {
+  const residents = building.residents?.length ?? 0;
+  const workers = building.workers?.length ?? 0;
+  const occupants = [
+    residents === 1 ? '1 resident' : residents > 0 ? `${residents} residents` : '',
+    workers === 1 ? '1 worker' : workers > 0 ? `${workers} workers` : '',
+  ].filter((part) => part !== '');
+  return occupants.length > 0 ? ` · ${occupants.join(' · ')}` : '';
 }
 
 /** Return the visually topmost inspectable entity under a world-space pointer. */
@@ -55,6 +69,13 @@ export function hoverTargetAt({
   tileSize,
   zoom,
 }: HoverTargetInput): HoverTarget | null {
+  // Small flock targets have tight hit areas so adjacent baskets stay individually collectable.
+  const basket = snapshot.eggBaskets?.find(b => Math.abs(b.x - worldX) <= 5 && worldY >= b.y - 14 && worldY <= b.y + 3);
+  if (basket) return { kind: 'eggBasket', id: basket.id, shelterId: basket.shelterId, title: 'Egg basket', detail: 'Click to collect · +3 food' };
+  const chicken = snapshot.chickens?.filter(c => Math.abs(c.x - worldX) <= 12 && worldY >= c.y - 26 && worldY <= c.y + 4)
+    .sort((a, b) => Math.hypot(a.x - worldX, a.y - worldY) - Math.hypot(b.x - worldX, b.y - worldY))[0];
+  if (chicken) return { kind: 'chicken', id: chicken.id, shelterId: chicken.shelterId, title: chicken.name,
+    detail: `${chicken.activity} · ${chicken.tendency}` };
   const hitRadius = Math.max(16, 22 / Math.max(zoom, 0.01));
   let closestVillager: { villager: VillagerView; distance: number } | null = null;
   for (const villager of snapshot.villagers) {
@@ -101,7 +122,7 @@ export function hoverTargetAt({
     const definition = catalog.buildings[building.kind];
     const statusLabel = BUILDING_STATUS_LABELS[building.status ?? 0] ?? 'Working';
     const detail = building.state === 2
-      ? statusLabel
+      ? `${statusLabel}${buildingHoverDetail(building)}`
       : `Building · ${building.progress}%`;
     return {
       kind: 'building',

@@ -13,6 +13,8 @@ pub enum MovePurpose {
     Wander,
     /// Walking to a water source. Appended so older saves keep their indices.
     Drink,
+    /// Walking home to sleep. Appended so older saves keep their indices.
+    Home,
 }
 
 impl MovePurpose {
@@ -23,6 +25,7 @@ impl MovePurpose {
             Self::Work => 1,
             Self::Wander => 2,
             Self::Drink => 3,
+            Self::Home => 4,
         }
     }
 }
@@ -75,6 +78,7 @@ impl AgentState {
                 MovePurpose::Work => "Going to work",
                 MovePurpose::Wander => "Wandering",
                 MovePurpose::Drink => "Fetching water",
+                MovePurpose::Home => "Going home",
             },
             Self::Working { .. } => "Working",
             Self::Eating { .. } => "Eating",
@@ -126,6 +130,12 @@ pub struct Villager {
     pub carrying: Option<CarryStack>,
     /// Villager traits.
     pub traits: Vec<String>,
+    /// Assigned residence: a completed building with housing capacity.
+    /// `None` means homeless — Sleep happens in place. New field for
+    /// save version 6; older saves decode with `None` via the frozen
+    /// `legacy_v5` layout and auto-fill on the next ticks.
+    #[serde(default)]
+    pub home: Option<u32>,
     /// Transient thought bubble shown above the villager. Not persisted in saves.
     #[serde(skip)]
     pub thought: Option<String>,
@@ -152,6 +162,7 @@ impl Villager {
             current_action: None,
             carrying: None,
             traits: Vec::new(),
+            home: None,
             thought: None,
             thought_ttl: 0,
             water_search_cooldown: 0,

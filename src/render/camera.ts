@@ -1,5 +1,36 @@
-export const MIN_ZOOM = 0.25;
-export const MAX_ZOOM = 4.0;
+/**
+ * The only zoom levels the camera may sit at. At 1x and above, every art
+ * pixel (ART_SCALE = 2) maps to a whole number of screen pixels; 0.25 and 0.5
+ * are overview levels.
+ */
+export const ZOOM_STEPS = [0.25, 0.5, 1, 2, 3, 4] as const;
+export const MIN_ZOOM = ZOOM_STEPS[0];
+export const MAX_ZOOM = ZOOM_STEPS[ZOOM_STEPS.length - 1];
+
+/** Largest zoom step at or below `zoom` (MIN_ZOOM when `zoom` is below every step). */
+export function snapZoomDown(zoom: number): number {
+  let best: number = MIN_ZOOM;
+  for (const step of ZOOM_STEPS) {
+    if (step <= zoom) best = step;
+  }
+  return best;
+}
+
+/** Zoom step closest to `zoom`; a tie goes to the lower step. */
+export function snapZoomNearest(zoom: number): number {
+  let best: number = MIN_ZOOM;
+  for (const step of ZOOM_STEPS) {
+    if (Math.abs(step - zoom) < Math.abs(best - zoom)) best = step;
+  }
+  return best;
+}
+
+/** The step `direction` places above (+1) or below (-1) `zoom`, clamped to the ends. */
+export function nextZoomStep(zoom: number, direction: 1 | -1): number {
+  const index = ZOOM_STEPS.indexOf(snapZoomNearest(zoom) as (typeof ZOOM_STEPS)[number]);
+  const nextIndex = Math.min(ZOOM_STEPS.length - 1, Math.max(0, index + direction));
+  return ZOOM_STEPS[nextIndex];
+}
 
 export class Camera {
   x: number;
@@ -9,7 +40,7 @@ export class Camera {
   constructor(x = 0, y = 0, zoom = 1) {
     this.x = x;
     this.y = y;
-    this.zoom = zoom;
+    this.zoom = snapZoomNearest(zoom);
   }
 
   worldToScreen(wx: number, wy: number): [number, number] {
@@ -25,9 +56,12 @@ export class Camera {
     this.y -= dyScreen / this.zoom;
   }
 
-  /** Zoom while keeping the world point under (sx, sy) fixed. */
+  /**
+   * Zoom while keeping the world point under (sx, sy) fixed. `nextZoom` snaps
+   * to the nearest entry in ZOOM_STEPS.
+   */
   zoomAt(sx: number, sy: number, nextZoom: number): void {
-    const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
+    const clamped = snapZoomNearest(nextZoom);
     if (clamped === this.zoom) return;
     const [wx, wy] = this.screenToWorld(sx, sy);
     this.zoom = clamped;
@@ -35,11 +69,19 @@ export class Camera {
     this.y = wy - sy / this.zoom;
   }
 
-  /** Fit the world in the viewport with a small margin, centered. */
+  /** Move one zoom step in (+1) or out (-1), anchored on the screen point (sx, sy). */
+  stepZoom(sx: number, sy: number, direction: 1 | -1): void {
+    this.zoomAt(sx, sy, nextZoomStep(this.zoom, direction));
+  }
+
+  /**
+   * Fit the world in the viewport with a small margin, centered. Snaps down
+   * to the largest zoom step that still fits (MIN_ZOOM when none does).
+   */
   fitWorld(worldWidth: number, worldHeight: number, viewWidth: number, viewHeight: number, margin = 0.92): void {
     const zoomX = viewWidth / worldWidth;
     const zoomY = viewHeight / worldHeight;
-    this.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.min(zoomX, zoomY) * margin));
+    this.zoom = snapZoomDown(Math.min(zoomX, zoomY) * margin);
     this.centerOnWorld(worldWidth, worldHeight, viewWidth, viewHeight);
   }
 

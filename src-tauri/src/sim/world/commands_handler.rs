@@ -4,6 +4,9 @@ use super::*;
 impl super::World {
 pub fn handle_command(&mut self, command: SimCommand) {
         match command {
+            SimCommand::RespondToVisitor { visit_id, decision, reply } => {
+                let _ = reply.send(self.respond_to_visitor(visit_id, decision));
+            }
             SimCommand::SetViewport { x, y, w, h } => {
                 self.viewport = Viewport { x, y, w, h };
             }
@@ -27,6 +30,12 @@ pub fn handle_command(&mut self, command: SimCommand) {
                 let result = self.place_building(&kind, x, y, rotation);
                 let _ = reply.send(result);
             }
+            SimCommand::ClickChicken { shelter_id, id, reply } => {
+                let _ = reply.send(self.click_chicken(shelter_id, id));
+            }
+            SimCommand::CollectEggs { shelter_id, id, reply } => {
+                let _ = reply.send(self.collect_eggs(shelter_id, id));
+            }
             SimCommand::Demolish { entity_id, reply } => {
                 let result = self.demolish(entity_id);
                 let _ = reply.send(result);
@@ -38,6 +47,14 @@ pub fn handle_command(&mut self, command: SimCommand) {
                 reply,
             } => {
                 let result = self.order_move_villager(x, y, villager_id);
+                let _ = reply.send(result);
+            }
+            SimCommand::AssignHome {
+                villager_id,
+                building_id,
+                reply,
+            } => {
+                let result = self.assign_home(villager_id, building_id);
                 let _ = reply.send(result);
             }
             SimCommand::GetVillagerDetail { id, reply } => {
@@ -111,6 +128,20 @@ pub fn validate_placement(
             };
         };
         let _ = kind_index;
+        if kind == "chicken_shelter" {
+            if self.flock.is_some() {
+                return PlacementValidity {
+                    valid: false,
+                    reason: "Only one chicken shelter per village".into(),
+                };
+            }
+            if !super::super::chickens::has_exit(&self.chicken_ground(), (x, y)) {
+                return PlacementValidity {
+                    valid: false,
+                    reason: "The shelter needs adjacent walkable ground".into(),
+                };
+            }
+        }
         // The frontend hides locked buildings, but it holds no authoritative state —
         // the sim must reject a direct placement attempt too (e.g. a raw `invoke`
         // bypassing the UI). Gating here also covers `validate_placement`, so the
@@ -200,7 +231,26 @@ pub fn place_building(
             inventory: BTreeMap::new(),
             recipe_ticks: 0,
         });
+        if kind == "chicken_shelter" {
+            if let Some(building) = self.buildings.last_mut() {
+                building.state = BuildState::Complete;
+            }
+            // Before dawn, the placement day's morning still belongs to this flock.
+            let last_morning = if self.clock.minute < 360 {
+                self.chicken_date().saturating_sub(1)
+            } else {
+                self.chicken_date()
+            };
+            self.flock = Some(super::super::chickens::Flock::new(
+                id, (x, y), self.seed, last_morning, &self.chicken_ground(),
+            ));
+            self.chronicle.push(&self.clock, Some((x, y)), ChronicleBody::BuildingComplete {
+                id,
+                building: kind.into(),
+            });
+        }
         self.invalidate_paths_if_needed();
+        self.relocate_covered_chickens();
         Ok(PlacementResult { id })
     }
 
@@ -211,6 +261,9 @@ pub fn demolish(&mut self, entity_id: u32) -> Result<(), String> {
             .position(|building| building.id == entity_id)
             .ok_or_else(|| format!("unknown building {entity_id}"))?;
         let building = self.buildings.remove(index);
+        if self.flock.as_ref().is_some_and(|f| f.shelter_id == entity_id) {
+            self.flock = None;
+        }
         let def = self
             .catalog
             .get(building.kind_index)
@@ -233,20 +286,11 @@ pub fn demolish(&mut self, entity_id: u32) -> Result<(), String> {
         }
         self.resources.refund(&def.cost);
         let released = self.job_board.remove_site(entity_id);
+        // Residence links die with the building; walks home are released.
+        self.clear_homes_for_building(entity_id);
+        self.clear_released_work_claims(released);
         for villager in &mut self.villagers {
-            if released.contains(&villager.id) {
-                villager.current_job = None;
-                if matches!(
-                    villager.state,
-                    AgentState::Working { .. }
-                        | AgentState::MovingTo {
-                            purpose: MovePurpose::Work,
-                            ..
-                        }
-                ) {
-                    villager.clear_path_to_idle();
-                }
-            } else if let Some(job_id) = villager.current_job {
+            if let Some(job_id) = villager.current_job {
                 if self.job_board.get(job_id).is_none() {
                     villager.current_job = None;
                 }
@@ -260,13 +304,15 @@ pub fn plant_crop(&mut self, kind: &str, x: i32, y: i32) -> Result<(), String> {
             .catalog
             .find_crop(kind)
             .ok_or_else(|| format!("unknown crop '{kind}'"))?;
-        let _ = def;
+        let seed_cost = def.seed_cost.clone();
         let farm_id = self
             .completed_farm_at(x, y)
             .ok_or_else(|| "tile is not on a completed farm".to_string())?;
-        let _ = farm_id;
         if self.crops.iter().any(|crop| crop.tile == (x, y)) {
             return Err("tile already has a crop".into());
+        }
+        if !self.spend_seed_cost(farm_id, &seed_cost) {
+            return Err("insufficient seeds".into());
         }
         let id = self.next_crop_id;
         self.next_crop_id = self.next_crop_id.saturating_add(1);

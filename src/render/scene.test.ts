@@ -7,6 +7,7 @@ import {
   buildDrawList,
   dyeIndex,
   facingFromDelta,
+  propFrame,
   type Facing,
 } from './scene';
 import type { BuildingDef, CropDef, TickSnapshot } from '../state/types';
@@ -316,8 +317,37 @@ describe('buildDrawList', () => {
       lastFacing,
       atlas,
     });
-    expect(list.find((e) => e.id === 'vfx:10')?.key).toBe('vfx.dust');
-    expect(list.find((e) => e.id === 'vfx:11')?.key).toBe('vfx.smoke');
+    const mill = list.find((e) => e.id === 'b:10')!;
+    const bakery = list.find((e) => e.id === 'b:11')!;
+    expect(list.find((e) => e.id === 'vfx:10')).toMatchObject({
+      key: 'vfx.dust', x: mill.x + 16, y: mill.y + 88, baseY: mill.baseY, frame: 0,
+    });
+    expect(list.find((e) => e.id === 'vfx:11')).toMatchObject({
+      key: 'vfx.smoke', x: bakery.x + 28, y: bakery.y - 28, baseY: bakery.baseY, frame: 2,
+    });
+    expect(list.indexOf(mill)).toBeLessThan(list.findIndex((e) => e.id === 'vfx:10'));
+    expect(list.indexOf(bakery)).toBeLessThan(list.findIndex((e) => e.id === 'vfx:11'));
+  });
+
+  it('keeps building effects attached when rotated and freezes them for reduced motion', () => {
+    const input = {
+      snapshot: snapshot({ buildings: [
+        { id: 10, kind: 2, x: 4, y: 4, rot: 1, state: 2, progress: 100 },
+        { id: 11, kind: 3, x: 8, y: 4, rot: 1, state: 2, progress: 100 },
+      ] }),
+      catalog: { buildings, crops }, props: [], tileSize: 32, tick: 10,
+      reduceMotion: false, selectedBuildingId: null, selectedVillagerId: null,
+      lastFacing, atlas,
+    };
+    const list = buildDrawList(input);
+    expect(list.find(e => e.id === 'vfx:10')).toMatchObject({ x: 144, y: 152, frame: 2 });
+    expect(list.find(e => e.id === 'vfx:11')).toMatchObject({ x: 284, y: 68, frame: 1 });
+    const frozen = buildDrawList({ ...input, reduceMotion: true });
+    expect(frozen.filter(e => e.id.startsWith('vfx:')).map(e => e.frame)).toEqual([0, 0]);
+    const culled = buildDrawList({ ...input, viewTiles: { minX: 30, minY: 30, maxX: 32, maxY: 32 } });
+    expect(culled.filter(e => e.id.startsWith('vfx:'))).toEqual([]);
+    const demolished = buildDrawList({ ...input, snapshot: snapshot() });
+    expect(demolished.filter(e => e.id.startsWith('vfx:'))).toEqual([]);
   });
 
   it('skips building VFX while under construction', () => {
@@ -392,5 +422,50 @@ describe('buildDrawList', () => {
     expect(list.find((e) => e.id === 'p:9,9')?.key).toBe('prop.bush');
     // Non-decor props are terrain-defining and never suppressed.
     expect(list.find((e) => e.id === 'p:3,4')?.key).toBe('prop.cypress');
+  });
+});
+
+it('renders chicken poses and baskets through the atlas and culls offscreen animals', () => {
+  const snapshot: TickSnapshot = {
+    tick: 0, villagers: [], buildings: [], crops: [],
+    resources: { wood: 0, stone: 0, grain: 0, flour: 0, food: 0, gold: 0 }, housingCapacity: 5,
+    clock: { minute: 480, day: 1, season: 0, year: 1, speed: 1, weather: 0 }, chronicleSeq: 0, unlocked: [],
+    chickens: [
+      { id: 1, shelterId: 9, name: 'Pip', tendency: 'curious', x: 48, y: 48, pose: 'peck', activity: 'pecking', soundSeq: 0, facingLeft: true },
+      { id: 2, shelterId: 9, name: 'Mabel', tendency: 'sleepy', x: 480, y: 480, pose: 'sleep', activity: 'sleeping', soundSeq: 0, facingLeft: false },
+    ],
+    eggBaskets: [{ id: 1, shelterId: 9, x: 50, y: 60 }],
+  };
+  const list = buildDrawList({ snapshot, catalog: { buildings, crops }, props: [], tileSize: 32, tick: 5,
+    reduceMotion: false, selectedBuildingId: null, selectedVillagerId: null, lastFacing: new Map(), atlas: fakeAtlas(),
+    viewTiles: { minX: 0, minY: 0, maxX: 3, maxY: 3 } });
+  expect(list.find(e => e.id === 'ch:9:1')).toMatchObject({ key: 'chicken.peck', frame: 1, mirror: true });
+  expect(list.find(e => e.id === 'ch:9:2')).toBeUndefined();
+  expect(list.find(e => e.id === 'egg:9:1')?.key).toBe('chicken.basket');
+  for (const pose of ['walk', 'peck', 'scratch', 'sleep', 'startled', 'hop', 'tilt', 'rest']) expect(manifest.cells[`chicken.${pose}`]).toBeDefined();
+  expect(manifest.cells.chicken_shelter).toBeDefined();
+});
+
+describe('propFrame', () => {
+  it('sways ordinary props in lockstep and freezes under reduced motion', () => {
+    const reeds = { x: 3, y: 4, key: 'prop.reeds' };
+    const other = { x: 40, y: 9, key: 'prop.reeds' };
+    expect(propFrame(24, reeds, 2, false)).toBe(propFrame(24, other, 2, false));
+    expect(propFrame(24, reeds, 2, true)).toBe(0);
+  });
+
+  it('staggers leaping fish so neighbouring tiles are not in unison', () => {
+    const frames = new Set<number>();
+    for (let x = 0; x < 16; x += 1) frames.add(propFrame(100, { x, y: 5, key: 'prop.fishSplash' }, 4, false));
+    expect(frames.size).toBeGreaterThan(1);
+    for (const frame of frames) expect(frame).toBeLessThan(4);
+  });
+
+  it('cycles every fish frame over time and rests on the ripple under reduced motion', () => {
+    const fish = { x: 11, y: 3, key: 'prop.fishSplash' };
+    const seen = new Set<number>();
+    for (let tick = 0; tick < 200; tick += 1) seen.add(propFrame(tick, fish, 4, false));
+    expect([...seen].sort()).toEqual([0, 1, 2, 3]);
+    expect(propFrame(57, fish, 4, true)).toBe(0);
   });
 });

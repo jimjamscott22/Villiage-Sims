@@ -11,3 +11,6 @@ export const APP_ICON_PATH = join(REPO_ROOT, 'app-icon.png');
 
 /** Desktop PNG sizes under src-tauri/icons (no iOS/Android). */
 export const ICONS_DIR = join(REPO_ROOT, 'src-tauri', 'icons');
+
+/** Generated CSS custom properties for the palette, imported by `src/styles.css`. */
+export const THEME_CSS_PATH = join(REPO_ROOT, 'src', 'theme', 'palette.css');

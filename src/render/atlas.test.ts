@@ -62,9 +62,10 @@ describe('committed manifest', () => {
     }
     expect(manifest.cells['prop.cypress']).toBeDefined();
     expect(manifest.cells['prop.peak']).toBeDefined();
-    for (const key of ['prop.bush', 'prop.boulder', 'prop.palm', 'prop.reeds']) {
+    for (const key of ['prop.bush', 'prop.boulder', 'prop.palm', 'prop.reeds', 'prop.sunflowers', 'prop.shells']) {
       expect(manifest.cells[key]).toBeDefined();
     }
+    expect(manifest.cells['prop.fishSplash'].frames).toBe(4);
     expect(manifest.cells['villager.s.idle.0']).toBeDefined();
     expect(manifest.cells['bubble.tool']).toBeDefined();
   });

@@ -1,10 +1,19 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { hash01 } from './hash';
-import { PALETTE, assertPaletteHex, toRgba } from './palette';
+import { PALETTE, THEME, UI_TOKENS, assertPaletteHex, toRgba } from './palette';
+import { ART_DIR } from './paths';
+import { decodePng } from './png';
 
 describe('PALETTE', () => {
-  it('holds exactly the 29 specified colors', () => {
-    expect(Object.keys(PALETTE)).toHaveLength(29);
+  it('holds exactly the 25 locked art colors', () => {
+    expect(Object.keys(PALETTE)).toHaveLength(25);
+  });
+
+  it('adds exactly two UI-only colours plus the uiText alias', () => {
+    expect(Object.keys(UI_TOKENS)).toEqual(['uiBg', 'highlight', 'uiText']);
+    expect(new Set(Object.values(THEME)).size).toBe(27);
   });
 
   it('has no duplicate hex values', () => {
@@ -54,5 +63,38 @@ describe('hash01', () => {
       for (let y = 0; y < 100; y += 1) buckets[Math.floor(hash01(x, y, 5) * 4)] += 1;
     }
     for (const count of buckets) expect(count).toBeGreaterThan(1800);
+  });
+});
+
+describe('THEME', () => {
+  it('adds only the UI tokens on top of the art palette', () => {
+    expect(Object.keys(THEME)).toEqual([...Object.keys(PALETTE), ...Object.keys(UI_TOKENS)]);
+    expect(UI_TOKENS.uiText).toBe(PALETTE.whitewash);
+  });
+
+  it('keeps UI-only colours out of the art palette', () => {
+    expect(() => assertPaletteHex(UI_TOKENS.uiBg)).toThrow();
+    expect(() => assertPaletteHex(UI_TOKENS.highlight)).toThrow();
+  });
+});
+
+describe('committed art', () => {
+  const pngs = readdirSync(ART_DIR).filter((name) => name.endsWith('.png'));
+
+  it('ships the expected sheets', () => {
+    expect(pngs.sort()).toEqual(['entities.png', 'panel.png', 'tiles.png', 'ui.png']);
+  });
+
+  it.each(pngs)('%s uses only palette colours, at full opacity', (name) => {
+    const allowed = new Set(Object.keys(PALETTE).map((key) => toRgba(key as keyof typeof PALETTE).slice(0, 3).join(',')));
+    const { rgba } = decodePng(readFileSync(join(ART_DIR, name)));
+    const offPalette = new Set<string>();
+    for (let i = 0; i < rgba.length; i += 4) {
+      if (rgba[i + 3] === 0) continue;
+      if (rgba[i + 3] !== 255) offPalette.add(`alpha ${rgba[i + 3]}`);
+      const key = `${rgba[i]},${rgba[i + 1]},${rgba[i + 2]}`;
+      if (!allowed.has(key)) offPalette.add(key);
+    }
+    expect([...offPalette]).toEqual([]);
   });
 });

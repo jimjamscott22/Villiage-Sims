@@ -69,6 +69,40 @@ npm run dev
 
 **Controls:** drag to pan · scroll wheel to zoom (anchored to the cursor) · `F` for fullscreen · `R` rotates a building in build mode · `Esc` exits build mode.
 
+### Chickens
+
+Place a **Chicken Shelter** (15 wood) on grass or sand with adjacent walkable ground.
+One shelter brings Pip, Mabel, and Poppy, with curious, sleepy, and social tendencies.
+They explore, peck, scratch, follow friends, react to passing villagers, and roost at
+18:00. New arrivals explore for a minute even in a village that starts at midnight.
+Hover for a name/activity; click for a brief hop and cluck (five-second cooldown).
+Enable the optional **Sound** toggle on the map for quiet clucks.
+
+A basket appears each morning at 06:00. Click each basket for **3 food**; at most
+three wait by the shelter. There are no feeding requirements or neglect penalties.
+Demolition asks before removing the shelter, its flock, and uncollected baskets.
+Desktop saves preserve the flock; browser-demo saves remain in memory.
+
+### Visitors
+
+Rowan the merchant, Lark the musician, and Mira the grower bring short offers.
+The first visitor arrives after one in-game hour. Visits last three in-game hours;
+the next arrival follows six hours after departure. Pause freezes the countdown.
+
+- Rowan trades **12 food for 8 grain**, usable as wheat seed.
+- Lark accepts **6 food** to restore **20 percentage points of Social** to current
+  villagers, capped at full.
+- Mira joins with **Green Thumb** when there is spare population capacity, a vacant
+  bed in completed reachable housing, and a free arrival tile. Existing residents
+  keep their beds. Automatic births leave one population slot during her visit.
+
+Use **Accept** or **Decline** in the offer panel, or let the visitor depart without
+penalty. Visits rotate in that order; Mira stops returning once she settles.
+Arrival and outcome appear in the Chronicle. Offers, timers, recruited residents,
+and outcomes survive save/load. Desktop saves are now version 8 (older supported
+versions 3–7 migrate); browser-demo saves are version 5 (versions 1–4 migrate).
+Older saves begin a fresh visitor schedule. Browser-demo now preserves its Chronicle.
+
 ### Checks
 
 ```bash

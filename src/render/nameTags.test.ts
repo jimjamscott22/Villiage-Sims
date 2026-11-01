@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Camera } from './camera';
-import { MIN_TAG_ZOOM, nameTagPlacements, staggerTag } from './nameTags';
+import { MIN_TAG_ZOOM, TAG_HEIGHT, nameTagPlacements, nameTagWidth, staggerTag } from './nameTags';
 
 describe('nameTagPlacements', () => {
   const labels = new Map([
@@ -60,5 +60,14 @@ describe('staggerTag', () => {
   it('stops after a bounded number of rows', () => {
     const stack = Array.from({ length: 10 }, (_, i) => ({ left: 0, top: i * 15, width: 40, height: 14 }));
     expect(staggerTag(rect, stack).top).toBe(45);
+  });
+});
+
+describe('nameTagWidth', () => {
+  it('sizes tags from bitmap glyph metrics plus padding', () => {
+    // 3 glyphs × 6px × 2 scale + 4px padding each side.
+    expect(nameTagWidth('Ada')).toBe(3 * 12 + 8);
+    expect(nameTagWidth('Bram')).toBe(4 * 12 + 8);
+    expect(TAG_HEIGHT).toBe(7 * 2 + 4);
   });
 });

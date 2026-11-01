@@ -68,6 +68,8 @@ impl LegacyWorld {
             encounters: Vec::new(),
             behavior: BTreeMap::new(),
             leisure_cache: Default::default(),
+            flock: None,
+            visits: Default::default(),
         };
         for v in &mut world.villagers {
             if matches!(v.state, AgentState::Socializing { .. }) {

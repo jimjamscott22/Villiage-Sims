@@ -106,14 +106,14 @@ export function VillagerRoster({
           type="button"
           onClick={onClose}
           aria-label="Close villager roster"
-          className="pixel-btn pixel-focus px-1.5 py-0.5"
+          className="pixel-btn pixel-focus px-1 py-0"
         >
           ✕
         </button>
       </header>
       <div className="min-h-0 overflow-auto">
         <table className="w-full border-collapse">
-          <thead className="sticky top-0 bg-[#1c2a21] text-left text-[10px] uppercase tracking-wide text-white/50">
+          <thead className="sticky top-0 bg-[var(--c-ui-bg)] text-left text-[10px] uppercase tracking-wide text-white/60">
             <tr>
               <th className="px-3 py-1">
                 <button type="button" className="pixel-focus" onClick={() => toggleSort('name')}>
@@ -128,6 +128,12 @@ export function VillagerRoster({
                   </button>
                 </th>
               ))}
+              <th className="px-1.5 py-1" title="Assigned residence building">
+                Home
+              </th>
+              <th className="px-1.5 py-1" title="Claimed job">
+                Job
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -147,25 +153,31 @@ export function VillagerRoster({
                   <td className="max-w-[11rem] px-3 py-1">
                     <div className="flex items-center gap-1 font-medium text-white/90">
                       <span className="truncate">{detail.name}</span>
-                      <span className="shrink-0 text-[10px] font-normal text-white/35">#{detail.id}</span>
+                      <span className="shrink-0 text-[10px] font-normal text-white/60">#{detail.id}</span>
                       {statTone(worst.value) === 'critical' && (
                         <span className="shrink-0 text-red-300" title={`${worst.label} is critical`}>
                           !
                         </span>
                       )}
                     </div>
-                    <div className="truncate text-[10px] text-white/50">{detail.stateLabel}</div>
+                    <div className="truncate text-[10px] text-white/60">{detail.stateLabel}</div>
                   </td>
                   {ROSTER_STATS.map((stat) => (
                     <StatCell key={stat.key} label={stat.label} value={detail[stat.key]} />
                   ))}
+                  <td className="max-w-[9rem] truncate px-1.5 py-1 text-[10px] text-white/60" title={detail.home != null ? `Home: ${detail.homeBuilding ?? 'hut'} #${detail.home}` : 'Homeless'}>
+                    {detail.home != null ? `#${detail.home}` : '—'}
+                  </td>
+                  <td className="max-w-[11rem] truncate px-1.5 py-1 text-[10px] text-white/60" title={detail.jobKind ? (detail.jobSiteName && detail.jobSite != null ? `${detail.jobKind.replace(/_/g, ' ')} @ ${detail.jobSiteName} #${detail.jobSite}` : detail.jobKind.replace(/_/g, ' ')) : 'No job'}>
+                    {detail.jobKind ? detail.jobKind.replace(/_/g, ' ') : '—'}
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
         {roster && roster.length === 0 && (
-          <p className="px-3 py-3 text-white/50">No villagers are alive.</p>
+          <p className="px-3 py-3 text-white/60">No villagers are alive.</p>
         )}
       </div>
     </section>

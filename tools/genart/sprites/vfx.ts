@@ -52,7 +52,7 @@ export const SMOKE_FRAMES: SpriteGrid[] = [0, 1, 2].map(smokeFrame);
 /** Mill flour dust — 16×16, anchorY 8 (ground contact). */
 function dustFrame(phase: number): SpriteGrid {
   return grid(16, 16, {
-    p: P.sandPale,
+    p: P.whitewash,
     l: P.sandLight,
     m: P.stonePale,
     s: P.sandMid,
