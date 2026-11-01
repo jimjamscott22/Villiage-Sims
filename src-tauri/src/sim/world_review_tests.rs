@@ -637,7 +637,9 @@ fn natural_day_rollover_autosave_holds_the_completed_tick() {
         assert!(guard < 100_000, "no autosave within a day");
     }
     let slot = world.last_autosave_slot.unwrap();
-    let mut saved = crate::persist::load_world(&dir.join(format!("slot-{slot}.vsav"))).unwrap();
+    let mut saved =
+        crate::persist::load_world(&crate::saves::vsav_path(&dir, &crate::saves::autosave_id(slot)))
+            .unwrap();
     // The slot marker is bookkeeping written after the file; ignore it.
     saved.last_autosave_slot = world.last_autosave_slot;
 

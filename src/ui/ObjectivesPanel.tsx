@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Catalog, ObjectiveDef } from '../state/types';
+import { shouldIgnoreHotkey } from './hotkeys';
 import { PixelText } from './PixelText';
 
 interface ObjectivesPanelProps {
@@ -41,6 +42,7 @@ export function ObjectivesPanel({ catalog, completed }: ObjectivesPanelProps) {
       }
     };
     const onKey = (event: KeyboardEvent) => {
+      if (shouldIgnoreHotkey(event)) return;
       if (event.key === 'Escape') setOpen(false);
     };
     window.addEventListener('pointerdown', onPointerDown);

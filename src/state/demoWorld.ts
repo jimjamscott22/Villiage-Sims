@@ -16,6 +16,7 @@ import type {
   PlacementResult,
   PlacementValidity,
   ResourceTotals,
+  SaveSummary,
   TerrainSnapshot,
   TickSnapshot,
   VillagerDetail,
@@ -722,7 +723,7 @@ export class DemoWorld {
   private readonly CHRONICLE_CAP = 200;
   private readonly seed = DEMO_SEED;
   private lastAutosaveSlot: number | null = null;
-  private autosaves: Map<number, string> | null = null;
+  private autosaveSink: ((slot: number, state: string, summary: SaveSummary) => void) | null = null;
   private clock: DemoClock = {
     tick: 0,
     minuteAccum: 0,
@@ -756,9 +757,19 @@ export class DemoWorld {
     this.unlocked = this.satisfiedUnlocks();
   }
 
-  /** Wire the transport's in-memory save map for rotating daily autosaves. */
-  bindAutosave(saves: Map<number, string>): void {
-    this.autosaves = saves;
+  /** Wire the transport's save store for rotating daily autosaves. */
+  bindAutosave(sink: (slot: number, state: string, summary: SaveSummary) => void): void {
+    this.autosaveSink = sink;
+  }
+
+  /** In-game summary recorded alongside a save (mirrors `saves::save_world_with_meta`). */
+  saveSummary(): SaveSummary {
+    return {
+      year: this.clock.year,
+      season: this.clock.season,
+      day: this.clock.day,
+      population: this.villagers.length,
+    };
   }
 
   currentWeather(): number {
@@ -1823,9 +1834,9 @@ export class DemoWorld {
   }
 
   private maybeAutosave(): void {
-    if (this.autosaves == null) return;
+    if (this.autosaveSink == null) return;
     const slot = demoAutosaveSlot(this.clock.year, this.clock.season, this.clock.day);
-    this.autosaves.set(slot, this.exportState());
+    this.autosaveSink(slot, this.exportState(), this.saveSummary());
     this.lastAutosaveSlot = slot;
   }
 

@@ -23,6 +23,7 @@ import {
 } from './spatial';
 import type { ShorelineTile, TerrainProp } from './tilemap';
 import { bakeTerrain, shorelineTiles, terrainProps } from './tilemap';
+import { shouldIgnoreHotkey } from '../ui/hotkeys';
 import { createViewportSync } from './viewportSync';
 import { THEME, withAlpha } from '../theme/palette';
 
@@ -681,7 +682,7 @@ export function Canvas({
     };
 
     const onKeyDown = async (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLElement && event.target.closest('dialog[open]')) return;
+      if (shouldIgnoreHotkey(event)) return;
       if (event.key.toLowerCase() === 'f') {
         if (document.fullscreenElement) await document.exitFullscreen();
         else {

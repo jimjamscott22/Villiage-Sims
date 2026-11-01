@@ -7,6 +7,7 @@ interface ClockBarProps {
   clock: ClockView | null;
   onSetSpeed: (speed: number) => void;
   winterWarning?: boolean;
+  disabled?: boolean;
 }
 
 const SPEEDS: Array<{ value: number; icon: string; label: string }> = [
@@ -18,7 +19,7 @@ const SPEEDS: Array<{ value: number; icon: string; label: string }> = [
 
 const SEASON_ICONS = ['ui.icon.spring', 'ui.icon.summer', 'ui.icon.autumn', 'ui.icon.winter'] as const;
 
-export function ClockBar({ clock, onSetSpeed, winterWarning }: ClockBarProps) {
+export function ClockBar({ clock, onSetSpeed, winterWarning, disabled = false }: ClockBarProps) {
   const season = clock ? (SEASON_NAMES[clock.season] ?? 'Spring') : '—';
   const seasonIcon = clock != null ? SEASON_ICONS[clock.season] ?? SEASON_ICONS[0] : SEASON_ICONS[0];
   const weather =
@@ -53,8 +54,11 @@ export function ClockBar({ clock, onSetSpeed, winterWarning }: ClockBarProps) {
               key={entry.value}
               type="button"
               title={entry.label}
-              onClick={() => onSetSpeed(entry.value)}
-              className={`pixel-btn pixel-focus flex items-center justify-center p-0 transition ${
+              disabled={disabled}
+              onClick={() => {
+                if (!disabled) onSetSpeed(entry.value);
+              }}
+              className={`pixel-btn pixel-focus flex items-center justify-center p-0 transition disabled:cursor-not-allowed disabled:opacity-40 ${
                 active ? 'pixel-btn-active' : ''
               }`}
             >

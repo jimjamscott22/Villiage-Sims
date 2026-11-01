@@ -15,6 +15,7 @@ interface BuildMenuProps {
   selectedBuildingId: number | null;
   villagerDetail: VillagerDetail | null;
   unlocked: string[];
+  disabled?: boolean;
   onSelectKind: (kind: string | null) => void;
   onSelectCrop: (kind: string | null) => void;
   onDemolish: () => void;
@@ -45,6 +46,7 @@ export function BuildMenu({
   selectedBuildingId,
   villagerDetail,
   unlocked,
+  disabled = false,
   onSelectKind,
   onSelectCrop,
   onDemolish,
@@ -58,7 +60,7 @@ export function BuildMenu({
   const canAssignHome = villagerDetail != null && selectedBuildingId != null;
 
   const onAssignHome = () => {
-    if (villagerDetail == null || selectedBuildingId == null || homeBusy) return;
+    if (disabled || villagerDetail == null || selectedBuildingId == null || homeBusy) return;
     setHomeBusy(true);
     void transport
       .assignHome(villagerDetail.id, selectedBuildingId)
@@ -82,8 +84,11 @@ export function BuildMenu({
                 <li key={crop.id}>
                   <button
                     type="button"
-                    onClick={() => onSelectCrop(nextSelection(selectedCrop, crop.id))}
-                    className={`pixel-btn pixel-focus w-full px-1.5 py-1.5 text-left transition ${
+                    disabled={disabled}
+                    onClick={() => {
+                      if (!disabled) onSelectCrop(nextSelection(selectedCrop, crop.id));
+                    }}
+                    className={`pixel-btn pixel-focus w-full px-1.5 py-1.5 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
                       active ? 'pixel-btn-active' : ''
                     }`}
                   >
@@ -117,10 +122,12 @@ export function BuildMenu({
                 <li key={building.id}>
                   <button
                     type="button"
-                    disabled={locked}
-                    onClick={() => onSelectKind(nextSelection(selectedKind, building.id))}
+                    disabled={disabled || locked}
+                    onClick={() => {
+                      if (!disabled && !locked) onSelectKind(nextSelection(selectedKind, building.id));
+                    }}
                     className={`pixel-btn pixel-focus relative w-full px-1.5 py-1.5 text-left transition ${
-                      locked
+                      disabled || locked
                         ? 'cursor-not-allowed opacity-60'
                         : active
                           ? 'pixel-btn-active'
@@ -176,7 +183,7 @@ export function BuildMenu({
           <div className="mb-2">
             <button
               type="button"
-              disabled={homeBusy}
+              disabled={disabled || homeBusy}
               onClick={onAssignHome}
               title="Assign the selected building as this villager's home"
               className="pixel-btn pixel-focus w-full bg-emerald-950/60 px-1.5 py-1.5 text-xs text-emerald-100 disabled:cursor-wait disabled:opacity-40"
@@ -188,8 +195,10 @@ export function BuildMenu({
         )}
         <button
           type="button"
-          disabled={selectedBuildingId == null}
-          onClick={onDemolish}
+          disabled={disabled || selectedBuildingId == null}
+          onClick={() => {
+            if (!disabled) onDemolish();
+          }}
           className="pixel-btn pixel-focus w-full bg-red-950/60 px-1.5 py-1.5 text-xs text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Demolish selected
