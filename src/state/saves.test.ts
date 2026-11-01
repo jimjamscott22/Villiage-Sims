@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { DemoSaveStore } from './demoSaves';
+import { generateDemoTerrain } from './demoTerrain';
+import { DemoWorld } from './demoWorld';
 import {
   formatGameDate,
   formatSavedAt,
@@ -98,8 +101,39 @@ describe('nextCurrentSave', () => {
 });
 
 describe('resumeSpeedAfterDialog', () => {
-  it('restores a running speed and leaves a paused game paused', () => {
+  it('restores a running speed and leaves a paused game paused on cancel/save', () => {
     expect(resumeSpeedAfterDialog(2)).toBe(2);
     expect(resumeSpeedAfterDialog(0)).toBeNull();
+  });
+
+  it('explicitly restores speed zero after loading a save from a paused game', () => {
+    expect(resumeSpeedAfterDialog(2, true)).toBe(2);
+    expect(resumeSpeedAfterDialog(0, true)).toBe(0);
+  });
+
+  it('keeps the simulation paused when loading an autosave captured while running', () => {
+    const world = new DemoWorld(generateDemoTerrain());
+    const saves = new DemoSaveStore();
+    world.bindAutosave((slot, state, summary) => saves.writeAutosave(slot, state, summary));
+
+    world.setSpeed(2);
+    world.advanceClock(1, null);
+    const autosave = saves.list().find((s) => s.kind === 'autosave')!;
+    expect(autosave).toBeDefined();
+
+    // Player pauses the game before opening LOAD
+    world.setSpeed(0);
+    const speedOnOpen = world.snapshot().clock.speed;
+    expect(speedOnOpen).toBe(0);
+
+    // Loading the autosave replaces the world with the autosave's running clock (speed 2)
+    const loadedWorld = DemoWorld.importState(saves.read(autosave.id));
+    expect(loadedWorld.snapshot().clock.speed).toBe(2);
+
+    // Restoring speed via resumeSpeedAfterDialog(speedOnOpen, true) brings it back to 0
+    const restore = resumeSpeedAfterDialog(speedOnOpen, true);
+    expect(restore).toBe(0);
+    if (restore != null) loadedWorld.setSpeed(restore);
+    expect(loadedWorld.snapshot().clock.speed).toBe(0);
   });
 });

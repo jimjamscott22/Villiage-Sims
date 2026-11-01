@@ -24,6 +24,9 @@ type Pending =
   | { action: 'load' | 'delete'; save: SaveInfo }
   | null;
 
+export const SAVE_DIALOG_BACKDROP_CLASS =
+  'fixed inset-0 z-40 flex items-center justify-center bg-black/60';
+
 function message(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
@@ -207,7 +210,10 @@ export function SaveDialog({ focus, currentSave, onSaveEvent, onClose }: SaveDia
   };
 
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60">
+    <div
+      data-testid="save-dialog-backdrop"
+      className={SAVE_DIALOG_BACKDROP_CLASS}
+    >
       <section
         ref={dialogRef}
         tabIndex={-1}

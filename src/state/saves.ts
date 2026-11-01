@@ -61,7 +61,7 @@ export function nextCurrentSave(current: CurrentSave, event: SaveEvent): Current
   }
 }
 
-/** Speed to restore when the dialog closes; `null` means stay paused. */
-export function resumeSpeedAfterDialog(speedOnOpen: number): number | null {
-  return speedOnOpen > 0 ? speedOnOpen : null;
+/** Speed to restore when the dialog closes; `null` means leave the clock speed unchanged. */
+export function resumeSpeedAfterDialog(speedOnOpen: number, loaded = false): number | null {
+  return speedOnOpen > 0 || loaded ? speedOnOpen : null;
 }

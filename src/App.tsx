@@ -272,6 +272,7 @@ export default function App() {
   };
 
   const demolishBuilding = async (id: number) => {
+    if (saveDialog != null) return;
     try {
       await transport.demolish(id);
       setSelectedBuildingId(null);
@@ -281,7 +282,7 @@ export default function App() {
   };
 
   const onDemolish = async () => {
-    if (selectedBuildingId == null) return;
+    if (saveDialog != null || selectedBuildingId == null) return;
     if (selectedBuildingId === chickenShelterId) { setPendingDemolition(selectedBuildingId); return; }
     await demolishBuilding(selectedBuildingId);
   };
@@ -325,15 +326,17 @@ export default function App() {
   const openSaveDialog = (focus: 'save' | 'load') => {
     if (saveDialog) return;
     const speed = clock?.speed ?? 0;
-    resumeSpeedRef.current = resumeSpeedAfterDialog(speed);
+    resumeSpeedRef.current = speed;
     if (speed > 0) void onSetSpeed(0);
     setSaveDialog(focus);
   };
 
-  const closeSaveDialog = () => {
+  const closeSaveDialog = (loaded = false) => {
     setSaveDialog(null);
-    const speed = resumeSpeedRef.current;
+    const speedOnOpen = resumeSpeedRef.current;
     resumeSpeedRef.current = null;
+    if (speedOnOpen == null) return;
+    const speed = resumeSpeedAfterDialog(speedOnOpen, loaded);
     if (speed != null) void onSetSpeed(speed);
   };
 
@@ -347,7 +350,7 @@ export default function App() {
       resetAfterWorldSwap();
       setPersistenceStatus(`Loaded · ${event.info.name}`);
       pushFloater(`Loaded "${event.info.name}"`, THEME.vegPale);
-      closeSaveDialog();
+      closeSaveDialog(true);
     } else if (event.type === 'renamed' && event.info.id === currentSave?.id) {
       // Keep the "Saved · " / "Loaded · " prefix, swap only the name.
       setPersistenceStatus((status) => status.replace(/ · .*$/, ` · ${event.info.name}`));
@@ -365,7 +368,11 @@ export default function App() {
         <div className="flex justify-center overflow-hidden">
           <ClockBar
             clock={clock}
-            onSetSpeed={(speed) => { void onSetSpeed(speed); }}
+            disabled={saveDialog != null}
+            onSetSpeed={(speed) => {
+              if (saveDialog != null) return;
+              void onSetSpeed(speed);
+            }}
             winterWarning={winterWarning}
           />
         </div>
@@ -473,14 +480,6 @@ export default function App() {
             }
           />
           <FloatingText floaters={floaters} onDismiss={dismissFloater} />
-          {saveDialog && (
-            <SaveDialog
-              focus={saveDialog}
-              currentSave={currentSave}
-              onSaveEvent={onSaveEvent}
-              onClose={closeSaveDialog}
-            />
-          )}
         </div>
         <div className="flex min-h-0 w-56 shrink-0 flex-col">
           <BuildMenu
@@ -491,6 +490,7 @@ export default function App() {
             selectedBuildingId={selectedBuildingId}
             villagerDetail={villagerDetail}
             unlocked={unlocked}
+            disabled={saveDialog != null}
             onSelectKind={(kind) => {
               setSelectedKind(kind);
               setSelectedCrop(null);
@@ -517,6 +517,14 @@ export default function App() {
           setFocusTile((previous) => ({ tile, nonce: (previous?.nonce ?? 0) + 1 }))
         }
       />
+      {saveDialog && (
+        <SaveDialog
+          focus={saveDialog}
+          currentSave={currentSave}
+          onSaveEvent={onSaveEvent}
+          onClose={() => closeSaveDialog()}
+        />
+      )}
       {pendingDemolition != null && (
         <ChickenDemolitionDialog onCancel={() => setPendingDemolition(null)} onConfirm={() => {
           const id = pendingDemolition; setPendingDemolition(null); void demolishBuilding(id);
