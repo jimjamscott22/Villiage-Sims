@@ -8,6 +8,7 @@ import { toRgba } from './palette';
 import type { Raster } from './raster';
 import { FENCE, GATE, SIGNPOST } from './sprites/buildings';
 import { CHICKEN_SPRITES } from './sprites/chickens';
+import { CYPRESS, PALM, PEAK, PINE, STANDING_STONE } from './sprites/props';
 import { ART_DIR, THEME_CSS_PATH } from './paths';
 import { decodePng } from './png';
 import { PANEL } from './sprites/ui';
@@ -76,6 +77,11 @@ describe('standing-object outlines', () => {
     ['gate', GATE],
     ['signpost', SIGNPOST],
     ['chicken_shelter', CHICKEN_SPRITES.chicken_shelter.grid],
+    ['cypress', CYPRESS],
+    ['palm', PALM],
+    ['pine', PINE],
+    ['peak', PEAK],
+    ['standingStone', STANDING_STONE],
     ...chickenFrames,
   ];
 
