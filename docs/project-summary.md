@@ -192,7 +192,7 @@ npm run dev
 ### Development Principles (`AGENTS.md`)
 
 - **Vite Target**: `vite.config.ts` must maintain `build.target: "es2020"` (do NOT revert to `safari13`, as esbuild in Vite 8 will fail destructuring).
-- **Art Palette Constraint**: Art generator only permits the 29 curated color hexes defined in [`tools/genart/palette.ts`](file:///d:/Code/Web%20Dev/Villiage-Sims/tools/genart/palette.ts).
+- **Art Palette Constraint**: Art generator only permits the 26 curated art color hexes defined in [`tools/genart/palette.ts`](file:///d:/Code/Web%20Dev/Villiage-Sims/tools/genart/palette.ts) (plus `uiBg` and the `uiText` alias in `THEME`, 27 unique colors / 28 tokens total).
 - **Chronicle Serialization Rule**: `ChronicleBody` in Rust persistence must maintain default externally-tagged serde representation (do NOT add `#[serde(tag = "...")]` to storage types, as `bincode` will fail).
 - **No Direct Mutation**: Frontend components must never mutate or guess simulation state — all state transitions flow through `Transport` commands.
 

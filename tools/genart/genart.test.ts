@@ -133,21 +133,27 @@ describe('lit-window overlays', () => {
   ];
 
   it.each(pairs)(
-    '%s matches its base dimensions and paints only on window/opening pixels in wheat/terraLight/ink',
+    '%s matches its base dimensions and paints only on window/opening pixels with highlight centres and wheat/terraLight rims',
     (_name, base, lit, allowedBaseKeys) => {
       expect(lit.size).toEqual(base.size);
       const [width, height] = lit.size;
       const allowedBase = new Set(allowedBaseKeys);
       let opaqueCount = 0;
+      let highlightCount = 0;
+      let wheatCount = 0;
       for (let y = 0; y < height; y += 1) {
         for (let x = 0; x < width; x += 1) {
           const key = lit.rows[y][x];
           if (lit.palette[key] == null) continue;
           opaqueCount += 1;
+          if (key === 'h') highlightCount += 1;
+          if (key === 'w') wheatCount += 1;
           expect(allowedBase.has(base.rows[y][x]), `(${x},${y}) base='${base.rows[y][x]}'`).toBe(true);
         }
       }
       expect(opaqueCount).toBeGreaterThan(0);
+      expect(highlightCount).toBeGreaterThan(0);
+      expect(wheatCount).toBeGreaterThan(0);
     },
   );
 });

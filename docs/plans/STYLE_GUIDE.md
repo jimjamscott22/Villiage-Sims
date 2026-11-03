@@ -10,10 +10,10 @@ conventions, have not been newly audited or marked complete.
 
 Based on the repo at commit `f30bcf5`. **[PROPOSAL]** marks a rule that is new. Everything unmarked is already true in the repo.
 
-## 1. Locked palette: 27 colours (25 art + 2 UI-only)
+## 1. Locked palette: 27 unique colours (26 art + 1 UI-only, 28 tokens with `uiText` alias)
 
 Starting point: `tools/genart/palette.ts` defines **29** colours (the earlier review said 33; that was a miscount). All 29 appear in the sheets.
-**[PROPOSAL]** Four merges take it to **25 art colours**. Adding `uiBg` and `highlight` gives **27 locked tokens**. `uiText` is an alias of `whitewash`, not a new colour.
+**[PROPOSAL]** Four merges take it to **25 art colours**, and promoting `highlight` (`#f4c95d`) for lit-window overlays brings `PALETTE` to **26 art colours**. Adding `uiBg` gives **27 unique colours** (**28 tokens** including `uiText`, an alias of `whitewash`).
 
 | Name | Hex | Ramp | Role | Current px |
 |---|---|---|---|---|
@@ -38,7 +38,8 @@ Starting point: `tools/genart/palette.ts` defines **29** colours (the earlier re
 | terraMid | #c05a34 | terra 2 | roofs, clothing | 1481 |
 | terraLight | #e08a5a | terra 3 | roof highlight | 1071 |
 | shutter | #3f6f8f | accent | shutters, active button, focus ring | 1026 |
-| wheat | #d9a531 | accent | wheat, gold accents | 1021 |
+| wheat | #d9a531 | accent | wheat, gold accents, lit-window rims | 1021 |
+| highlight | #f4c95d | accent | lit-window centres; UI selection, intent arrows, tag borders | — |
 | ink | #2b2320 | neutral 1 | outlines, darkest value | 9860 |
 | uiPanel | #1b3038 | ui 1 | panel fill; absorbs uiRecess | 72 (+278) |
 | uiRaised | #26454f | ui 2 | button and chip fill | 158 |
@@ -51,14 +52,13 @@ Merges, with RGB distance between the pair:
 
 Considered and rejected: seaDeepest ↔ uiRaised (24.9). They belong to different layers (world vs UI).
 
-**Final locked count: 25 art + uiBg + highlight = 27 tokens.** The table above is complete.
+**Final locked count: 26 art (including `highlight`) + `uiBg` = 27 unique colours (28 tokens with `uiText`).** The table above is complete.
 
 UI-only tokens **[PROPOSAL]**:
 
 | Token | Hex | Role | Replaces (code occurrences) |
 |---|---|---|---|
 | uiBg | #17211b | app background, text outline | #17211b (10), #0b151c (1), #1c2a21 (1), #1a1510 (2) |
-| highlight | #f4c95d | selection, intent arrows, tag borders | #f4c95d (8), #ffd700 (1), #e6c84a (1) |
 | uiText | alias of whitewash #f2ece0 | body text | #f7f4e9 (14), #fff6d5 (3), #f4e8d0 (1) |
 
 Other mappings:

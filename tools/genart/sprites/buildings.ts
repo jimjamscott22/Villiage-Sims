@@ -486,13 +486,17 @@ function litPane(
 ): void {
   for (let y = y0; y <= y1; y += 1) {
     for (let x = x0; x <= x1; x += 1) {
-      const innerEdge = x === x0 || x === x1 || y === y0 || y === y1;
-      set(x, y, innerEdge ? 'l' : 'w');
+      const edgeX = x === x0 || x === x1;
+      const edgeY = y === y0 || y === y1;
+      if (edgeX && edgeY) set(x, y, 'l');
+      else if (edgeX || edgeY) set(x, y, 'w');
+      else set(x, y, 'h');
     }
   }
 }
 
 const LIT_PAL: Pal = {
+  h: P.highlight,
   w: P.wheat,
   l: P.terraLight,
   i: P.ink,
@@ -526,8 +530,11 @@ export const STOREHOUSE_LIT: SpriteGrid = grid(32, 48, LIT_PAL, (set) => {
   for (let y = 31; y <= 43; y += 1) {
     for (let x = 12; x <= 19; x += 1) {
       if ((y >= 32 && x === 15) || (y === 37 && (x === 13 || x === 18))) continue;
-      const innerEdge = x === 12 || x === 19 || y === 31 || y === 43;
-      set(x, y, innerEdge ? 'l' : 'w');
+      const edgeX = x === 12 || x === 19;
+      const edgeY = y === 31 || y === 43;
+      if (edgeX && edgeY) set(x, y, 'l');
+      else if (edgeX || edgeY) set(x, y, 'w');
+      else set(x, y, 'h');
     }
   }
 });
