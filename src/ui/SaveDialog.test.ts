@@ -80,4 +80,18 @@ describe('SaveDialog backdrop and surrounding control guards', () => {
       expect(button).toContain('disabled=""');
     }
   });
+
+  it('uses locked theme tokens instead of default Tailwind colour utilities', () => {
+    const html = renderToStaticMarkup(
+      createElement(SaveDialog, {
+        focus: 'save',
+        currentSave: { id: 'my-village', name: 'My Village' },
+        onSaveEvent: () => {},
+        onClose: () => {},
+      }),
+    );
+    expect(html).not.toMatch(/\b(bg|text|border)-(black|white|amber|red|rose|emerald)\b/);
+    expect(html).toContain('--c-ui-bg');
+    expect(html).toContain('--c-whitewash');
+  });
 });
