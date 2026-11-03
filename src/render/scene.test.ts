@@ -423,6 +423,61 @@ describe('buildDrawList', () => {
     // Non-decor props are terrain-defining and never suppressed.
     expect(list.find((e) => e.id === 'p:3,4')?.key).toBe('prop.cypress');
   });
+
+  it('keeps lit-window overlays off by default and draws them on completed buildings when litWindows is true', () => {
+    const fullBuildings: BuildingDef[] = [
+      ...buildings,
+      { id: 'granary', name: 'Granary', footprint: [2, 2], cost: {}, buildTicks: 1, category: 'storage', validTerrain: ['grass'] },
+      { id: 'storehouse', name: 'Storehouse', footprint: [2, 2], cost: {}, buildTicks: 1, category: 'storage', validTerrain: ['grass'] },
+    ];
+    const snap = snapshot({
+      buildings: [
+        { id: 1, kind: 0, x: 2, y: 2, rot: 0, state: 2, progress: 100 }, // hut (completed)
+        { id: 2, kind: 2, x: 5, y: 2, rot: 0, state: 2, progress: 100 }, // mill (completed)
+        { id: 3, kind: 3, x: 9, y: 2, rot: 0, state: 2, progress: 100 }, // bakery (completed)
+        { id: 4, kind: 4, x: 2, y: 6, rot: 0, state: 2, progress: 100 }, // granary (completed)
+        { id: 5, kind: 5, x: 6, y: 6, rot: 0, state: 2, progress: 100 }, // storehouse (completed)
+        { id: 6, kind: 0, x: 11, y: 6, rot: 0, state: 1, progress: 40 }, // hut scaffold (under construction)
+      ],
+    });
+    const baseInput = {
+      snapshot: snap,
+      catalog: { buildings: fullBuildings, crops },
+      props: [],
+      tileSize: 32,
+      tick: 0,
+      reduceMotion: false,
+      selectedBuildingId: null,
+      selectedVillagerId: null,
+      lastFacing,
+      atlas,
+    };
+
+    const defaultList = buildDrawList(baseInput);
+    expect(defaultList.filter((e) => e.id.startsWith('blit:'))).toEqual([]);
+
+    const litList = buildDrawList({ ...baseInput, litWindows: true });
+    expect(litList.filter((e) => e.id.startsWith('blit:')).map((e) => e.key)).toEqual([
+      'hut.lit',
+      'mill.lit',
+      'bakery.lit',
+      'granary.lit',
+      'storehouse.lit',
+    ]);
+    // Scaffolds do not receive a lit overlay.
+    expect(litList.find((e) => e.id === 'blit:6')).toBeUndefined();
+    // Each overlay draws at the exact same x/y/baseY as its parent building and sorts right after it.
+    for (const id of [1, 2, 3, 4, 5]) {
+      const bIdx = litList.findIndex((e) => e.id === `b:${id}`);
+      const litIdx = litList.findIndex((e) => e.id === `blit:${id}`);
+      expect(litIdx).toBeGreaterThan(bIdx);
+      expect(litList[litIdx]).toMatchObject({
+        x: litList[bIdx].x,
+        y: litList[bIdx].y,
+        baseY: litList[bIdx].baseY,
+      });
+    }
+  });
 });
 
 it('renders chicken poses and baskets through the atlas and culls offscreen animals', () => {

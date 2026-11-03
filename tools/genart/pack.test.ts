@@ -48,4 +48,12 @@ describe('pack', () => {
   it('throws when an item is wider than the sheet', () => {
     expect(() => pack([square('huge', 300)], 256)).toThrow(/wider than the sheet/);
   });
+
+  it('appends new items after existing shelves without moving existing cells', async () => {
+    const { packAppend } = await import('./pack');
+    const base = pack([square('a', 32), square('b', 16), square('c', 16)], 64);
+    const appended = packAppend(base.cells, [square('d', 16), square('e', 32)], 64);
+    expect(appended.cells.slice(0, 3)).toEqual(base.cells);
+    expect(appended.cells).toHaveLength(5);
+  });
 });
