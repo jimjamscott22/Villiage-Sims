@@ -1,5 +1,5 @@
 import { PALETTE } from '../palette';
-import type { SpriteGrid } from '../grid';
+import { outlineGrid, paintGrid, type SpriteGrid } from '../grid';
 
 const P = PALETTE;
 
@@ -20,54 +20,74 @@ function grid(width: number, height: number, palette: Pal, paint: (set: (x: numb
 }
 
 /** Cypress cluster. 16×32, anchorY 16. */
-export const CYPRESS: SpriteGrid = grid(16, 32, {
-  d: P.vegDarkest,
-  v: P.vegDark,
-  m: P.vegMid,
-  s: P.stoneShadow,
-}, (set) => {
-  for (let y = 0; y <= 22; y += 1) {
-    const t = y / 22;
-    const half = Math.max(1, Math.floor(1 + (1 - Math.abs(t - 0.45) * 1.6) * 5));
-    for (let x = 8 - half; x <= 7 + half; x += 1) {
-      const edge = x === 8 - half || x === 7 + half;
-      set(x, y, edge ? 'd' : y % 3 === 0 ? 'm' : 'v');
+export const CYPRESS: SpriteGrid = paintGrid(
+  outlineGrid(
+    grid(16, 32, {
+      d: P.vegDarkest,
+      v: P.vegDark,
+      m: P.vegMid,
+      s: P.stoneShadow,
+      c: P.sandShadow,
+      i: P.ink,
+    }, (set) => {
+      // Top starts at y 1 so the 1px ink outline fits inside the cell.
+      for (let y = 1; y <= 22; y += 1) {
+        const t = (y - 1) / 21;
+        const half = Math.max(1, Math.floor(1 + (1 - Math.abs(t - 0.45) * 1.6) * 5));
+        for (let x = 8 - half; x <= 7 + half; x += 1) {
+          const edge = x === 8 - half || x === 7 + half;
+          set(x, y, edge ? 'd' : y % 3 === 0 ? 'm' : 'v');
+        }
+      }
+      for (let y = 23; y <= 28; y += 1) {
+        set(7, y, 's');
+        set(8, y, 's');
+      }
+    }),
+    'i',
+  ),
+  (set) => {
+    for (let x = 4; x <= 11; x += 1) {
+      set(x, 29, 'c');
+      set(x, 30, 'c');
     }
-  }
-  for (let y = 23; y <= 28; y += 1) {
-    set(7, y, 's');
-    set(8, y, 's');
-  }
-  for (let x = 4; x <= 11; x += 1) {
-    set(x, 29, 'd');
-    set(x, 30, 'd');
-  }
-});
+  },
+);
 
 /** Mountain peak. 16×24, anchorY 8. */
-export const PEAK: SpriteGrid = grid(16, 24, {
-  p: P.stonePale,
-  l: P.sandMid,
-  m: P.stoneMid,
-  s: P.stoneShadow,
-  i: P.ink,
-}, (set) => {
-  for (let y = 0; y <= 15; y += 1) {
-    const half = Math.floor(y * 0.7) + 1;
-    for (let x = 8 - half; x <= 7 + half; x += 1) {
-      const top = y < 3;
-      const edge = x === 8 - half || x === 7 + half;
-      set(x, y, top ? 'p' : edge ? 's' : y < 8 ? 'l' : 'm');
+export const PEAK: SpriteGrid = paintGrid(
+  outlineGrid(
+    grid(16, 24, {
+      p: P.stonePale,
+      l: P.sandMid,
+      m: P.stoneMid,
+      s: P.stoneShadow,
+      c: P.sandShadow,
+      i: P.ink,
+    }, (set) => {
+      // Peak starts at y 1 so the crest gets an ink cap; lower slopes stay
+      // full-width so neighbouring mountain tiles join seamlessly.
+      for (let y = 1; y <= 15; y += 1) {
+        const half = Math.floor((y - 1) * 0.7) + 1;
+        for (let x = 8 - half; x <= 7 + half; x += 1) {
+          const top = y < 4;
+          const edge = x === 8 - half || x === 7 + half;
+          set(x, y, top ? 'p' : edge ? 's' : y < 9 ? 'l' : 'm');
+        }
+      }
+      for (let y = 16; y <= 20; y += 1) {
+        for (let x = 2; x <= 13; x += 1) set(x, y, 's');
+      }
+    }),
+    'i',
+  ),
+  (set) => {
+    for (let x = 4; x <= 11; x += 1) {
+      set(x, 21, 'c');
+      set(x, 22, 'c');
     }
-  }
-  for (let y = 16; y <= 20; y += 1) {
-    for (let x = 2; x <= 13; x += 1) set(x, y, 's');
-  }
-  for (let x = 4; x <= 11; x += 1) {
-    set(x, 21, 'i');
-    set(x, 22, 'i');
-  }
-});
+  },
+);
 
 /** Scatter boulder for bare rock tiles. 16×16, anchorY 0. */
 export const BOULDER: SpriteGrid = grid(16, 16, {
@@ -271,44 +291,53 @@ export const DRIFTWOOD: SpriteGrid = grid(16, 16, {
   for (let x = 3; x <= 12; x += 1) set(x, 13, 'i');
 });
 
-export const PALM: SpriteGrid = grid(16, 32, {
-  t: P.sandMid,
-  b: P.sandShadow,
-  d: P.vegDarkest,
-  v: P.vegDark,
-  m: P.vegMid,
-  l: P.vegLight,
-  c: P.terraDark,
-}, (set) => {
-  // Trunk leans a little to the east as it rises.
-  for (let y = 12; y <= 29; y += 1) {
-    const lean = Math.floor((29 - y) / 6);
-    set(7 + lean, y, 'b');
-    set(8 + lean, y, 't');
-  }
-  const crownX = 9;
-  const crownY = 12;
-  const fronds = [
-    { dx: -1, len: 6, dip: 1 },
-    { dx: 1, len: 6, dip: 1 },
-    { dx: -1, len: 4, dip: 3 },
-    { dx: 1, len: 4, dip: 3 },
-  ];
-  for (const frond of fronds) {
-    for (let i = 1; i <= frond.len; i += 1) {
-      const x = crownX + frond.dx * i;
-      const y = crownY - frond.dip + Math.floor((i * i) / 8);
-      const tip = i > frond.len - 2;
-      set(x, y, tip ? 'd' : 'v');
-      set(x, y + 1, tip ? 'v' : 'm');
-    }
-  }
-  set(crownX, crownY - 1, 'l');
-  set(crownX, crownY, 'd');
-  set(crownX - 1, crownY + 1, 'c');
-  set(crownX + 1, crownY + 1, 'c');
-  for (let x = 5; x <= 12; x += 1) set(x, 30, 'b');
-});
+export const PALM: SpriteGrid = paintGrid(
+  outlineGrid(
+    grid(16, 32, {
+      t: P.sandMid,
+      b: P.sandShadow,
+      d: P.vegDarkest,
+      v: P.vegDark,
+      m: P.vegMid,
+      l: P.vegLight,
+      c: P.terraDark,
+      i: P.ink,
+    }, (set) => {
+      // Trunk leans a little to the east as it rises.
+      for (let y = 12; y <= 29; y += 1) {
+        const lean = Math.floor((29 - y) / 6);
+        set(7 + lean, y, 'b');
+        set(8 + lean, y, 't');
+      }
+      const crownX = 9;
+      const crownY = 12;
+      // East frond stops at x 14 so a 1px outline fits inside the cell.
+      const fronds = [
+        { dx: -1, len: 6, dip: 1 },
+        { dx: 1, len: 5, dip: 1 },
+        { dx: -1, len: 4, dip: 3 },
+        { dx: 1, len: 4, dip: 3 },
+      ];
+      for (const frond of fronds) {
+        for (let i = 1; i <= frond.len; i += 1) {
+          const x = crownX + frond.dx * i;
+          const y = crownY - frond.dip + Math.floor((i * i) / 8);
+          const tip = i > frond.len - 2;
+          set(x, y, tip ? 'd' : 'v');
+          set(x, y + 1, tip ? 'v' : 'm');
+        }
+      }
+      set(crownX, crownY - 1, 'l');
+      set(crownX, crownY, 'd');
+      set(crownX - 1, crownY + 1, 'c');
+      set(crownX + 1, crownY + 1, 'c');
+    }),
+    'i',
+  ),
+  (set) => {
+    for (let x = 5; x <= 12; x += 1) set(x, 30, 'b');
+  },
+);
 
 /** Floating lily pad for calm open water. 16×16, anchorY 0. */
 export const LILYPAD: SpriteGrid = grid(16, 16, {
@@ -433,30 +462,38 @@ export const CRYSTAL: SpriteGrid = grid(16, 16, {
 });
 
 /** Small foothill pine for grass beside mountains. 16×24, anchorY 8. */
-export const PINE: SpriteGrid = grid(16, 24, {
-  d: P.vegDarkest,
-  v: P.vegDark,
-  m: P.vegMid,
-  s: P.stoneShadow,
-  i: P.ink,
-}, (set) => {
-  // Three stacked tiers, each wider than the one above.
-  for (let tier = 0; tier < 3; tier += 1) {
-    const top = 2 + tier * 5;
-    for (let dy = 0; dy <= 6; dy += 1) {
-      const half = 1 + Math.floor(dy * 0.6) + tier;
-      for (let x = 8 - half; x <= 7 + half; x += 1) {
-        const edge = x === 8 - half || x === 7 + half || dy === 6;
-        set(x, top + dy, edge ? 'd' : x < 8 ? 'm' : 'v');
+export const PINE: SpriteGrid = paintGrid(
+  outlineGrid(
+    grid(16, 24, {
+      d: P.vegDarkest,
+      v: P.vegDark,
+      m: P.vegMid,
+      s: P.stoneShadow,
+      c: P.sandShadow,
+      i: P.ink,
+    }, (set) => {
+      // Three stacked tiers, each wider than the one above.
+      for (let tier = 0; tier < 3; tier += 1) {
+        const top = 2 + tier * 5;
+        for (let dy = 0; dy <= 6; dy += 1) {
+          const half = 1 + Math.floor(dy * 0.6) + tier;
+          for (let x = 8 - half; x <= 7 + half; x += 1) {
+            const edge = x === 8 - half || x === 7 + half || dy === 6;
+            set(x, top + dy, edge ? 'd' : x < 8 ? 'm' : 'v');
+          }
+        }
       }
-    }
-  }
-  for (let y = 19; y <= 20; y += 1) {
-    set(7, y, 's');
-    set(8, y, 's');
-  }
-  for (let x = 4; x <= 11; x += 1) set(x, 21, 'i');
-});
+      for (let y = 19; y <= 20; y += 1) {
+        set(7, y, 's');
+        set(8, y, 's');
+      }
+    }),
+    'i',
+  ),
+  (set) => {
+    for (let x = 4; x <= 11; x += 1) set(x, 21, 'c');
+  },
+);
 
 /** Cattails in shallow water at the land's edge. 16×16, anchorY 0, two sway frames. */
 function cattail(sway: number): SpriteGrid {
@@ -515,33 +552,41 @@ export const SNOW_DRIFT: SpriteGrid = grid(16, 16, {
 });
 
 /** Ancient standing stones — a rare landmark on open grass. 16×24, anchorY 8. */
-export const STANDING_STONE: SpriteGrid = grid(16, 24, {
-  p: P.stonePale,
-  l: P.sandMid,
-  m: P.stoneMid,
-  s: P.stoneShadow,
-  g: P.vegMid,
-  i: P.ink,
-}, (set) => {
-  for (let y = 3; y <= 19; y += 1) {
-    const inset = y === 3 ? 1 : 0;
-    for (let x = 5 + inset; x <= 9 - inset; x += 1) {
-      const edge = x === 9 - inset || y === 3;
-      set(x, y, edge ? 's' : x === 5 ? 'p' : x === 6 ? 'l' : 'm');
-    }
-  }
-  // Moss creeping up the shaded base, and a chiselled notch.
-  for (const [mx, my] of [[8, 17], [7, 18], [8, 18], [6, 19], [7, 19]]) set(mx, my, 'g');
-  set(7, 8, 's');
-  set(7, 9, 's');
-  // Smaller companion stone.
-  for (let y = 13; y <= 19; y += 1) {
-    for (let x = 11; x <= 13; x += 1) {
-      set(x, y, x === 13 || y === 13 ? 's' : x === 11 ? 'l' : 'm');
-    }
-  }
-  for (let x = 4; x <= 14; x += 1) set(x, 20, 'i');
-});
+export const STANDING_STONE: SpriteGrid = paintGrid(
+  outlineGrid(
+    grid(16, 24, {
+      p: P.stonePale,
+      l: P.sandMid,
+      m: P.stoneMid,
+      s: P.stoneShadow,
+      g: P.vegMid,
+      c: P.sandShadow,
+      i: P.ink,
+    }, (set) => {
+      for (let y = 3; y <= 19; y += 1) {
+        const inset = y === 3 ? 1 : 0;
+        for (let x = 5 + inset; x <= 9 - inset; x += 1) {
+          const edge = x === 9 - inset || y === 3;
+          set(x, y, edge ? 's' : x === 5 ? 'p' : x === 6 ? 'l' : 'm');
+        }
+      }
+      // Moss creeping up the shaded base, and a chiselled notch.
+      for (const [mx, my] of [[8, 17], [7, 18], [8, 18], [6, 19], [7, 19]]) set(mx, my, 'g');
+      set(7, 8, 's');
+      set(7, 9, 's');
+      // Smaller companion stone.
+      for (let y = 13; y <= 19; y += 1) {
+        for (let x = 11; x <= 13; x += 1) {
+          set(x, y, x === 13 || y === 13 ? 's' : x === 11 ? 'l' : 'm');
+        }
+      }
+    }),
+    'i',
+  ),
+  (set) => {
+    for (let x = 4; x <= 14; x += 1) set(x, 20, 'c');
+  },
+);
 
 /** Summer sunflower patch. 16×16, anchorY 0 — the season slot between spring flowers and autumn leaves. */
 export const SUNFLOWERS: SpriteGrid = grid(16, 16, {

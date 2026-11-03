@@ -25,7 +25,7 @@ type Pending =
   | null;
 
 export const SAVE_DIALOG_BACKDROP_CLASS =
-  'fixed inset-0 z-40 flex items-center justify-center bg-black/60';
+  'fixed inset-0 z-40 flex items-center justify-center bg-[var(--c-ui-bg)]/60';
 
 function message(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -131,7 +131,7 @@ export function SaveDialog({ focus, currentSave, onSaveEvent, onClose }: SaveDia
     const confirming = pending && pending.action !== 'overwrite' && pending.save.id === save.id ? pending : null;
     const isRenaming = renaming?.id === save.id;
     return (
-      <li key={save.id} className="border-b border-white/5 px-3 py-2" data-testid={`save-row-${save.id}`}>
+      <li key={save.id} className="border-b border-[var(--c-whitewash)]/5 px-3 py-2" data-testid={`save-row-${save.id}`}>
         <div className="flex items-baseline gap-2">
           {isRenaming ? (
             <input
@@ -143,14 +143,14 @@ export function SaveDialog({ focus, currentSave, onSaveEvent, onClose }: SaveDia
                 if (event.key === 'Enter') commitRename();
               }}
               aria-label="New save name"
-              className="pixel-focus min-w-0 flex-1 bg-black/40 px-1 text-white"
+              className="pixel-focus min-w-0 flex-1 bg-[var(--c-ui-bg)]/40 px-1 text-[var(--c-whitewash)]"
             />
           ) : (
-            <span className={`min-w-0 flex-1 truncate ${currentSave?.id === save.id ? 'text-amber-200' : 'text-white'}`}>
+            <span className={`min-w-0 flex-1 truncate ${currentSave?.id === save.id ? 'text-[var(--c-highlight)]' : 'text-[var(--c-whitewash)]'}`}>
               {save.name}
             </span>
           )}
-          <span className="shrink-0 text-white/50">
+          <span className="shrink-0 text-[var(--c-whitewash)]/50">
             {formatGameDate(save)}
             {save.population != null && ` · pop ${save.population}`} · {formatSavedAt(save.savedAt, now)}
           </span>
@@ -158,7 +158,7 @@ export function SaveDialog({ focus, currentSave, onSaveEvent, onClose }: SaveDia
         <div className="mt-1 flex justify-end gap-1">
           {confirming ? (
             <>
-              <span className="mr-auto text-amber-200">
+              <span className="mr-auto text-[var(--c-highlight)]">
                 {confirming.action === 'load'
                   ? `Load "${save.name}"? Unsaved progress will be lost.`
                   : `Delete "${save.name}"?`}
@@ -221,10 +221,10 @@ export function SaveDialog({ focus, currentSave, onSaveEvent, onClose }: SaveDia
         aria-modal="true"
         aria-labelledby="save-dialog-title"
         data-testid="save-dialog"
-        className="pixel-panel flex max-h-[calc(100%-2rem)] w-[min(36rem,calc(100%-2rem))] flex-col text-xs text-white/80 outline-none"
+        className="pixel-panel flex max-h-[calc(100%-2rem)] w-[min(36rem,calc(100%-2rem))] flex-col text-xs text-[var(--c-whitewash)]/80 outline-none"
       >
-        <header className="flex shrink-0 items-center border-b border-white/10 px-3 py-2">
-          <h2 id="save-dialog-title" className="text-[11px] text-white/60">
+        <header className="flex shrink-0 items-center border-b border-[var(--c-whitewash)]/10 px-3 py-2">
+          <h2 id="save-dialog-title" className="text-[11px] text-[var(--c-whitewash)]/60">
             <PixelText text="SAVES" />
           </h2>
           <button
@@ -238,13 +238,13 @@ export function SaveDialog({ focus, currentSave, onSaveEvent, onClose }: SaveDia
           </button>
         </header>
 
-        <div className="shrink-0 space-y-2 border-b border-white/10 px-3 py-2">
+        <div className="shrink-0 space-y-2 border-b border-[var(--c-whitewash)]/10 px-3 py-2">
           <p>
-            Current: <span className="text-white">{currentSave ? currentSave.name : 'Unsaved village'}</span>
+            Current: <span className="text-[var(--c-whitewash)]">{currentSave ? currentSave.name : 'Unsaved village'}</span>
           </p>
           {pending?.action === 'overwrite' && currentSave ? (
             <div className="flex items-center gap-1">
-              <span className="mr-auto text-amber-200">Overwrite "{currentSave.name}"?</span>
+              <span className="mr-auto text-[var(--c-highlight)]">Overwrite "{currentSave.name}"?</span>
               <button type="button" disabled={busy} onClick={() => void overwriteCurrent()} className="pixel-btn pixel-focus px-2 py-0.5">
                 <PixelText text="YES" />
               </button>
@@ -263,7 +263,7 @@ export function SaveDialog({ focus, currentSave, onSaveEvent, onClose }: SaveDia
               >
                 <PixelText text="SAVE" />
               </button>
-              <span className="text-white/50">
+              <span className="text-[var(--c-whitewash)]/50">
                 {currentSave ? `overwrites "${currentSave.name}"` : 'name a new save below'}
               </span>
             </div>
@@ -286,7 +286,7 @@ export function SaveDialog({ focus, currentSave, onSaveEvent, onClose }: SaveDia
               onChange={(event) => setDraftName(event.target.value)}
               placeholder="Village name"
               data-testid="save-as-name"
-              className="pixel-focus min-w-0 flex-1 bg-black/40 px-1 py-0.5 text-white"
+              className="pixel-focus min-w-0 flex-1 bg-[var(--c-ui-bg)]/40 px-1 py-0.5 text-[var(--c-whitewash)]"
             />
             <button type="submit" disabled={busy} data-testid="save-as" className="pixel-btn pixel-focus px-2 py-1 disabled:opacity-40">
               <PixelText text="SAVE AS" />
@@ -296,16 +296,16 @@ export function SaveDialog({ focus, currentSave, onSaveEvent, onClose }: SaveDia
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {saves == null ? (
-            <p className="px-3 py-2 text-white/50">Loading…</p>
+            <p className="px-3 py-2 text-[var(--c-whitewash)]/50">Loading…</p>
           ) : saves.length === 0 ? (
-            <p className="px-3 py-2 text-white/50">No saves yet.</p>
+            <p className="px-3 py-2 text-[var(--c-whitewash)]/50">No saves yet.</p>
           ) : (
             <>
-              <h3 className="px-3 pt-2 text-[10px] text-white/50">MY SAVES</h3>
+              <h3 className="px-3 pt-2 text-[10px] text-[var(--c-whitewash)]/50">MY SAVES</h3>
               <ul>{groups.manual.map(row)}</ul>
               {groups.autosave.length > 0 && (
                 <>
-                  <h3 className="px-3 pt-2 text-[10px] text-white/50">AUTOSAVES</h3>
+                  <h3 className="px-3 pt-2 text-[10px] text-[var(--c-whitewash)]/50">AUTOSAVES</h3>
                   <ul>{groups.autosave.map(row)}</ul>
                 </>
               )}
@@ -314,7 +314,7 @@ export function SaveDialog({ focus, currentSave, onSaveEvent, onClose }: SaveDia
         </div>
 
         {error && (
-          <p role="alert" className="shrink-0 border-t-2 border-red-500/50 bg-red-950/90 px-3 py-2 text-red-100">
+          <p role="alert" className="shrink-0 border-t-2 border-[var(--c-terra-dark)] bg-[var(--c-terra-dark)]/90 px-3 py-2 text-[var(--c-whitewash)]">
             {error}
           </p>
         )}

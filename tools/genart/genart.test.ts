@@ -6,8 +6,9 @@ import { renderPaletteCss } from './css';
 import { rasterizeGrid, type SpriteGrid } from './grid';
 import { toRgba } from './palette';
 import type { Raster } from './raster';
-import { FENCE, GATE, SIGNPOST } from './sprites/buildings';
+import { FARM, FENCE, GATE, SIGNPOST, WELL } from './sprites/buildings';
 import { CHICKEN_SPRITES } from './sprites/chickens';
+import { CYPRESS, PALM, PEAK, PINE, STANDING_STONE } from './sprites/props';
 import { ART_DIR, THEME_CSS_PATH } from './paths';
 import { decodePng } from './png';
 import { PANEL } from './sprites/ui';
@@ -76,6 +77,13 @@ describe('standing-object outlines', () => {
     ['gate', GATE],
     ['signpost', SIGNPOST],
     ['chicken_shelter', CHICKEN_SPRITES.chicken_shelter.grid],
+    ['cypress', CYPRESS],
+    ['palm', PALM],
+    ['pine', PINE],
+    ['peak', PEAK],
+    ['standingStone', STANDING_STONE],
+    ['well', WELL],
+    ['farm', FARM],
     ...chickenFrames,
   ];
 

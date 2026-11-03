@@ -64,37 +64,43 @@ export const HUT: SpriteGrid = grid(16, 32, {
 });
 
 /** Farm shed at plot origin. 16×24, anchorY 8. */
-export const FARM: SpriteGrid = grid(16, 24, {
-  t: P.terraMid,
-  d: P.terraDark,
-  w: P.stonePale,
-  m: P.stoneMid,
-  i: P.ink,
-  c: P.sandShadow,
-  v: P.vegMid,
-}, (set) => {
-  for (let y = 2; y <= 7; y += 1) {
-    const half = y;
-    for (let x = 8 - half; x <= 7 + half; x += 1) {
-      set(x, y, y === 2 || x === 8 - half || x === 7 + half ? 'd' : 't');
+export const FARM: SpriteGrid = paintGrid(
+  outlineGrid(
+    grid(16, 24, {
+      t: P.terraMid,
+      d: P.terraDark,
+      w: P.stonePale,
+      m: P.stoneMid,
+      i: P.ink,
+      c: P.sandShadow,
+      v: P.vegMid,
+    }, (set) => {
+      for (let y = 2; y <= 7; y += 1) {
+        const half = y;
+        for (let x = 8 - half; x <= 7 + half; x += 1) {
+          set(x, y, y === 2 || x === 8 - half || x === 7 + half ? 'd' : 't');
+        }
+      }
+      for (let y = 8; y <= 18; y += 1) {
+        for (let x = 4; x <= 11; x += 1) {
+          if (y >= 12 && y <= 16 && x >= 7 && x <= 9) set(x, y, 'm');
+          else set(x, y, 'w');
+        }
+      }
+    }),
+    'i',
+  ),
+  (set) => {
+    for (let x = 2; x <= 13; x += 1) {
+      set(x, 19, 'c');
+      set(x, 20, 'c');
     }
-  }
-  for (let y = 8; y <= 18; y += 1) {
-    for (let x = 3; x <= 12; x += 1) {
-      if (y === 8 || y === 18 || x === 3 || x === 12) set(x, y, 'i');
-      else if (y >= 12 && y <= 16 && x >= 7 && x <= 9) set(x, y, 'm');
-      else set(x, y, 'w');
-    }
-  }
-  for (let x = 2; x <= 13; x += 1) {
-    set(x, 19, 'c');
-    set(x, 20, 'c');
-  }
-  set(4, 21, 'v');
-  set(5, 21, 'v');
-  set(10, 21, 'v');
-  set(11, 21, 'v');
-});
+    set(4, 21, 'v');
+    set(5, 21, 'v');
+    set(10, 21, 'v');
+    set(11, 21, 'v');
+  },
+);
 
 /** Tilled 3×3 farm field. 48×48, anchorY 0. */
 export const FARM_FIELD: SpriteGrid = grid(48, 48, {
@@ -264,46 +270,53 @@ function bakeryFrame(_smoke: number): SpriteGrid {
 export const BAKERY: SpriteGrid = bakeryFrame(0);
 
 /** 1×1 well — stone drum, timber frame, shingled cap. 16×32, anchorY 16. */
-export const WELL: SpriteGrid = grid(16, 32, {
-  m: P.stoneMid,
-  l: P.sandMid,
-  p: P.stonePale,
-  s: P.stoneShadow,
-  t: P.terraMid,
-  d: P.terraDark,
-  a: P.seaMid,
-  i: P.ink,
-}, (set) => {
-  // Shingled cap in the headroom (y 3..9).
-  for (let y = 3; y <= 9; y += 1) {
-    const half = y - 1;
-    for (let x = 8 - half; x <= 7 + half; x += 1) {
-      set(x, y, y === 3 || x === 8 - half || x === 7 + half ? 'd' : 't');
-    }
-  }
-  // Posts down to the drum lip.
-  for (let y = 10; y <= 21; y += 1) {
-    set(3, y, 's');
-    set(12, y, 's');
-  }
-  // Winch bar and bucket rope.
-  for (let x = 4; x <= 11; x += 1) set(x, 11, 'i');
-  for (let y = 12; y <= 15; y += 1) set(8, y, 'i');
-  for (let y = 16; y <= 18; y += 1) {
-    for (let x = 6; x <= 9; x += 1) set(x, y, y === 16 ? 's' : 'm');
-  }
-  // Stone drum on the footprint (y 22..29) with water inside the lip.
-  for (let y = 22; y <= 29; y += 1) {
-    for (let x = 2; x <= 13; x += 1) {
-      if (y === 22) set(x, y, 'p');
-      else if (x === 2 || x === 13 || y === 29) set(x, y, 's');
-      else set(x, y, (x + y) % 4 === 0 ? 'l' : 'm');
-    }
-  }
-  for (let x = 4; x <= 11; x += 1) set(x, 23, 'a');
-  // Contact shadow.
-  for (let x = 3; x <= 12; x += 1) set(x, 30, 'i');
-});
+export const WELL: SpriteGrid = paintGrid(
+  outlineGrid(
+    grid(16, 32, {
+      m: P.stoneMid,
+      l: P.sandMid,
+      p: P.stonePale,
+      s: P.stoneShadow,
+      t: P.terraMid,
+      d: P.terraDark,
+      a: P.seaMid,
+      c: P.sandShadow,
+      i: P.ink,
+    }, (set) => {
+      // Shingled cap in the headroom (y 3..9); eaves stop 1px inside the cell so the outline fits.
+      for (let y = 3; y <= 9; y += 1) {
+        const half = Math.min(7, y - 1);
+        for (let x = 8 - half; x <= 7 + half; x += 1) {
+          set(x, y, y === 3 || x === 8 - half || x === 7 + half ? 'd' : 't');
+        }
+      }
+      // Posts down to the drum lip.
+      for (let y = 10; y <= 21; y += 1) {
+        set(3, y, 's');
+        set(12, y, 's');
+      }
+      for (let y = 16; y <= 18; y += 1) {
+        for (let x = 6; x <= 9; x += 1) set(x, y, y === 16 ? 's' : 'm');
+      }
+      // Stone drum on the footprint (y 22..29) with water inside the lip.
+      for (let y = 22; y <= 29; y += 1) {
+        for (let x = 2; x <= 13; x += 1) {
+          if (y === 22) set(x, y, 'p');
+          else if (x === 2 || x === 13 || y === 29) set(x, y, 's');
+          else set(x, y, (x + y) % 4 === 0 ? 'l' : 'm');
+        }
+      }
+      for (let x = 4; x <= 11; x += 1) set(x, 23, 'a');
+    }),
+    'i',
+  ),
+  (set) => {
+    // Winch bar, bucket rope, and contact shadow painted after the outline.
+    for (let x = 4; x <= 11; x += 1) set(x, 11, 'i');
+    for (let y = 12; y <= 15; y += 1) set(8, y, 'i');
+    for (let x = 3; x <= 12; x += 1) set(x, 30, 'c');
+  },
+);
 
 /** Palette shared by the timber decor pieces. */
 const TIMBER: Pal = {
