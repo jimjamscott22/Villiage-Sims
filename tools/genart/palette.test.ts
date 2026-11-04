@@ -7,13 +7,14 @@ import { ART_DIR } from './paths';
 import { decodePng } from './png';
 
 describe('PALETTE', () => {
-  it('holds exactly the 25 locked art colors', () => {
-    expect(Object.keys(PALETTE)).toHaveLength(25);
+  it('holds exactly the 26 locked art colors', () => {
+    expect(Object.keys(PALETTE)).toHaveLength(26);
   });
 
-  it('adds exactly two UI-only colours plus the uiText alias', () => {
-    expect(Object.keys(UI_TOKENS)).toEqual(['uiBg', 'highlight', 'uiText']);
+  it('adds one UI-only colour plus the uiText alias (27 unique colours, 28 tokens)', () => {
+    expect(Object.keys(UI_TOKENS)).toEqual(['uiBg', 'uiText']);
     expect(new Set(Object.values(THEME)).size).toBe(27);
+    expect(Object.keys(THEME)).toHaveLength(28);
   });
 
   it('has no duplicate hex values', () => {
@@ -67,14 +68,15 @@ describe('hash01', () => {
 });
 
 describe('THEME', () => {
-  it('adds only the UI tokens on top of the art palette', () => {
+  it('adds only the UI tokens on top of the art palette and exposes highlight to both art and UI', () => {
     expect(Object.keys(THEME)).toEqual([...Object.keys(PALETTE), ...Object.keys(UI_TOKENS)]);
     expect(UI_TOKENS.uiText).toBe(PALETTE.whitewash);
+    expect(THEME.highlight).toBe(PALETTE.highlight);
+    expect(assertPaletteHex(PALETTE.highlight)).toBe('highlight');
   });
 
   it('keeps UI-only colours out of the art palette', () => {
     expect(() => assertPaletteHex(UI_TOKENS.uiBg)).toThrow();
-    expect(() => assertPaletteHex(UI_TOKENS.highlight)).toThrow();
   });
 });
 

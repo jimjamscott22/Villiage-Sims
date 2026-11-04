@@ -13,6 +13,14 @@
       "h": 48,
       "anchorY": 16
     },
+    "bakery.lit": {
+      "sheet": "entities",
+      "x": 32,
+      "y": 606,
+      "w": 32,
+      "h": 48,
+      "anchorY": 16
+    },
     "bubble.fork": {
       "sheet": "entities",
       "x": 96,
@@ -676,10 +684,26 @@
       "h": 48,
       "anchorY": 16
     },
+    "granary.lit": {
+      "sheet": "entities",
+      "x": 64,
+      "y": 606,
+      "w": 32,
+      "h": 48,
+      "anchorY": 16
+    },
     "hut": {
       "sheet": "entities",
       "x": 96,
       "y": 64,
+      "w": 16,
+      "h": 32,
+      "anchorY": 16
+    },
+    "hut.lit": {
+      "sheet": "entities",
+      "x": 128,
+      "y": 606,
       "w": 16,
       "h": 32,
       "anchorY": 16
@@ -691,6 +715,14 @@
       "w": 32,
       "h": 64,
       "frames": 4,
+      "anchorY": 32
+    },
+    "mill.lit": {
+      "sheet": "entities",
+      "x": 0,
+      "y": 606,
+      "w": 32,
+      "h": 64,
       "anchorY": 32
     },
     "peas.0": {
@@ -935,6 +967,14 @@
       "sheet": "entities",
       "x": 32,
       "y": 64,
+      "w": 32,
+      "h": 48,
+      "anchorY": 16
+    },
+    "storehouse.lit": {
+      "sheet": "entities",
+      "x": 96,
+      "y": 606,
       "w": 32,
       "h": 48,
       "anchorY": 16

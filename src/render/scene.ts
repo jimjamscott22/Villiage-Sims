@@ -178,6 +178,8 @@ export interface SceneInput {
   /** Mutable map retained across frames so idle villagers keep their last facing. */
   lastFacing: Map<number, Facing>;
   atlas: Atlas;
+  /** When true, draw `<building>.lit` window overlays on completed buildings (defaults to false). */
+  litWindows?: boolean;
 }
 
 /** Stats returned alongside the draw list when callers need perf counters. */
@@ -248,6 +250,7 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
     selectedVillagerId,
     lastFacing,
     atlas,
+    litWindows = false,
   } = input;
   const list: DrawEntry[] = [];
   const farmKind = catalog.buildings.findIndex((b) => b.id === 'farm');
@@ -299,6 +302,22 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
         footprintH: fh,
         atlas,
       });
+
+      const litKey = `${key}.lit`;
+      if (litWindows && buildingSprite && hasCell(atlas, litKey)) {
+        pushSprite(list, {
+          rank: 1,
+          id: `blit:${building.id}`,
+          key: litKey,
+          frame: 0,
+          tileX: building.x,
+          tileY: building.y,
+          tileSize,
+          footprintH: fh,
+          atlas,
+          baseY: buildingSprite.baseY,
+        });
+      }
 
       const vfx = def?.id ? BUILDING_VFX[def.id] : undefined;
       if (buildingSprite && vfx && hasCell(atlas, vfx.key)) {

@@ -69,7 +69,7 @@ status/handoff notes are in `progress.md` (check this first — it's updated eve
   After changing anything under `tools/genart/`, re-run `npm run art` or `tools/genart/genart.test.ts`
   will fail. The drift test compares decoded pixels, not raw PNG bytes, because `zlib` output
   varies with the Node version.
-- Only the 29 colors in `tools/genart/palette.ts` may appear in art; the rasterizer throws otherwise.
+- Only the 26 colors in `tools/genart/palette.ts` may appear in art; the rasterizer throws otherwise.
 - A building's `kind` is its index in `src-tauri/data/buildings.json`, and saves store that index.
   Append new buildings; never insert or reorder. Mirror every catalog change into `DEMO_CATALOG`
   (`src/state/demoWorld.ts`) or the browser-demo drifts from the desktop build.

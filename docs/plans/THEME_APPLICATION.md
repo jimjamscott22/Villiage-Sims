@@ -2,8 +2,8 @@
 
 - **Reference:** Gridwright, "Medieval Village: 16x16 Pixel Art Fantasy Town Tileset" (itch.io, v1.0).
 - **Repo:** VillageSim `main` at `c762426`.
-- **Locked spec:** STYLE_GUIDE.md, 25 art colours plus uiBg and highlight.
-- **Reference only.** No asset from the pack is copied, traced, or imported. Every idea below is redrawn in `tools/genart` code, using palette colours only. (The pack's licence would allow shipping its tiles, but that would break the guide's "all art is generated, 25 colours" rule. See section 3.)
+- **Locked spec:** STYLE_GUIDE.md, 26 art colours (including `highlight` `#f4c95d`) plus `uiBg` (27 unique colours, 28 tokens with `uiText`).
+- **Reference only.** No asset from the pack is copied, traced, or imported. Every idea below is redrawn in `tools/genart` code, using palette colours only. (The pack's licence would allow shipping its tiles, but that would break the guide's "all art is generated, 26 colours" rule. See section 3.)
 
 ## 0. What I looked at, and what I could not see
 - **Read:** the itch page text.
@@ -56,8 +56,8 @@ From the page text, except where marked as seen:
   - granary x 8-11 and 20-23, y 20-24 (lines 146-150)
 - The game has no night lighting yet: no night tint in `src/render`. Night exists only in the sim and demo logic (`demoWorld.ts` lines 262-264: `NIGHT_START_MINUTE = 20*60`, `NIGHT_END_MINUTE = 6*60`). Shot list S-11 (day/night tint) is Todo.
 - Mapping: new overlay cells `<building>.lit`, the same size as the base cell, transparent except the window panes, drawn on top of the base when it is night.
-- Panes in `wheat` #d9a531 with a `terraLight` #e08a5a inner glow, both in palette.
-- **[PROPOSAL for Jamie]** A brighter lamp yellow (for example around #f4c95d) would glow more, and that hex already exists as the UI `highlight` token. Allowing it in art would make it a 26th art colour. **Jamie decides.** The default plan uses wheat and needs no new colour.
+- Panes in `highlight` #f4c95d at the centre with a `wheat` #d9a531 inner rim and `terraLight` #e08a5a corner falloff, all in `PALETTE`.
+- **[APPROVED by Jamie]** `highlight` (#f4c95d) is promoted from UI-only to the 26th art colour (keeping 27 unique colours / 28 named tokens total across `THEME`) so night windows read as a bright lantern glow even on narrow 4px panes.
 
 ### R4. "No baked shadows"
 - VillageSim bakes a 1-row contact shadow in `sandShadow` into its sprites: 6 "Contact shadow" blocks across `tools/genart/sprites/*.ts`, for example hut line 59. STYLE_GUIDE.md §5 makes that the rule.
@@ -84,7 +84,7 @@ From the page text, except where marked as seen:
 - The reference's outlines look similar (impression only). Nothing new to borrow; it confirms the direction.
 
 ## 3. What NOT to borrow
-- **Their palette.** The screenshots show far more than 25 colours (152–425 unique per screenshot, inflated by text and scaling). The guide locks 25, so use its ramps only.
+- **Their palette.** The screenshots show far more than 26 colours (152–425 unique per screenshot, inflated by text and scaling). The guide locks 26 art colours, so use its ramps only.
 - **Their files.** Importing would bypass genart, the palette guard test (`palette.lint.test.ts`, PR #64) and the "every pixel is a palette colour" sheet test. Also, the pack's 2× and 3× files are only scaled copies, so they add nothing.
 - **Dropping baked contact shadows.** VillageSim has no runtime shadow pass. Removing the 6 sandShadow contact shadows would leave buildings floating, and §5 makes them the rule. Keep them.
 - **Medieval-fantasy subjects** (smithy and armour stands, weapon racks, graveyard, watchtower, slate and thatch roofs, banners). They clash with VillageSim's Mediterranean set (cypress, palm, terracotta, whitewash, sea) and with its gameplay; there is no combat. Fantasy shop icons such as alchemist and armourer have no matching building.
@@ -97,7 +97,7 @@ From the page text, except where marked as seen:
 | Rank | Change | Effort | Shot list | New colour? |
 |---|---|---|---|---|
 | 1 | Day/night tint pass (prerequisite for lit windows) | M | S-11 | No (seaDeepest at partial alpha for night, terraLight for dusk, as in FEATURE_IDEAS) |
-| 2 | Lit-window overlays `<b>.lit` for hut, granary, bakery, storehouse, mill | M | new S-25 (P) | No (wheat + terraLight); optional lamp yellow for Jamie |
+| 2 | Lit-window overlays `<b>.lit` for hut, granary, bakery, storehouse, mill | M | new S-25 (P) | No (`highlight` promoted from UI-only to 26th art colour + `wheat` + `terraLight`) |
 | 3 | Shared roof/facade helpers (ridge/slope/eave rows) so the 5 houses share one rhythm; can be combined with the top-left light pass (OUTLINE_PLAN Phase 3) | M | — | No |
 | 4 | Winter roof-cap overlays `<b>.snow` gated on season 3 | S-M | new S-26 (P) | No |
 | 5 | Wordless 8×8 building signs (granary, bakery, storehouse) | S | new S-27 (P) | No |
@@ -139,7 +139,7 @@ Shared rules:
   - `tools/genart/sprites/buildings.ts`: add `HUT_LIT`, `GRANARY_LIT`, `BAKERY_LIT`, `STOREHOUSE_LIT` and `MILL_LIT`, each the same size as its base (16×32, 32×48 ×3, 32×64). They are transparent except the window panes, at exactly the base window coordinates (for example hut x 4-7, y 18-22; granary x 8-11 and 20-23, y 20-24). Read each base sprite for the rest.
   - Register the overlays in `BUILDING_SPRITES` as `'<b>.lit'` with the same `anchorY`.
   - `src/render/scene.ts`: when `ambienceFor(minute).alpha >= 0.3`, draw `<b>.lit` after the base building and **after** the tint, so the windows glow through the darkness. Completed buildings only, not scaffolds.
-- **Colours:** pane fill wheat, with a 1px terraLight inner edge. Keep the existing ink mullions such as hut (5,20) and (6,20).
+- **Colours:** pane centre in `highlight` (`#f4c95d`), 1px `wheat` (`#d9a531`) inner rim, `terraLight` (`#e08a5a`) corners, and existing `ink` mullions such as hut (5,20) and (6,20).
 - **Acceptance:**
   - `npm run art` adds exactly 5 cells; the atlas goes from 459 cells to 464. Existing cell x/y/w/h are byte-identical: diff the old and new atlas with the `.lit` keys filtered out.
   - Each `.lit` cell's opaque pixels are a subset of its base's window and mullion pixel coordinates. Add this test in `genart.test.ts`.
@@ -148,5 +148,5 @@ Shared rules:
 - **Verify:** `npm run art && npm test -- genart scene palette && npx tsc -b`
 
 ## Open decisions for Jamie
-1. Allow a 26th art colour, a lamp yellow (for example #f4c95d, today UI-only), for glowing windows? Default is no: use wheat.
+1. Allow a 26th art colour, a lamp yellow (for example #f4c95d, previously UI-only `highlight`), for glowing windows? **Approved by Jamie** (`PALETTE` now has 26 art colours; `THEME` has 27 unique colours / 28 tokens).
 2. Add proposed shot-list rows S-25 to S-28 (lit windows, winter caps, signs, storage props) to SHOT_LIST.md?

@@ -6,7 +6,23 @@ import { renderPaletteCss } from './css';
 import { rasterizeGrid, type SpriteGrid } from './grid';
 import { toRgba } from './palette';
 import type { Raster } from './raster';
-import { FARM, FENCE, GATE, SIGNPOST, WELL } from './sprites/buildings';
+import {
+  BAKERY,
+  BAKERY_LIT,
+  FARM,
+  FENCE,
+  GATE,
+  GRANARY,
+  GRANARY_LIT,
+  HUT,
+  HUT_LIT,
+  MILL_FRAMES,
+  MILL_LIT,
+  SIGNPOST,
+  STOREHOUSE,
+  STOREHOUSE_LIT,
+  WELL,
+} from './sprites/buildings';
 import { CHICKEN_SPRITES } from './sprites/chickens';
 import { CYPRESS, PALM, PEAK, PINE, STANDING_STONE } from './sprites/props';
 import { ART_DIR, THEME_CSS_PATH } from './paths';
@@ -90,4 +106,54 @@ describe('standing-object outlines', () => {
   it.each(cases)('%s has at least 30%% ink on its edge pixels', (_name, grid) => {
     expect(edgeInkShare(rasterizeGrid(grid))).toBeGreaterThanOrEqual(0.3);
   });
+});
+
+describe('lit-window overlays', () => {
+  const atlas = buildAtlas();
+
+  it('adds exactly 5 .lit cells (464 total) without shifting any of the 459 base cells', () => {
+    const allKeys = Object.keys(atlas.manifest.cells);
+    const litKeys = allKeys.filter((key) => key.endsWith('.lit'));
+    expect(allKeys).toHaveLength(464);
+    expect(litKeys.sort()).toEqual([
+      'bakery.lit',
+      'granary.lit',
+      'hut.lit',
+      'mill.lit',
+      'storehouse.lit',
+    ]);
+  });
+
+  const pairs: Array<[string, SpriteGrid, SpriteGrid, string[]]> = [
+    ['hut.lit', HUT, HUT_LIT, ['s', 'i']],
+    ['granary.lit', GRANARY, GRANARY_LIT, ['u']],
+    ['mill.lit', MILL_FRAMES[0], MILL_LIT, ['u']],
+    ['bakery.lit', BAKERY, BAKERY_LIT, ['u']],
+    ['storehouse.lit', STOREHOUSE, STOREHOUSE_LIT, ['g']],
+  ];
+
+  it.each(pairs)(
+    '%s matches its base dimensions and paints only on window/opening pixels with highlight centres and wheat/terraLight rims',
+    (_name, base, lit, allowedBaseKeys) => {
+      expect(lit.size).toEqual(base.size);
+      const [width, height] = lit.size;
+      const allowedBase = new Set(allowedBaseKeys);
+      let opaqueCount = 0;
+      let highlightCount = 0;
+      let wheatCount = 0;
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const key = lit.rows[y][x];
+          if (lit.palette[key] == null) continue;
+          opaqueCount += 1;
+          if (key === 'h') highlightCount += 1;
+          if (key === 'w') wheatCount += 1;
+          expect(allowedBase.has(base.rows[y][x]), `(${x},${y}) base='${base.rows[y][x]}'`).toBe(true);
+        }
+      }
+      expect(opaqueCount).toBeGreaterThan(0);
+      expect(highlightCount).toBeGreaterThan(0);
+      expect(wheatCount).toBeGreaterThan(0);
+    },
+  );
 });

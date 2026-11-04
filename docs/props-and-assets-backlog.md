@@ -21,8 +21,8 @@ is in [`progress.md`](../progress.md).
 | Building VFX | `vfx.smoke` above bakery chimneys and `vfx.dust` at mill bases; 3 frames each, completed buildings only |
 | UI | 9-slice panel, bitmap font strip, resource/season/speed icons |
 
-All art is generated from `tools/genart/`, restricted to the 29 colors in
-`tools/genart/palette.ts`, drawn at 16px native against a 32px world tile (exactly 2× via
+All art is generated from `tools/genart/`, restricted to the 26 colors in
+`tools/genart/palette.ts` (plus `uiBg` and the `uiText` alias in `THEME`, for 27 unique colors / 28 tokens total), drawn at 16px native against a 32px world tile (exactly 2× via
 `ART_SCALE`), and committed to `public/art/`.
 
 ## Cost model
@@ -107,7 +107,7 @@ Roughly what each kind of addition costs, in the order the work happens:
 
 ## Rules of thumb for anyone picking one up
 
-1. Only the 29 palette colors may appear in art — the rasterizer throws otherwise.
+1. Only the 26 palette colors may appear in art — the rasterizer throws otherwise.
 2. Re-run `npm run art` after touching anything under `tools/genart/`, or `genart.test.ts` fails.
    The committed PNGs are the source of truth for the renderer and are compared by decoded pixels.
 3. Append to `buildings.json`; never insert or reorder. `kind` is an index and saves store it.

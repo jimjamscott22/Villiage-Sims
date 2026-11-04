@@ -1,7 +1,8 @@
 /**
- * The complete VillageSim art palette (25 colours). No color outside this
+ * The complete VillageSim art palette (26 colours). No color outside this
  * table may appear in art. Merged away in the style lock: stoneLight →
  * sandMid, sandPale → whitewash, uiRecess → uiPanel, terraDeep → terraDark.
+ * `highlight` (#f4c95d) is shared between art (lit windows) and UI.
  */
 export const PALETTE = {
   // sea
@@ -32,6 +33,7 @@ export const PALETTE = {
   // accents
   shutter: '#3f6f8f',
   wheat: '#d9a531',
+  highlight: '#f4c95d',
   ink: '#2b2320',
   // ui
   uiPanel: '#1b3038',
@@ -41,13 +43,12 @@ export const PALETTE = {
 export type PaletteName = keyof typeof PALETTE;
 
 /**
- * UI-only tokens. They never appear in generated art (the rasterizer only
- * accepts `PALETTE`), but the app's CSS and canvas overlays may use them.
- * `uiText` is an alias of `whitewash`, not a new colour.
+ * UI-only tokens. `uiBg` never appears in generated art (the rasterizer only
+ * accepts `PALETTE`), while the app's CSS and canvas overlays may use all
+ * `THEME` tokens. `uiText` is an alias of `whitewash`, not a new colour.
  */
 export const UI_TOKENS = {
   uiBg: '#17211b',
-  highlight: '#f4c95d',
   uiText: PALETTE.whitewash,
 } as const;
 

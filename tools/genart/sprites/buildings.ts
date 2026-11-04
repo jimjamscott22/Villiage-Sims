@@ -477,6 +477,68 @@ export const SCAFFOLD_1 = scaffold(1);
 export const SCAFFOLD_2 = scaffold(2);
 export const SCAFFOLD_3 = scaffold(3);
 
+function litPane(
+  set: (x: number, y: number, k: string) => void,
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+): void {
+  for (let y = y0; y <= y1; y += 1) {
+    for (let x = x0; x <= x1; x += 1) {
+      const edgeX = x === x0 || x === x1;
+      const edgeY = y === y0 || y === y1;
+      if (edgeX && edgeY) set(x, y, 'l');
+      else if (edgeX || edgeY) set(x, y, 'w');
+      else set(x, y, 'h');
+    }
+  }
+}
+
+const LIT_PAL: Pal = {
+  h: P.highlight,
+  w: P.wheat,
+  l: P.terraLight,
+  i: P.ink,
+};
+
+/** 1×1 hut lit-window overlay — window at x 4..7, y 18..22 with ink mullions at (5..6, 20). */
+export const HUT_LIT: SpriteGrid = grid(16, 32, LIT_PAL, (set) => {
+  litPane(set, 4, 7, 18, 22);
+  set(5, 20, 'i');
+  set(6, 20, 'i');
+});
+
+/** 2×2 granary lit-window overlay — twin windows at x 8..11 and 20..23, y 20..24. */
+export const GRANARY_LIT: SpriteGrid = grid(32, 48, LIT_PAL, (set) => {
+  litPane(set, 8, 11, 20, 24);
+  litPane(set, 20, 23, 20, 24);
+});
+
+/** 2×2 mill lit-window overlay — tower window at x 14..17, y 38..44. */
+export const MILL_LIT: SpriteGrid = grid(32, 64, LIT_PAL, (set) => {
+  litPane(set, 14, 17, 38, 44);
+});
+
+/** 2×1 bakery lit-window overlay — wide oven window at x 13..18, y 28..34. */
+export const BAKERY_LIT: SpriteGrid = grid(32, 48, LIT_PAL, (set) => {
+  litPane(set, 13, 18, 28, 34);
+});
+
+/** 2×2 storehouse lit-window overlay — lit cart doorway interior at x 12..19, y 31..43, keeping split/latches. */
+export const STOREHOUSE_LIT: SpriteGrid = grid(32, 48, LIT_PAL, (set) => {
+  for (let y = 31; y <= 43; y += 1) {
+    for (let x = 12; x <= 19; x += 1) {
+      if ((y >= 32 && x === 15) || (y === 37 && (x === 13 || x === 18))) continue;
+      const edgeX = x === 12 || x === 19;
+      const edgeY = y === 31 || y === 43;
+      if (edgeX && edgeY) set(x, y, 'l');
+      else if (edgeX || edgeY) set(x, y, 'w');
+      else set(x, y, 'h');
+    }
+  }
+});
+
 export interface BuildingSprite {
   grid: SpriteGrid;
   anchorY: number;
@@ -485,16 +547,21 @@ export interface BuildingSprite {
 
 export const BUILDING_SPRITES: Record<string, BuildingSprite> = {
   hut: { grid: HUT, anchorY: 16 },
+  'hut.lit': { grid: HUT_LIT, anchorY: 16 },
   farm: { grid: FARM, anchorY: 8 },
   'farm.field': { grid: FARM_FIELD, anchorY: 0 },
   granary: { grid: GRANARY, anchorY: 16 },
+  'granary.lit': { grid: GRANARY_LIT, anchorY: 16 },
   mill: { grid: MILL_FRAMES[0], anchorY: 32, frames: MILL_FRAMES },
+  'mill.lit': { grid: MILL_LIT, anchorY: 32 },
   bakery: { grid: BAKERY, anchorY: 16 },
+  'bakery.lit': { grid: BAKERY_LIT, anchorY: 16 },
   well: { grid: WELL, anchorY: 16 },
   fence: { grid: FENCE, anchorY: 8 },
   gate: { grid: GATE, anchorY: 8 },
   signpost: { grid: SIGNPOST, anchorY: 8 },
   storehouse: { grid: STOREHOUSE, anchorY: 16 },
+  'storehouse.lit': { grid: STOREHOUSE_LIT, anchorY: 16 },
   'scaffold.1': { grid: SCAFFOLD_1, anchorY: 8 },
   'scaffold.2': { grid: SCAFFOLD_2, anchorY: 8 },
   'scaffold.3': { grid: SCAFFOLD_3, anchorY: 8 },

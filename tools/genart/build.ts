@@ -1,7 +1,7 @@
 import type { SpriteGrid } from './grid';
 import { rasterizeGrid, remapColor } from './grid';
 import type { PackItem } from './pack';
-import { pack } from './pack';
+import { pack, packAppend } from './pack';
 import { Raster } from './raster';
 import { BUILDING_SPRITES } from './sprites/buildings';
 import { CHICKEN_SPRITES } from './sprites/chickens';
@@ -141,13 +141,19 @@ function uiSources(): Source[] {
 }
 
 function packSheet(name: string, sources: Source[]): { sheet: BuiltSheet; cells: Record<string, AtlasCellDef> } {
-  const items: PackItem[] = sources.map((source) => ({
+  const toItem = (source: Source): PackItem => ({
     key: source.key,
     width: source.frames[0].width * source.frames.length,
     height: source.frames[0].height,
-  }));
+  });
+  // Keep `.lit` overlays packed after the base shelves so existing cell coordinates never shift.
+  const baseItems = sources.filter((source) => !source.key.endsWith('.lit')).map(toItem);
+  const appendedItems = sources.filter((source) => source.key.endsWith('.lit')).map(toItem);
 
-  const { cells, height } = pack(items, SHEET_WIDTH);
+  const initial = pack(baseItems, SHEET_WIDTH);
+  const { cells, height } = appendedItems.length > 0
+    ? packAppend(initial.cells, appendedItems, SHEET_WIDTH)
+    : initial;
   const sheetRaster = new Raster(SHEET_WIDTH, height);
   const byKey = new Map(sources.map((source) => [source.key, source]));
   const manifestCells: Record<string, AtlasCellDef> = {};
