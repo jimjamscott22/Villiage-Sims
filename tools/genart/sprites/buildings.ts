@@ -19,6 +19,28 @@ function grid(width: number, height: number, palette: Pal, paint: (set: (x: numb
   };
 }
 
+type SetPixel = (x: number, y: number, key: string) => void;
+
+/** Shared ridge, staggered tile courses and dark eave; preserves each building's silhouette. */
+function roof(set: SetPixel, top: number, bottom: number, leftAt: (y: number) => number, rightAt: (y: number) => number): void {
+  for (let y = top; y <= bottom; y += 1) {
+    const left = leftAt(y);
+    const right = rightAt(y);
+    for (let x = left; x <= right; x += 1) {
+      const edge = x === left || x === right || y === bottom;
+      set(x, y, edge ? 'd' : y <= top + 2 ? 'l' : (y % 3 === 0 && (x + Math.floor(y / 3)) % 4 === 0) ? 'd' : 't');
+    }
+  }
+}
+
+function facade(set: SetPixel, left: number, top: number, right: number, bottom: number, fill: (x: number, y: number) => string): void {
+  for (let y = top; y <= bottom; y += 1) {
+    for (let x = left; x <= right; x += 1) {
+      set(x, y, y === top || y === bottom || x === left || x === right ? 'i' : fill(x, y));
+    }
+  }
+}
+
 /** 1×1 hut — whitewash, terracotta roof. 16×32, anchorY 16. */
 export const HUT: SpriteGrid = grid(16, 32, {
   t: P.terraMid,
@@ -30,20 +52,8 @@ export const HUT: SpriteGrid = grid(16, 32, {
   c: P.sandShadow,
   g: P.sandMid,
 }, (set) => {
-  // Roof triangle in headroom (y 2..15)
-  for (let y = 2; y <= 15; y += 1) {
-    const half = y - 1;
-    for (let x = 8 - half; x <= 7 + half; x += 1) {
-      set(x, y, y === 2 || x === 8 - half || x === 7 + half ? 'd' : y < 6 ? 'l' : 't');
-    }
-  }
-  // Walls on footprint (y 16..29)
-  for (let y = 16; y <= 29; y += 1) {
-    for (let x = 2; x <= 13; x += 1) {
-      if (y === 16 || y === 29 || x === 2 || x === 13) set(x, y, 'i');
-      else set(x, y, 'w');
-    }
-  }
+  roof(set, 2, 15, y => 9 - y, y => 6 + y);
+  facade(set, 2, 16, 13, 29, () => 'w');
   // Shutter window
   for (let y = 18; y <= 22; y += 1) {
     for (let x = 4; x <= 7; x += 1) set(x, y, 's');
@@ -135,20 +145,8 @@ export const GRANARY: SpriteGrid = grid(32, 48, {
   c: P.sandShadow,
   u: P.shutter,
 }, (set) => {
-  // Roof in headroom
-  for (let y = 4; y <= 15; y += 1) {
-    const inset = 15 - y;
-    for (let x = 4 + inset; x <= 27 - inset; x += 1) {
-      set(x, y, y === 4 || x === 4 + inset || x === 27 - inset ? 'd' : y < 8 ? 'l' : 't');
-    }
-  }
-  // Walls on footprint
-  for (let y = 16; y <= 42; y += 1) {
-    for (let x = 4; x <= 27; x += 1) {
-      if (y === 16 || y === 42 || x === 4 || x === 27) set(x, y, 'i');
-      else set(x, y, 'w');
-    }
-  }
+  roof(set, 4, 15, y => 19 - y, y => 12 + y);
+  facade(set, 4, 16, 27, 42, () => 'w');
   // Windows
   for (let y = 20; y <= 24; y += 1) {
     for (let x = 8; x <= 11; x += 1) set(x, y, 'u');
@@ -212,14 +210,8 @@ function millFrame(sailOffset: number): SpriteGrid {
     for (let dy = -1; dy <= 1; dy += 1) {
       for (let dx = -1; dx <= 1; dx += 1) set(cx + dx, cy + dy, 'i');
     }
-    // Tower on footprint (anchorY 32 → footprint y 32..63, but tower reads better starting mid)
-    for (let y = 28; y <= 55; y += 1) {
-      for (let x = 10; x <= 21; x += 1) {
-        if (y === 28 || y === 55 || x === 10 || x === 21) set(x, y, 'i');
-        else if (y >= 38 && y <= 44 && x >= 14 && x <= 17) set(x, y, 'u');
-        else set(x, y, 'w');
-      }
-    }
+    roof(set, 25, 28, y => 10 - (y - 25), y => 21 + (y - 25));
+    facade(set, 10, 29, 21, 55, (x, y) => y >= 38 && y <= 44 && x >= 14 && x <= 17 ? 'u' : 'w');
     for (let x = 9; x <= 22; x += 1) {
       set(x, 56, 'c');
       set(x, 57, 'c');
@@ -233,6 +225,7 @@ function bakeryFrame(_smoke: number): SpriteGrid {
   return grid(32, 48, {
     t: P.terraMid,
     d: P.terraDark,
+    l: P.terraLight,
     w: P.whitewash,
     s: P.stoneMid,
     u: P.shutter,
@@ -245,21 +238,8 @@ function bakeryFrame(_smoke: number): SpriteGrid {
         set(x, y, x === 20 || x === 23 || y === 8 ? 'i' : 's');
       }
     }
-    // Roof
-    for (let y = 12; y <= 18; y += 1) {
-      const inset = 18 - y;
-      for (let x = 8 + inset; x <= 23 - inset; x += 1) {
-        set(x, y, y === 12 ? 'd' : 't');
-      }
-    }
-    // Walls
-    for (let y = 19; y <= 38; y += 1) {
-      for (let x = 8; x <= 23; x += 1) {
-        if (y === 19 || y === 38 || x === 8 || x === 23) set(x, y, 'i');
-        else if (y >= 28 && y <= 34 && x >= 13 && x <= 18) set(x, y, 'u');
-        else set(x, y, 'w');
-      }
-    }
+    roof(set, 12, 18, y => 26 - y, y => 5 + y);
+    facade(set, 8, 19, 23, 38, (x, y) => y >= 28 && y <= 34 && x >= 13 && x <= 18 ? 'u' : 'w');
     for (let x = 7; x <= 24; x += 1) {
       set(x, 39, 'c');
       set(x, 40, 'c');
@@ -411,23 +391,12 @@ export const SIGNPOST: SpriteGrid = paintGrid(outlineGrid(grid(16, 24, TIMBER, (
  */
 export const STOREHOUSE: SpriteGrid = grid(32, 48, {
   ...TIMBER,
+  l: P.terraLight,
   s: P.stoneShadow,
   w: P.whitewash,
 }, (set) => {
-  // Gable that widens to the full sprite at the eaves.
-  for (let y = 6; y <= 21; y += 1) {
-    const half = 2 + (y - 6);
-    for (let x = 16 - half; x <= 15 + half; x += 1) {
-      set(x, y, y === 6 || x === 16 - half || x === 15 + half ? 'd' : y < 12 ? 't' : 'd');
-    }
-  }
-  // Plank walls on the footprint.
-  for (let y = 22; y <= 44; y += 1) {
-    for (let x = 2; x <= 29; x += 1) {
-      if (y === 22 || y === 44 || x === 2 || x === 29) set(x, y, 'i');
-      else set(x, y, x % 5 === 0 ? 'm' : 'p');
-    }
-  }
+  roof(set, 6, 21, y => 20 - y, y => 11 + y);
+  facade(set, 2, 22, 29, 44, x => x % 5 === 0 ? 'm' : 'p');
   // Cart doors, split down the middle.
   for (let y = 30; y <= 43; y += 1) {
     for (let x = 11; x <= 20; x += 1) {

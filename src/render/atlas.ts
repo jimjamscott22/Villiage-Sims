@@ -18,7 +18,7 @@ export interface AtlasManifest {
 
 export interface Atlas {
   manifest: AtlasManifest;
-  images: Record<string, HTMLImageElement>;
+  images: Record<string, HTMLImageElement | HTMLCanvasElement>;
 }
 
 /** Native art is 16px; the world uses 32px tiles, so art draws at 2x. */

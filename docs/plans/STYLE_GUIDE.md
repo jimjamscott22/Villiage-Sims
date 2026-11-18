@@ -82,6 +82,7 @@ Other mappings:
 |---|---|---|
 | tiles.png | 256×128 | terrain/fringe/foam 16×16 (88) |
 | entities.png | 256×1024 | see list below |
+| details.png | 256×64 | five roof caps, three 8×8 wordless signs, three 16×16 storage props; preserves existing atlas definitions |
 | ui.png | 256×32 | icons 16×16 (14), 8×8 (5), bar notch 4×6 (2), panel 18×18 (1), font.strip 144×14 (1) |
 | panel.png | 18×18 | 9-slice frame, 6px slice |
 

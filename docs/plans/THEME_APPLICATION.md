@@ -1,5 +1,33 @@
 # Applying the Gridwright Medieval Village look to VillageSim
 
+## Implementation status — 2026-11-18
+
+Presentation items 1–6 are implemented. PR #68 already supplied the five lit-window
+cells and the shared highlight colour; the completion connects those cells to the
+clock and adds the remaining generated art.
+
+| Item | Status |
+|---|---|
+| S-11 day/night ambience | Complete: palette-blue night and warm dawn/dusk layers, matching the Rust 20:00–06:00 night window. |
+| S-25 lit windows | Complete: existing five cells switch on at ambience alpha >= 0.3. |
+| Shared roofs/facades | Complete: ridge, staggered tile courses, dark eaves and shared facade primitives for five buildings. |
+| S-26 winter roofs | Complete: five silhouette-following roof caps, season 3 only. |
+| S-27 wordless signs | Complete: wheat, loaf and crate signs, 8×8, on granary/bakery/storehouse. |
+| S-28 storage props | Complete: sack beside granary, barrel/crate beside storehouse, within existing footprints. |
+| S-20 market / S-21 paths | Deferred as specified: require Market and simulation traffic support. |
+
+All 464 existing atlas definitions (including the five lit cells) remain identical.
+The 11 new cells live on `details.png` (256×64), for 475 total cells; existing
+sheet dimensions stay unchanged. No imported art, gameplay, catalogs or save changes.
+The storehouse retains PR #68's lit doorway, including the split and latch details.
+
+The original briefs below remain as design history. Terrain receives a screen-space
+tint; world sprites use a cached equivalently tinted atlas. Panes and UI use the
+original art, at their normal draw depth, so foreground entities still occlude light.
+Blue/amber layers crossfade continuously rather than jumping colour at a nonzero
+opacity. Reduced-motion mode retains lighting and seasonal art.
+
+
 - **Reference:** Gridwright, "Medieval Village: 16x16 Pixel Art Fantasy Town Tileset" (itch.io, v1.0).
 - **Repo:** VillageSim `main` at `c762426`.
 - **Locked spec:** STYLE_GUIDE.md, 26 art colours (including `highlight` `#f4c95d`) plus `uiBg` (27 unique colours, 28 tokens with `uiText`).

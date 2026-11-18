@@ -8,8 +8,8 @@ describe('buildAtlas', () => {
   const entities = atlas.sheets.find((sheet) => sheet.name === 'entities')!;
   const ui = atlas.sheets.find((sheet) => sheet.name === 'ui')!;
 
-  it('emits tiles, entities and ui sheets', () => {
-    expect(atlas.sheets).toHaveLength(3);
+  it('emits tiles, entities, ui and details sheets', () => {
+    expect(atlas.sheets).toHaveLength(4);
     expect(tiles).toBeDefined();
     expect(entities).toBeDefined();
     expect(ui).toBeDefined();
@@ -17,6 +17,7 @@ describe('buildAtlas', () => {
       tiles: 'tiles.png',
       entities: 'entities.png',
       ui: 'ui.png',
+      details: 'details.png',
     });
   });
 

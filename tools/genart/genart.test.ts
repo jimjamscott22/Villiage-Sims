@@ -111,10 +111,10 @@ describe('standing-object outlines', () => {
 describe('lit-window overlays', () => {
   const atlas = buildAtlas();
 
-  it('adds exactly 5 .lit cells (464 total) without shifting any of the 459 base cells', () => {
+  it('includes exactly 5 .lit cells (475 total with seasonal details) without shifting any of the 459 base cells', () => {
     const allKeys = Object.keys(atlas.manifest.cells);
     const litKeys = allKeys.filter((key) => key.endsWith('.lit'));
-    expect(allKeys).toHaveLength(464);
+    expect(allKeys).toHaveLength(475);
     expect(litKeys.sort()).toEqual([
       'bakery.lit',
       'granary.lit',
