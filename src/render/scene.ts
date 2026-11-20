@@ -319,6 +319,28 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
         });
       }
 
+      if (buildingSprite) {
+        // Attached art shares owner depth so nearer entities occlude it.
+        const attach = (suffix: string, offsetX = 0, offsetY = 0) => {
+          const detailKey = suffix.startsWith('prop.') ? suffix : `${key}.${suffix}`;
+          if (!hasCell(atlas, detailKey)) return;
+          list.push({ ...buildingSprite, id: `bmeta:${building.id}:${suffix}`, key: detailKey,
+            frame: 0, x: buildingSprite.x + offsetX * ART_SCALE,
+            y: buildingSprite.y + offsetY * ART_SCALE });
+        };
+        if (snapshot.clock.season === 3) attach('snow');
+        if (key === 'granary') {
+          attach('sign', 13, 18);
+          attach('prop.sack', 0, 30);
+        } else if (key === 'bakery') {
+          attach('sign', 9, 20);
+        } else if (key === 'storehouse') {
+          attach('sign', 22, 31);
+          attach('prop.barrel', 0, 31);
+          attach('prop.crate', 17, 31);
+        }
+      }
+
       const vfx = def?.id ? BUILDING_VFX[def.id] : undefined;
       if (buildingSprite && vfx && hasCell(atlas, vfx.key)) {
         const vfxFrames = cellFrames(atlas, vfx.key);
@@ -512,7 +534,7 @@ export function buildDrawListWithStats(input: SceneInput): DrawListResult {
 }
 
 /** Paint a previously built draw list. */
-export function paintScene(ctx: CanvasRenderingContext2D, atlas: Atlas, list: DrawEntry[]): void {
+export function paintScene(ctx: CanvasRenderingContext2D, atlas: Atlas, list: DrawEntry[], worldAtlas: Atlas = atlas): void {
   const hasUiBrackets = atlas.manifest.cells['ui.bracket.tl'] != null;
 
   for (const entry of list) {
@@ -530,16 +552,17 @@ export function paintScene(ctx: CanvasRenderingContext2D, atlas: Atlas, list: Dr
     }
     if (entry.key.startsWith('__')) continue;
 
+    const spriteAtlas = entry.rank === 2 || entry.key.endsWith('.lit') ? atlas : worldAtlas;
     if (entry.mirror) {
       const cell = atlas.manifest.cells[entry.key];
       if (!cell) continue;
       ctx.save();
       ctx.translate(entry.x + cell.w * ART_SCALE, entry.y);
       ctx.scale(-1, 1);
-      drawCell(ctx, atlas, entry.key, 0, 0, entry.frame, ART_SCALE);
+      drawCell(ctx, spriteAtlas, entry.key, 0, 0, entry.frame, ART_SCALE);
       ctx.restore();
     } else {
-      drawCell(ctx, atlas, entry.key, entry.x, entry.y, entry.frame, ART_SCALE);
+      drawCell(ctx, spriteAtlas, entry.key, entry.x, entry.y, entry.frame, ART_SCALE);
     }
   }
 }

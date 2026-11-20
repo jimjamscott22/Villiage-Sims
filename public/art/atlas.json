@@ -2,7 +2,8 @@
   "sheets": {
     "tiles": "tiles.png",
     "entities": "entities.png",
-    "ui": "ui.png"
+    "ui": "ui.png",
+    "details": "details.png"
   },
   "cells": {
     "bakery": {
@@ -17,6 +18,21 @@
       "sheet": "entities",
       "x": 32,
       "y": 606,
+      "w": 32,
+      "h": 48,
+      "anchorY": 16
+    },
+    "bakery.sign": {
+      "sheet": "details",
+      "x": 192,
+      "y": 0,
+      "w": 8,
+      "h": 8
+    },
+    "bakery.snow": {
+      "sheet": "details",
+      "x": 32,
+      "y": 0,
       "w": 32,
       "h": 48,
       "anchorY": 16
@@ -692,6 +708,21 @@
       "h": 48,
       "anchorY": 16
     },
+    "granary.sign": {
+      "sheet": "details",
+      "x": 200,
+      "y": 0,
+      "w": 8,
+      "h": 8
+    },
+    "granary.snow": {
+      "sheet": "details",
+      "x": 64,
+      "y": 0,
+      "w": 32,
+      "h": 48,
+      "anchorY": 16
+    },
     "hut": {
       "sheet": "entities",
       "x": 96,
@@ -704,6 +735,14 @@
       "sheet": "entities",
       "x": 128,
       "y": 606,
+      "w": 16,
+      "h": 32,
+      "anchorY": 16
+    },
+    "hut.snow": {
+      "sheet": "details",
+      "x": 128,
+      "y": 0,
       "w": 16,
       "h": 32,
       "anchorY": 16
@@ -721,6 +760,14 @@
       "sheet": "entities",
       "x": 0,
       "y": 606,
+      "w": 32,
+      "h": 64,
+      "anchorY": 32
+    },
+    "mill.snow": {
+      "sheet": "details",
+      "x": 0,
+      "y": 0,
       "w": 32,
       "h": 64,
       "anchorY": 32
@@ -746,6 +793,13 @@
       "w": 16,
       "h": 16,
       "frames": 2
+    },
+    "prop.barrel": {
+      "sheet": "details",
+      "x": 144,
+      "y": 0,
+      "w": 16,
+      "h": 16
     },
     "prop.boulder": {
       "sheet": "entities",
@@ -783,6 +837,13 @@
       "w": 16,
       "h": 16,
       "frames": 2
+    },
+    "prop.crate": {
+      "sheet": "details",
+      "x": 160,
+      "y": 0,
+      "w": 16,
+      "h": 16
     },
     "prop.crystal": {
       "sheet": "entities",
@@ -888,6 +949,13 @@
       "h": 16,
       "frames": 2
     },
+    "prop.sack": {
+      "sheet": "details",
+      "x": 176,
+      "y": 0,
+      "w": 16,
+      "h": 16
+    },
     "prop.shells": {
       "sheet": "entities",
       "x": 176,
@@ -975,6 +1043,21 @@
       "sheet": "entities",
       "x": 96,
       "y": 606,
+      "w": 32,
+      "h": 48,
+      "anchorY": 16
+    },
+    "storehouse.sign": {
+      "sheet": "details",
+      "x": 208,
+      "y": 0,
+      "w": 8,
+      "h": 8
+    },
+    "storehouse.snow": {
+      "sheet": "details",
+      "x": 96,
+      "y": 0,
       "w": 32,
       "h": 48,
       "anchorY": 16

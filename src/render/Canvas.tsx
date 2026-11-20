@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { SnapshotBuffer } from '../state/snapshot';
 import { advanceDemoTime, transport } from '../state/transport';
 import type { BuildingDef, Catalog, TerrainSnapshot, TickSnapshot, VillagerDetail } from '../state/types';
+import { ambienceFor } from './ambience';
+import { AmbienceAtlas, paintAmbience } from './ambienceAtlas';
 import { Camera } from './camera';
 import type { Atlas } from './atlas';
 import { ART_SCALE, drawCell, loadAtlas } from './atlas';
@@ -377,6 +379,7 @@ export function Canvas({
       if (key === lastValidateKey) hoverValid = validity.valid;
     };
 
+    const ambienceAtlas = new AmbienceAtlas();
     const draw = (now: number) => {
       const frameStart = performance.now();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -441,6 +444,7 @@ export function Canvas({
         if (atlas && atlasHasEntities(atlas) && catalog) {
           const { list, propsDrawn } = buildDrawListWithStats({
             snapshot: rendered,
+            litWindows: ambienceFor(rendered.clock.minute).alpha >= 0.3,
             catalog,
             props,
             propsIndex,
@@ -455,7 +459,12 @@ export function Canvas({
           });
           lastDrawListLength = list.length;
           lastPropsDrawn = propsDrawn;
-          paintScene(ctx, atlas, list);
+          const ambience = ambienceFor(rendered.clock.minute);
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          paintAmbience(ctx, ambience, canvas.width, canvas.height);
+          ctx.restore();
+          paintScene(ctx, atlas, list, ambienceAtlas.for(atlas, ambience));
         } else {
           const footprints = (catalog?.buildings ?? []).map(
             (building) => building.footprint as [number, number],
@@ -481,6 +490,12 @@ export function Canvas({
               );
             }
           }
+        }
+        if (!atlas || !atlasHasEntities(atlas) || !catalog) {
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          paintAmbience(ctx, ambienceFor(rendered.clock.minute), canvas.width, canvas.height);
+          ctx.restore();
         }
         const footprintsForIntent = (catalogRef.current?.buildings ?? []).map(
           (building) => building.footprint as [number, number],

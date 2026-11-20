@@ -330,3 +330,31 @@ The pixel-art redesign (Phases 1–3) is complete — see
 
 Browser-demo gap: births and deaths are not simulated, so `villagerBorn` / `villagerDied`
 chronicle entries only appear in the desktop build.
+
+
+## Theme application completion (2026-11-18)
+
+Completed the attached THEME_APPLICATION design's presentation items 1–6 on top of
+PR #68's merged lit-window art. Added continuous night/dawn/dusk ambience and automatic
+light gating; shared roof/facade authoring; five winter roof caps; three wordless signs;
+and barrel/crate/sack storage dressing within existing footprints. Construction sites
+receive none of these details. Nearer entities occlude panes, and selection/UI retain
+their original colours. The storehouse retains the merged PR's lit doorway treatment.
+
+New `details.png` is 256×64. A comparison with `origin/main` confirms all 464 old atlas
+cell definitions are identical, with 11 new cells for 475 total. Generated sprites and
+dependent app icons were regenerated. Simulation, state logic, catalogs and saves are
+unchanged. Market art and traffic paths remain deferred to their gameplay prerequisites.
+
+Validation: `npm run art`, **425 frontend tests in 43 files**, production build and
+`git diff --check` passed. Pixel tests cover roof bounds, opaque palette art and generated
+file drift. Scene tests cover winter, construction, owner position/depth, culling,
+signs/props and bright-pane drawing order. Existing lit-window tests remain green.
+
+Installed Chromium/Playwright tested the browser-demo at 1440×1000 and 390×844 using a
+temporary in-memory fixture with all five buildings: day/dusk/night/winter, Pause,
+loaded art, page identity and absence of framework overlays or application runtime errors.
+Browser pixel checks confirmed cache reuse, original atlas by day and identical sprite
+alpha values after tinting. Temporary scripts/screenshots are under `/tmp`. Native Tauri
+rendering was not run. Earlier uncommitted work was missing after environment restart;
+this completion restores the remaining work against current main without duplicating #68.

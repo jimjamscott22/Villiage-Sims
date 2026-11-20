@@ -84,7 +84,7 @@ describe('committed art', () => {
   const pngs = readdirSync(ART_DIR).filter((name) => name.endsWith('.png'));
 
   it('ships the expected sheets', () => {
-    expect(pngs.sort()).toEqual(['entities.png', 'panel.png', 'tiles.png', 'ui.png']);
+    expect(pngs.sort()).toEqual(['details.png', 'entities.png', 'panel.png', 'tiles.png', 'ui.png']);
   });
 
   it.each(pngs)('%s uses only palette colours, at full opacity', (name) => {

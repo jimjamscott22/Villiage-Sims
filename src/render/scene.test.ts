@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Atlas, AtlasManifest } from './atlas';
 import {
   DYE_COUNT,
@@ -8,6 +8,7 @@ import {
   dyeIndex,
   facingFromDelta,
   propFrame,
+  paintScene,
   type Facing,
 } from './scene';
 import type { BuildingDef, CropDef, TickSnapshot } from '../state/types';
@@ -522,5 +523,61 @@ describe('propFrame', () => {
     for (let tick = 0; tick < 200; tick += 1) seen.add(propFrame(tick, fish, 4, false));
     expect([...seen].sort()).toEqual([0, 1, 2, 3]);
     expect(propFrame(57, fish, 4, true)).toBe(0);
+  });
+});
+
+describe('seasonal building details', () => {
+  const detailsCatalog = ['hut', 'granary', 'bakery', 'storehouse', 'mill'].map((id): BuildingDef => ({
+    id, name: id, footprint: [2, 2], cost: {}, buildTicks: 1, category: 'storage', validTerrain: ['grass'],
+  }));
+  function detailList(state = 2, season = 0, viewTiles?: { minX: number; minY: number; maxX: number; maxY: number }) {
+    const snap = snapshot({ buildings: detailsCatalog.map((_, kind) => ({
+      id: kind + 1, kind, x: 5 + kind * 4, y: 6, rot: 0, state, progress: 100,
+    })) });
+    snap.clock.season = season;
+    return buildDrawList({ snapshot: snap, catalog: { buildings: detailsCatalog, crops: [] },
+      props: [], tileSize: 32, tick: 0, reduceMotion: true, selectedBuildingId: null,
+      selectedVillagerId: null, lastFacing: new Map(), atlas: fakeAtlas(), viewTiles });
+  }
+  it('gates all five roof caps on winter and places them at the owner origin/depth', () => {
+    expect(detailList().some(e => e.key.endsWith('.snow'))).toBe(false);
+    const list = detailList(2, 3);
+    const snow = list.filter(e => e.key.endsWith('.snow'));
+    expect(snow).toHaveLength(5);
+    for (const e of snow) {
+      const base = list.find(b => b.id === `b:${e.id.split(':')[1]}`)!;
+      expect([e.x, e.y, e.baseY, e.rank]).toEqual([base.x, base.y, base.baseY, base.rank]);
+    }
+  });
+  it('attaches wordless signs and all three storage props to complete buildings', () => {
+    expect(detailList().map(e => e.key)).toEqual(expect.arrayContaining([
+      'granary.sign', 'bakery.sign', 'storehouse.sign', 'prop.barrel', 'prop.crate', 'prop.sack',
+    ]));
+  });
+  it('omits details on construction sites and offscreen buildings', () => {
+    expect(detailList(1, 3).some(e => e.id.startsWith('bmeta:'))).toBe(false);
+    expect(detailList(2, 3, { minX: 0, minY: 0, maxX: 1, maxY: 1 })).toEqual([]);
+  });
+});
+
+
+describe('ambience painting order', () => {
+  it('uses tinted world art, bright panes, then tinted foreground entities and readable UI', () => {
+    const atlas = fakeAtlas(), world = fakeAtlas();
+    for (const sheet of ['entities', 'details', 'ui']) {
+      atlas.images[sheet] = { tag: `original:${sheet}` } as unknown as HTMLImageElement;
+      world.images[sheet] = { tag: `tinted:${sheet}` } as unknown as HTMLImageElement;
+    }
+    const drawImage = vi.fn();
+    const ctx = { drawImage } as unknown as CanvasRenderingContext2D;
+    const entry = { rank: 1, baseY: 100, id: 'test', frame: 0, x: 0, y: 0 };
+    paintScene(ctx, atlas, [
+      { ...entry, key: 'hut' }, { ...entry, key: 'hut.lit' },
+      { ...entry, key: 'villager.s.idle.0', baseY: 101 },
+      { ...entry, key: 'bubble.tool', rank: 2 },
+    ], world);
+    expect(drawImage.mock.calls.map(call => call[0].tag)).toEqual([
+      'tinted:entities', 'original:entities', 'tinted:entities', 'original:entities',
+    ]);
   });
 });

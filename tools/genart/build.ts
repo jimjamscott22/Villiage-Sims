@@ -3,6 +3,7 @@ import { rasterizeGrid, remapColor } from './grid';
 import type { PackItem } from './pack';
 import { pack, packAppend } from './pack';
 import { Raster } from './raster';
+import { BUILDING_DETAILS } from './sprites/buildingDetails';
 import { BUILDING_SPRITES } from './sprites/buildings';
 import { CHICKEN_SPRITES } from './sprites/chickens';
 import { CROP_SPRITES } from './sprites/crops';
@@ -187,19 +188,22 @@ export function buildAtlas(): BuiltAtlas {
   const tiles = packSheet('tiles', terrainSources());
   const entities = packSheet('entities', entitySources());
   const ui = packSheet('ui', uiSources());
+  // Separate sheet preserves all previously published atlas coordinates.
+  const details = packSheet('details', Object.entries(BUILDING_DETAILS).map(([key, entry]) => fromSprite(key, entry)));
 
   const merged: Record<string, AtlasCellDef> = {
     ...tiles.cells,
     ...entities.cells,
     ...ui.cells,
+    ...details.cells,
   };
   const sortedCells: Record<string, AtlasCellDef> = {};
   for (const key of Object.keys(merged).sort()) sortedCells[key] = merged[key];
 
   return {
-    sheets: [tiles.sheet, entities.sheet, ui.sheet],
+    sheets: [tiles.sheet, entities.sheet, ui.sheet, details.sheet],
     manifest: {
-      sheets: { tiles: 'tiles.png', entities: 'entities.png', ui: 'ui.png' },
+      sheets: { tiles: 'tiles.png', entities: 'entities.png', ui: 'ui.png', details: 'details.png' },
       cells: sortedCells,
     },
   };
